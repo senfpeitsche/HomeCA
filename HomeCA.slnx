@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HomeCA.Service/HomeCA.Service.csproj" />
+  </Folder>
+</Solution>

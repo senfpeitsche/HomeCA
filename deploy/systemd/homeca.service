@@ -1,0 +1,26 @@
+[Unit]
+Description=HomeCA private certificate authority
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=homeca
+Group=homeca
+WorkingDirectory=/opt/homeca
+ExecStart=/usr/bin/dotnet /opt/homeca/HomeCA.Service.dll
+Restart=on-failure
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+Environment=Storage__RootPath=/var/lib/homeca
+Environment=Storage__BackupPath=/var/backups/homeca
+Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/homeca /var/backups/homeca
+
+[Install]
+WantedBy=multi-user.target

@@ -2,13 +2,13 @@
 
 ## 1. Fundament
 
-- [ ] Lokalen LXC-tauglichen Dienst, Dateilayout, lokalen Zustand und Backup-Format entwerfen.
-- [ ] Lokale Administrator-Anmeldung, Sitzungen, Audit und optionalen Schlüsselumschlag definieren.
-- [ ] Root-, Intermediate- und getrennte SSH-CA-Lebenszyklen implementieren.
+- [x] ASP.NET-Core-Dienst auf .NET 10 für Debian-LXC einschließlich systemd-Deployment, Dateilayout, lokalem Zustand und Backup-Format entwerfen.
+- [x] Lokale Administrator-Anmeldung, Sitzungen, Audit und optionalen Schlüsselumschlag definieren.
+- [x] Root-, Intermediate- und getrennte SSH-CA-Lebenszyklen implementieren.
 
 ## 2. Zertifikate und ACME
 
-- [ ] TLS-, mTLS- und SSH-Ausstellung inklusive SANs, IP-SANs, Laufzeitpolitik, CRL und Exporten realisieren.
+- [x] TLS-, mTLS- und SSH-Ausstellung inklusive SANs, IP-SANs, Laufzeitpolitik, CRL und Exporten realisieren.
 - [ ] Internes ACME mit zonenbasierter Berechtigung und externes ACME als verwalteten Issuer umsetzen.
 
 ## 3. Integrationen und Profile

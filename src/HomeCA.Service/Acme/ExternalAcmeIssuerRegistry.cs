@@ -1,0 +1,5 @@
+using System.Text.Json;
+using HomeCA.Service.Infrastructure;
+namespace HomeCA.Service.Acme;
+public sealed class ExternalAcmeIssuerRegistry(HomeCaStorage storage) { private readonly string _path=Path.Combine(storage.RootPath,"state","external-acme-issuers.json"); public async Task<ExternalAcmeIssuer> AddAsync(CreateExternalAcmeIssuerRequest r,CancellationToken ct) { if(!Uri.TryCreate(r.DirectoryUrl,UriKind.Absolute,out _)) throw new ArgumentException("Valid directory URL required."); var x=File.Exists(_path)?await JsonSerializer.DeserializeAsync<List<ExternalAcmeIssuer>>(File.OpenRead(_path),cancellationToken:ct)??[]:[]; var i=new ExternalAcmeIssuer(Guid.NewGuid().ToString("N"),r.Name,r.DirectoryUrl,r.ConnectorType); x.Add(i); await using var f=File.Create(_path); await JsonSerializer.SerializeAsync(f,x,cancellationToken:ct); return i; } }
+public sealed record CreateExternalAcmeIssuerRequest(string Name,string DirectoryUrl,string ConnectorType); public sealed record ExternalAcmeIssuer(string Id,string Name,string DirectoryUrl,string ConnectorType);

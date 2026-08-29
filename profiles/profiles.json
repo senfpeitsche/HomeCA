@@ -1,0 +1,4 @@
+[
+  { "id": "generic-tls", "version": "1.0", "displayName": "Generisches TLS", "keyAlgorithm": "ECC", "exportFormats": ["PEM", "PFX"], "documentation": "Install certificate.pem and chain.pem, then restart the service.", "renewalScriptTemplate": "# Replace the certificate files and restart the target service." },
+  { "id": "iis", "version": "1.0", "displayName": "Windows IIS", "keyAlgorithm": "RSA", "exportFormats": ["PFX"], "documentation": "Import the PFX into the Local Machine certificate store and bind it in IIS.", "renewalScriptTemplate": "Import-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\\LocalMachine\\My" }
+]

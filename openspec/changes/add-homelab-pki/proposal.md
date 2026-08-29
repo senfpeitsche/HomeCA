@@ -6,13 +6,13 @@ Homelab-Dienste und -Geräte verwenden heute zahlreiche unterschiedliche Zertifi
 
 ## Was ändert sich
 
-- Eine lokale Webverwaltung für Root-, Intermediate-, TLS-, mTLS- und SSH-CAs.
+- Eine lokale Webverwaltung auf ASP.NET Core (.NET 10) für Root-, Intermediate-, TLS-, mTLS- und SSH-CAs, betrieben in einem Debian-basierten Proxmox-LXC.
 - Ausstellen, erneuern, exportieren und widerrufen von Zertifikaten mit DNS- und IP-SANs sowie Laufzeiten bis zwei Jahre.
 - Ein internes ACME-Verzeichnis für alle Namen unter konfigurierten internen Ausstellungszonen.
 - Verwaltung externer ACME-Zertifikate über DNS-01.
 - Konfigurierbare Technitium- und Hetzner-DNS-Integrationen; keine Instanzdetails wie `zikke.org` werden fest eingebaut.
 - Deklarative Zielsystem-Profile mit Formaten, Validierung, Dokumentation und wiederholbaren Einspielskripten.
-- Dateibasierter Bestand für langlebige Artefakte sowie ein lokaler eingebetteter Zustandsspeicher; keine externe Datenbank.
+- Dateibasierter Bestand für langlebige Artefakte sowie ein lokaler eingebetteter Zustandsspeicher; keine externe Datenbank. Betrieb und Konfiguration erfolgen als systemd-Dienst im Debian-LXC.
 
 ## Nicht im ersten Umfang
 

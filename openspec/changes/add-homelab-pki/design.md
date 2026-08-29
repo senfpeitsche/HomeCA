@@ -3,12 +3,12 @@
 ## Architektur
 
 ```text
-Browser UI -> HomeCA API/Kern -> CA- und ACME-Dienste
+Browser UI -> ASP.NET Core API/Kern (.NET 10) -> CA- und ACME-Dienste
                                 -> Dateiartefakte + lokaler Zustand
                                 -> Profile und DNS-Connectoren
 ```
 
-Die React/TypeScript-Oberfläche wird als statisches Asset mit dem Dienst ausgeliefert. Sie spricht eine dokumentierte API; im LXC ist kein Node-Entwicklungsserver und keine separate Datenbank nötig.
+Der Dienst basiert auf ASP.NET Core unter .NET 10 und wird als systemd-Dienst in einem Debian-basierten Proxmox-LXC betrieben. Die React/TypeScript-Oberfläche wird als statisches Asset mit dem Dienst ausgeliefert. Sie spricht eine dokumentierte API; im LXC ist kein Node-Entwicklungsserver und keine separate Datenbank nötig.
 
 ## Vertrauensmodell
 
@@ -25,7 +25,7 @@ Die Instanz besitzt konfigurierbare Domains. Für internes ACME darf jedes regis
 
 ## Daten und Schlüssel
 
-CA-Objekte, Zertifikate, Exportpakete, Profil-Snapshots, CRLs und Audit-Ereignisse liegen in einer nachvollziehbaren Verzeichnisstruktur. Transaktionaler Zustand für Seriennummern, ACME-Konten, Orders und Nonces wird lokal eingebettet gespeichert. Die CA-Schlüssel können unverschlüsselt, mit einem LXC-Secret umschlossen oder nach Neustart passwortgeschützt betrieben werden. Backups werden immer separat symmetrisch verschlüsselt.
+CA-Objekte, Zertifikate, Exportpakete, Profil-Snapshots, CRLs und Audit-Ereignisse liegen in einer nachvollziehbaren Verzeichnisstruktur. Transaktionaler Zustand für Seriennummern, ACME-Konten, Orders und Nonces wird lokal eingebettet gespeichert. Daten- und Secret-Verzeichnisse sind über die systemd-Konfiguration des Debian-LXC explizit konfigurierbar. Die CA-Schlüssel können unverschlüsselt, mit einem LXC-Secret umschlossen oder nach Neustart passwortgeschützt betrieben werden. Backups werden immer separat symmetrisch verschlüsselt.
 
 ## Erweiterungen
 
