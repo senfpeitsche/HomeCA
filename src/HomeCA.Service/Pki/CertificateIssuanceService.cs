@@ -1,23 +1,38 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using HomeCA.Service.Infrastructure;
+using HomeCA.Service.Deployments;
 
 namespace HomeCA.Service.Pki;
 
-public sealed class CertificateIssuanceService(HomeCaStorage storage)
+public sealed class CertificateIssuanceService(HomeCaStorage storage, DeploymentPackageService deployments, CertificateAuthorityService authorities)
 {
-    private readonly string _issuingCaPath = Path.Combine(storage.RootPath, "authorities", "tls-issuing", "tls-issuing-ca.pfx");
-    private readonly string _rootCaPath = Path.Combine(storage.RootPath, "authorities", "root", "root-ca.pfx");
     private readonly string _certificateRoot = Path.Combine(storage.RootPath, "certificates");
     private readonly string _exportRoot = Path.Combine(storage.RootPath, "exports");
 
-    public Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<CertificateInventoryItem>> ListAsync(CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(_certificateRoot)) return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>([]);
+        var items = Directory.EnumerateDirectories(_certificateRoot)
+            .Select(directory => new { Id = Path.GetFileName(directory), Path = Path.Combine(directory, "certificate.pfx") })
+            .Where(item => File.Exists(item.Path))
+            .Select(item =>
+            {
+                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(item.Path, null);
+                return new CertificateInventoryItem(item.Id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, item.Id));
+            })
+            .OrderBy(item => item.ExpiresAt)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>(items);
+    }
+
+    public async Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken)
     {
         if (request.DnsNames.Count == 0 && request.IpAddresses.Count == 0) throw new ArgumentException("At least one DNS or IP SAN is required.");
         if (request.ValidityDays is < 1 or > 730) throw new ArgumentOutOfRangeException(nameof(request.ValidityDays), "Validity must be between 1 and 730 days.");
-        if (!File.Exists(_issuingCaPath)) throw new InvalidOperationException("Initialize certificate authorities before issuing certificates.");
+        var authorityPaths = await authorities.GetDefaultIssuingAsync(cancellationToken);
 
-        using var issuer = X509CertificateLoader.LoadPkcs12FromFile(_issuingCaPath, null);
+        using var issuer = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.IssuingPath, null);
         using var ecc = request.KeyAlgorithm == "RSA" ? null : ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var rsa = request.KeyAlgorithm == "RSA" ? RSA.Create(request.RsaKeySize is 2048 or 3072 ? request.RsaKeySize : 2048) : null;
         var subject = request.DnsNames.FirstOrDefault() ?? request.IpAddresses.First();
@@ -47,11 +62,13 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage)
         Directory.CreateDirectory(exportPath);
         File.WriteAllBytes(Path.Combine(certificatePath, "certificate.pfx"), certificate.Export(X509ContentType.Pkcs12));
         File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certificate.ExportCertificatePem());
-        using var root = X509CertificateLoader.LoadPkcs12FromFile(_rootCaPath, null);
+        using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
         File.WriteAllText(Path.Combine(exportPath, "chain.pem"), issuer.ExportCertificatePem() + root.ExportCertificatePem());
-        return Task.FromResult(new IssueResult(id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath));
+        await deployments.CreateAsync(exportPath, id, request.TargetProfileId, cancellationToken);
+        return new IssueResult(id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath);
     }
 }
 
-public sealed record IssueCertificateRequest(string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, int ValidityDays = 365, string KeyAlgorithm = "ECC", int RsaKeySize = 2048);
+public sealed record IssueCertificateRequest(string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, int ValidityDays = 365, string KeyAlgorithm = "ECC", int RsaKeySize = 2048, string? TargetProfileId = null);
 public sealed record IssueResult(string Id, string Subject, DateTime ExpiresAt, string Usage, string KeyAlgorithm, string ExportPath);
+public sealed record CertificateInventoryItem(string Id, string Subject, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, string ExportPath);

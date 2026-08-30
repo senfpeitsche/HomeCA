@@ -14,4 +14,5 @@ public sealed record ConnectorCheckResult(bool Connected, IReadOnlyList<string> 
 public sealed class ConnectorCatalog(IEnumerable<IDnsConnector> connectors)
 {
     public IReadOnlyList<string> Types => connectors.Select(connector => connector.Type).Order().ToList();
+    public IDnsConnector? Find(string type) => connectors.FirstOrDefault(connector => connector.Type.Equals(type, StringComparison.OrdinalIgnoreCase));
 }

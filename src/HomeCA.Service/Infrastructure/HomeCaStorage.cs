@@ -69,6 +69,23 @@ public sealed class HomeCaStorage
         }
     }
 
+    public async Task<BackupVerificationResult> VerifyBackupAsync(string fileName, CancellationToken cancellationToken)
+    {
+        var safeName = Path.GetFileName(fileName);
+        if (!string.Equals(safeName, fileName, StringComparison.Ordinal) || !safeName.EndsWith(".hcab", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Invalid backup file name.");
+        var path = Path.Combine(_options.BackupPath, safeName);
+        if (!File.Exists(path)) throw new FileNotFoundException("Backup was not found.", safeName);
+        var key = await File.ReadAllBytesAsync(_options.BackupKeyPath, cancellationToken);
+        var payload = await File.ReadAllBytesAsync(path, cancellationToken);
+        if (key.Length != 32 || payload.Length < BackupMagic.Length + 28 || !payload.AsSpan(0, BackupMagic.Length).SequenceEqual(BackupMagic)) throw new InvalidDataException("Backup header or key is invalid.");
+        var nonce = payload.AsSpan(BackupMagic.Length, 12); var tag = payload.AsSpan(BackupMagic.Length + 12, 16); var encrypted = payload.AsSpan(BackupMagic.Length + 28);
+        var plaintext = new byte[encrypted.Length];
+        using (var cipher = new AesGcm(key, tag.Length)) cipher.Decrypt(nonce, encrypted, tag, plaintext, BackupMagic);
+        var temporaryPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.zip");
+        try { await File.WriteAllBytesAsync(temporaryPath, plaintext, cancellationToken); using var archive = ZipFile.OpenRead(temporaryPath); return new BackupVerificationResult(safeName, true, archive.Entries.Count); }
+        finally { File.Delete(temporaryPath); }
+    }
+
     private void EnsureLayout()
     {
         Directory.CreateDirectory(_options.RootPath);
@@ -86,3 +103,4 @@ public sealed class HomeCaStorage
 }
 
 public sealed record BackupDescriptor(string FileName, string Path, DateTimeOffset CreatedAt);
+public sealed record BackupVerificationResult(string FileName, bool IsValid, int EntryCount);

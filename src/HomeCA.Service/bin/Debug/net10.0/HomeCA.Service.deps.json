@@ -1,0 +1,91 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "HomeCA.Service/1.0.0": {
+        "dependencies": {
+          "Certes": "3.0.4",
+          "MudBlazor": "8.12.0"
+        },
+        "runtime": {
+          "HomeCA.Service.dll": {}
+        }
+      },
+      "Certes/3.0.4": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.2",
+          "Portable.BouncyCastle": "1.9.0"
+        },
+        "runtime": {
+          "lib/net6.0/Certes.dll": {
+            "assemblyVersion": "3.0.4.0",
+            "fileVersion": "3.0.4.60000"
+          }
+        }
+      },
+      "MudBlazor/8.12.0": {
+        "runtime": {
+          "lib/net9.0/MudBlazor.dll": {
+            "assemblyVersion": "8.12.0.0",
+            "fileVersion": "8.12.0.0"
+          }
+        }
+      },
+      "Newtonsoft.Json/13.0.2": {
+        "runtime": {
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.2.27524"
+          }
+        }
+      },
+      "Portable.BouncyCastle/1.9.0": {
+        "runtime": {
+          "lib/netstandard2.0/BouncyCastle.Crypto.dll": {
+            "assemblyVersion": "1.9.0.0",
+            "fileVersion": "1.9.0.1"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "HomeCA.Service/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Certes/3.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-dWst/ss3+b9HjkwP3V7zxUngL8puQwrjce22w4xdZoGMovYi8NFF7xSE5A4A2zqR+M5n70Z5d2RDJR73iNggsA==",
+      "path": "certes/3.0.4",
+      "hashPath": "certes.3.0.4.nupkg.sha512"
+    },
+    "MudBlazor/8.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ZwgHPt2DwiQoFeP8jxPzNEsUmJF17ljtospVH+uMUKUKpklz6jEkdE5vNs7PnHaPH9HEbpFEQgJw8QPlnFZjsQ==",
+      "path": "mudblazor/8.12.0",
+      "hashPath": "mudblazor.8.12.0.nupkg.sha512"
+    },
+    "Newtonsoft.Json/13.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-R2pZ3B0UjeyHShm9vG+Tu0EBb2lC8b0dFzV9gVn50ofHXh9Smjk6kTn7A/FdAsC8B5cKib1OnGYOXxRBz5XQDg==",
+      "path": "newtonsoft.json/13.0.2",
+      "hashPath": "newtonsoft.json.13.0.2.nupkg.sha512"
+    },
+    "Portable.BouncyCastle/1.9.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-eZZBCABzVOek+id9Xy04HhmgykF0wZg9wpByzrWN7q8qEI0Qen9b7tfd7w8VA3dOeesumMG7C5ZPy0jk7PSRHw==",
+      "path": "portable.bouncycastle/1.9.0",
+      "hashPath": "portable.bouncycastle.1.9.0.nupkg.sha512"
+    }
+  }
+}
