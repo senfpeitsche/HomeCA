@@ -1,0 +1,28 @@
+/* Custom styles for Markdown preview – fix unreadable code blocks */
+
+/* Inline code */
+code {
+  color: #d4d4d4;
+  background-color: #1e1e1e;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Fenced code blocks */
+pre {
+  background-color: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+
+pre code {
+  color: #d4d4d4;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.9em;
+  line-height: 1.5;
+}

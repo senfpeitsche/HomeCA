@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HomeCA.Service")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.3.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.3+5023aea5567361788e152aa64a956a16ee2021cf")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.3+fdf47deb2405bf1ecceda90ba19fc6789838f49b")]
 [assembly: System.Reflection.AssemblyProductAttribute("HomeCA.Service")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HomeCA.Service")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.2.3.0")]

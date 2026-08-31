@@ -152,6 +152,7 @@ fi
 # ── Update sudoers drop-in for web-triggered TLS activation ─────────
 msg_info "Refreshing sudoers drop-in …"
 if gh_raw "deploy/sudoers/homeca-tls" /tmp/homeca-tls.sudoers 2>/dev/null; then
+  mkdir -p /etc/sudoers.d
   install -m 0440 /tmp/homeca-tls.sudoers /etc/sudoers.d/homeca-tls
   rm -f /tmp/homeca-tls.sudoers
   msg_ok "sudoers drop-in updated"

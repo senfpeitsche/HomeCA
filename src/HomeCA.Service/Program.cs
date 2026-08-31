@@ -295,45 +295,30 @@ api.MapPost("/system/activate-tls", async (SetupStateService setupState, HomeCaS
     if (!File.Exists(tlsConfig.PfxPath))
         return Results.Conflict(new { detail = $"Zertifikatsdatei nicht gefunden: {tlsConfig.PfxPath}" });
 
-    // Write the systemd override that switches Kestrel to HTTPS
+    // Write the systemd override that switches Kestrel to HTTPS.
+    // The service runs under ProtectSystem=strict, so /etc/systemd/system
+    // is always read-only — we must use sudo for all writes there.
     const string overrideDir = "/etc/systemd/system/homeca.service.d";
     const string overridePath = "/etc/systemd/system/homeca.service.d/tls.conf";
-    try
-    {
-        Directory.CreateDirectory(overrideDir);
-        var overrideContent = $"""
-            [Service]
-            Environment=ASPNETCORE_URLS={tlsConfig.HttpsUrl}
-            Environment=ASPNETCORE_Kestrel__Certificates__Default__Path={tlsConfig.PfxPath}
-            Environment=Storage__PublicUrl={tlsConfig.PublicUrl}
-            """;
-        // Normalize indentation — heredoc-style content must not have leading spaces
-        overrideContent = string.Join('\n', overrideContent.Split('\n').Select(l => l.TrimStart()));
-        await File.WriteAllTextAsync(overridePath, overrideContent, ct);
-        logger.LogInformation("Wrote systemd TLS override to {Path}", overridePath);
-    }
-    catch (UnauthorizedAccessException)
-    {
-        // The homeca user cannot write to /etc/systemd/system directly — use sudo helper
-        logger.LogWarning("Direct write to {Path} failed, attempting via sudo", overridePath);
-        var mkdirResult = RunProcess("sudo", $"mkdir -p {overrideDir}");
-        if (!mkdirResult.Success)
-            return Results.Problem($"Systemd-Override-Verzeichnis konnte nicht erstellt werden: {mkdirResult.Error}");
 
-        var overrideLines = new[]
-        {
-            "[Service]",
-            $"Environment=ASPNETCORE_URLS={tlsConfig.HttpsUrl}",
-            $"Environment=ASPNETCORE_Kestrel__Certificates__Default__Path={tlsConfig.PfxPath}",
-            $"Environment=Storage__PublicUrl={tlsConfig.PublicUrl}",
-            ""
-        };
-        var overrideContent = string.Join('\n', overrideLines);
-        // Write via sudo tee
-        var teeResult = RunProcess("sudo", $"tee {overridePath}", overrideContent);
-        if (!teeResult.Success)
-            return Results.Problem($"Systemd-Override konnte nicht geschrieben werden: {teeResult.Error}");
-    }
+    var mkdirResult = RunProcess("sudo", $"mkdir -p {overrideDir}");
+    if (!mkdirResult.Success)
+        return Results.Problem($"Systemd-Override-Verzeichnis konnte nicht erstellt werden: {mkdirResult.Error}");
+
+    var overrideLines = new[]
+    {
+        "[Service]",
+        $"Environment=ASPNETCORE_URLS={tlsConfig.HttpsUrl}",
+        $"Environment=ASPNETCORE_Kestrel__Certificates__Default__Path={tlsConfig.PfxPath}",
+        $"Environment=Storage__PublicUrl={tlsConfig.PublicUrl}",
+        ""
+    };
+    var overrideContent = string.Join('\n', overrideLines);
+    var teeResult = RunProcess("sudo", $"tee {overridePath}", overrideContent);
+    if (!teeResult.Success)
+        return Results.Problem($"Systemd-Override konnte nicht geschrieben werden: {teeResult.Error}");
+
+    logger.LogInformation("Wrote systemd TLS override to {Path} via sudo", overridePath);
 
     // Reload systemd to pick up the override, then restart the service
     var reload = RunProcess("sudo", "systemctl daemon-reload");

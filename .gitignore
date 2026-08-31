@@ -1,0 +1,4 @@
+src/HomeCA.Service/bin/*
+src/HomeCA.Service/obj/*
+tests/HomeCA.Tests/bin/*
+tests/HomeCA.Tests/obj/*

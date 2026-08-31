@@ -123,6 +123,7 @@ msg_ok "TLS helper installed"
 
 # ── sudoers for web-triggered TLS activation ────────────────────────
 msg_info "Installing sudoers drop-in for TLS activation …"
+mkdir -p /etc/sudoers.d
 cat > /etc/sudoers.d/homeca-tls << 'SUDOERS'
 # Allow the homeca service user to activate TLS from the web UI.
 homeca ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl restart homeca, /usr/bin/mkdir -p /etc/systemd/system/homeca.service.d, /usr/bin/tee /etc/systemd/system/homeca.service.d/tls.conf

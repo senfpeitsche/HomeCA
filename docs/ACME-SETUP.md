@@ -21,6 +21,68 @@ Das Token ist 12 Stunden gültig.
 
 ---
 
+## Benutzerdefinierte CA-URL (Directory-URL)
+
+Viele ACME-Clients (z. B. Certbot, acme.sh, Caddy, Traefik, win-acme) erlauben die Angabe einer benutzerdefinierten CA-URL anstelle von Let's Encrypt. Die URL setzt sich aus der öffentlichen Adresse der HomeCA-Instanz und dem Directory-Pfad zusammen.
+
+### Interner ACME-Server
+
+Die Directory-URL für den internen ACME-Server lautet:
+
+```
+http://<hostname>:<port>/api/v1/acme/directory
+```
+
+**Beispiele** (je nach Setup-Konfiguration):
+
+| Szenario | Directory-URL |
+| --- | --- |
+| HTTP, Standardport | `http://homeca.lab.example.com:5080/api/v1/acme/directory` |
+| HTTPS nach TLS-Aktivierung | `https://homeca.lab.example.com:5443/api/v1/acme/directory` |
+| Hinter Reverse-Proxy (Port 443) | `https://homeca.lab.example.com/api/v1/acme/directory` |
+
+Hostname und Port entsprechen der `PublicUrl`, die beim Setup über `POST /api/v1/setup/configure-instance` festgelegt wurde. Die aktuell konfigurierte Basis-URL lässt sich über `GET /api/v1/storage/info` im Feld `publicUrl` ablesen.
+
+### Konfigurationsbeispiele für gängige ACME-Clients
+
+**Certbot:**
+
+```bash
+certbot certonly --server http://homeca.lab.example.com:5080/api/v1/acme/directory \
+  --manual --preferred-challenges dns \
+  -d node1.lab.example.com
+```
+
+**acme.sh:**
+
+```bash
+acme.sh --issue --server http://homeca.lab.example.com:5080/api/v1/acme/directory \
+  -d node1.lab.example.com --dns dns_manual
+```
+
+**win-acme:**
+
+```powershell
+wacs.exe --baseuri http://homeca.lab.example.com:5080/api/v1/acme/directory
+```
+
+> **Hinweis:** Da der interne ACME-Server keine Challenge-Validierung durchführt (alle Clients gelten als vertrauenswürdig), muss der Client keine DNS- oder HTTP-Challenge lösen. Einige Clients erfordern trotzdem die Angabe eines Challenge-Typs — die Wahl ist in diesem Fall irrelevant.
+
+### Externer ACME-Aussteller
+
+Für externe Aussteller wird die Directory-URL beim Registrieren des Issuers über `directoryUrl` angegeben. Dies ist die URL der öffentlichen CA, nicht von HomeCA selbst. Gängige Werte:
+
+| CA | Directory-URL |
+| --- | --- |
+| Let's Encrypt (Produktion) | `https://acme-v2.api.letsencrypt.org/directory` |
+| Let's Encrypt (Staging) | `https://acme-staging-v02.api.letsencrypt.org/directory` |
+| ZeroSSL | `https://acme.zerossl.com/v2/DV90` |
+| Google Trust Services | `https://dv.acme-v02.api.pki.goog/directory` |
+| Buypass (Produktion) | `https://api.buypass.com/acme/directory` |
+| Buypass (Staging) | `https://api.test4.buypass.no/acme/directory` |
+
+---
+
 ## 1. Interner ACME-Server
 
 Der interne ACME-Server stellt Zertifikate für DNS-Namen aus, die unter einer aktivierten internen Ausstellungszone liegen. Orders gehen direkt in den Status `ready`, da alle Clients als vertrauenswürdig gelten; eine Challenge-Validierung findet nicht statt.
