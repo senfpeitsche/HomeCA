@@ -345,53 +345,165 @@
     // ── ACME ─────────────────────────────────────────────────────────────────
     private RenderFragment AcmeHelp => @<div class="help-content">
         <MudText Typo="Typo.h4" Class="mt-2 mb-3">ACME-Einrichtung</MudText>
-        <MudText Class="mud-text-secondary mb-4">HomeCA bietet zwei ACME-Betriebsarten: einen internen ACME-Server, der Zertifikate über die eigene TLS Issuing CA ausstellt, und eine verwaltete Registrierung für externe ACME-Aussteller (z. B. Let's Encrypt) mit DNS-01-Challenges.</MudText>
+        <MudText Class="mud-text-secondary mb-4">HomeCA stellt einen RFC 8555-kompatiblen ACME-Server bereit, der mit Standard-Clients wie OPNsense, acme.sh, Certbot, Caddy und Traefik funktioniert. Challenges werden automatisch bestätigt — kein DNS- oder HTTP-01-Setup nötig.</MudText>
 
-        <MudText Typo="Typo.h5" Class="mt-4 mb-2">1. Interner ACME-Server</MudText>
-        <MudText>Der interne ACME-Server stellt Zertifikate für DNS-Namen aus, die unter einer aktivierten internen Ausstellungszone liegen. Orders gehen direkt in den Status <code>ready</code>, da alle Clients als vertrauenswürdig gelten.</MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            <strong>Directory-URL für alle ACME-Clients:</strong> <code>http://HOMECA:5080/acme/directory</code><br />
+            Ersetze <code>HOMECA</code> durch den Hostnamen oder die IP-Adresse deiner HomeCA-Instanz. Bei aktiviertem TLS: <code>https://HOMECA:5443/acme/directory</code>
+        </MudAlert>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.1 Ausstellungszone anlegen</MudText>
-        <MudText>Lege unter <strong>Einstellungen</strong> eine Domain mit aktivierter interner Ausstellung an. Der ACME-Server stellt Zertifikate für alle Namen aus, die exakt der Zone entsprechen oder eine Subdomain davon sind.</MudText>
-        <MudTextField Value="@_acmeZone" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/domains" />
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">Voraussetzungen</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Check">Root- und Issuing-CA sind initialisiert.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Mindestens eine Ausstellungszone ist unter <strong>Einstellungen > Domains</strong> mit <code>Interne Ausstellung: Aktiv</code> angelegt (z. B. <code>lab.example.com</code>).</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Das HomeCA Root-CA-Zertifikat ist auf den Clients importiert — siehe Tab „Vertrauensstellung".</MudListItem>
+        </MudList>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.2 Directory abrufen</MudText>
-        <MudText>Der Directory-Endpunkt ist ohne Authentifizierung erreichbar:</MudText>
-        <MudTextField Value="@_acmeDirectory" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" />
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">1. OPNsense einrichten</MudText>
+        <MudText Class="mud-text-secondary mb-3">OPNsense nutzt intern <code>acme.sh</code> über das Plugin <code>os-acme-client</code>. Die folgenden Schritte richten die automatische Zertifikatsausstellung über HomeCA ein.</MudText>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.3 ACME-Account registrieren</MudText>
-        <MudTextField Value="@_acmeAccount" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/accounts" />
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.1 Plugin installieren</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.LooksOne"><strong>System > Firmware > Plugins</strong> — <code>os-acme-client</code> suchen und installieren.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.LooksTwo">Seite neu laden, damit der Menüpunkt erscheint.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Looks3"><strong>Services > ACME Client > Settings</strong> — <strong>Enable Plugin</strong> aktivieren und speichern. <strong>Auto Renewal</strong> ebenfalls aktiviert lassen.</MudListItem>
+        </MudList>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.4 Order erstellen</MudText>
-        <MudTextField Value="@_acmeOrder" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/orders" />
-
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.5 Order finalisieren</MudText>
-        <MudTextField Value="@_acmeFinalize" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/orders/{id}/finalize" />
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.2 ACME-Konto registrieren</MudText>
+        <MudText>Unter <strong>Services > ACME Client > Accounts</strong> auf <strong>+ Add</strong> klicken:</MudText>
         <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
-            <thead><tr><th>Parameter</th><th>Standard</th><th>Erklärung</th></tr></thead>
+            <thead><tr><th>Feld</th><th>Wert</th></tr></thead>
             <tbody>
-                <tr><td><code>validityDays</code></td><td>365</td><td>1 bis 730 Tage</td></tr>
-                <tr><td><code>keyAlgorithm</code></td><td><code>ECC</code></td><td><code>ECC</code> (P-256) oder <code>RSA</code></td></tr>
-                <tr><td><code>rsaKeySize</code></td><td>2048</td><td>Nur bei RSA: 2048 oder 3072</td></tr>
+                <tr><td>Enabled</td><td>angehakt</td></tr>
+                <tr><td>Name</td><td>Frei wählbar, z. B. <code>HomeCA</code></td></tr>
+                <tr><td>E-Mail Address</td><td>Kontaktadresse, z. B. <code>admin@@lab.example.com</code></td></tr>
+                <tr><td>ACME CA</td><td><strong>Custom CA URL</strong></td></tr>
+                <tr><td>Custom CA URL</td><td><code>http://HOMECA:5080/acme/directory</code></td></tr>
+            </tbody>
+        </MudSimpleTable>
+        <MudText><strong>Key Identifier</strong> und <strong>HMAC Key</strong> leer lassen — HomeCA braucht kein EAB.</MudText>
+        <MudText Class="mt-2">Speichern, dann die <strong>Register</strong>-Aktion (Kreispfeil-Symbol) in der Kontoliste ausführen.</MudText>
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">Die URL muss auf <code>/acme/directory</code> enden — nicht <code>/api/v1/acme/directory</code> (das ist die vereinfachte API, die acme.sh nicht versteht).</MudAlert>
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.3 Challenge-Typ einrichten</MudText>
+        <MudText>Unter <strong>Services > ACME Client > Challenge Types</strong> auf <strong>+ Add</strong> klicken:</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Feld</th><th>Wert</th></tr></thead>
+            <tbody>
+                <tr><td>Name</td><td>z. B. <code>HomeCA Internal</code></td></tr>
+                <tr><td>Challenge Type</td><td><strong>HTTP-01</strong></td></tr>
+                <tr><td>HTTP Service</td><td><strong>OPNsense Web Service (automatic port forward)</strong></td></tr>
+            </tbody>
+        </MudSimpleTable>
+        <MudText Class="mud-text-secondary">HomeCA bestätigt Challenges automatisch — der Typ muss nur konfiguriert sein, weil das Plugin ihn erfordert. HTTP-01 ist die einfachste Wahl.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.4 Automation anlegen (empfohlen)</MudText>
+        <MudText>Unter <strong>Services > ACME Client > Automations</strong> auf <strong>+ Add</strong> klicken und z. B. <strong>Restart OPNsense Web UI</strong> wählen. Ohne Automation serviert die Weboberfläche nach einer Erneuerung weiter das alte Zertifikat.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.5 Zertifikat erstellen und ausstellen</MudText>
+        <MudText>Unter <strong>Services > ACME Client > Certificates</strong> auf <strong>+ Add</strong> klicken:</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Feld</th><th>Wert</th></tr></thead>
+            <tbody>
+                <tr><td>Common Name</td><td>FQDN des Geräts, z. B. <code>gw.lab.example.com</code></td></tr>
+                <tr><td>Alt Names</td><td>Weitere Hostnamen (optional)</td></tr>
+                <tr><td>ACME Account</td><td>Das in 1.2 angelegte Konto</td></tr>
+                <tr><td>Challenge Type</td><td>Der in 1.3 angelegte Typ</td></tr>
+                <tr><td>Auto Renewal</td><td>angehakt</td></tr>
+                <tr><td>Key Length</td><td><code>ec-256</code> (empfohlen) oder <code>4096</code></td></tr>
+                <tr><td>Automations</td><td>Die in 1.4 angelegte Automation</td></tr>
+            </tbody>
+        </MudSimpleTable>
+        <MudText>Speichern, dann die <strong>Issue</strong>-Aktion (Abspielen-Symbol) ausführen.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.6 Zertifikat zuweisen</MudText>
+        <MudText>Unter <strong>System > Settings > Administration</strong> — HTTPS aktivieren und das neue Zertifikat im Dropdown <strong>SSL Certificate</strong> auswählen.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.7 Root-CA importieren</MudText>
+        <MudText>Unter <strong>System > Trust > Authorities > + Add</strong> — Method: <strong>Import an existing Certificate Authority</strong> — das HomeCA Root-CA-PEM einfügen. Download: <code>GET /api/v1/trust-anchor/pem</code></MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Weitere ACME-Clients</MudText>
+        <MudText Class="mud-text-secondary mb-3">Alle RFC 8555-kompatiblen Clients funktionieren mit der HomeCA Directory-URL. Da Challenges automatisch bestätigt werden, ist die Wahl des Challenge-Typs irrelevant.</MudText>
+
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="Certbot">
+                <MudTextField Value="@_acmeCertbot" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudText Class="mud-text-secondary mt-2">Certbot erwartet einen Challenge-Typ, obwohl HomeCA ihn nicht prüft. <code>--preferred-challenges http</code> ist die einfachste Wahl. Für Standalone-Modus (ohne bestehenden Webserver): <code>--standalone</code> statt <code>--webroot</code>.</MudText>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="acme.sh">
+                <MudTextField Value="@_acmeAcmeSh" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudText Class="mud-text-secondary mt-2"><code>--webroot</code> legt die Challenge-Datei im angegebenen Verzeichnis ab. Da HomeCA die Challenge nicht abruft, kann ein beliebiges Verzeichnis verwendet werden. Alternativ <code>--standalone</code>.</MudText>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Caddy">
+                <MudTextField Value="@_acmeCaddy" Lines="8" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Traefik">
+                <MudTextField Value="@_acmeTraefik" Lines="10" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="win-acme (Windows)">
+                <MudTextField Value="@_acmeWinAcme" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Ausstellungszone anlegen</MudText>
+        <MudText>Alle DNS-Namen in ACME-Anfragen müssen unter einer aktiven Ausstellungszone liegen. Zonen werden unter <strong>Einstellungen > Domains</strong> angelegt oder per API:</MudText>
+        <MudTextField Value="@_acmeZone" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/domains" />
+        <MudText Class="mud-text-secondary">Beispiel: Zone <code>lab.example.com</code> erlaubt Zertifikate für <code>lab.example.com</code>, <code>gw.lab.example.com</code>, <code>nas.lab.example.com</code>, etc.</MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Externe ACME-Aussteller</MudText>
+        <MudText>Für öffentlich vertrauenswürdige Zertifikate (Let's Encrypt, ZeroSSL, etc.) kann HomeCA als verwalteter ACME-Client mit DNS-01-Challenges agieren.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">4.1 DNS-Connector einrichten</MudText>
+        <MudText>Unter <strong>Einstellungen</strong> eine Connector-Instanz anlegen. Unterstützte Typen: <code>technitium</code> und <code>hetzner</code>.</MudText>
+        <MudTextField Value="@_acmeConnector" Lines="6" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/connectors" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">4.2 Externen Aussteller registrieren</MudText>
+        <MudTextField Value="@_acmeIssuer" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/external-issuers" />
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>CA</th><th>Directory-URL</th></tr></thead>
+            <tbody>
+                <tr><td>Let's Encrypt (Produktion)</td><td><code>https://acme-v2.api.letsencrypt.org/directory</code></td></tr>
+                <tr><td>Let's Encrypt (Staging)</td><td><code>https://acme-staging-v02.api.letsencrypt.org/directory</code></td></tr>
+                <tr><td>ZeroSSL</td><td><code>https://acme.zerossl.com/v2/DV90</code></td></tr>
+                <tr><td>Google Trust Services</td><td><code>https://dv.acme-v02.api.pki.goog/directory</code></td></tr>
+                <tr><td>Buypass</td><td><code>https://api.buypass.com/acme/directory</code></td></tr>
             </tbody>
         </MudSimpleTable>
 
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Externe ACME-Aussteller</MudText>
-        <MudText>Externe ACME-Aussteller verweisen auf die Directory-URL einer öffentlichen CA. Die DNS-01-Challenge-Verwaltung wird über einen DNS-Connector abgewickelt.</MudText>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">5. Vereinfachte API (curl/Skripte)</MudText>
+        <MudText Class="mud-text-secondary mb-3">Neben dem RFC 8555-Server bietet HomeCA eine vereinfachte REST-API unter <code>/api/v1/acme/</code> mit Bearer-Token-Authentifizierung. Diese ist für direkte curl-Aufrufe und eigene Skripte gedacht — nicht für Standard-ACME-Clients.</MudText>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">2.1 DNS-Connector einrichten</MudText>
-        <MudText>Richte unter <strong>Einstellungen</strong> eine Connector-Instanz ein. Unterstützte Typen: <code>technitium</code> und <code>hetzner</code>.</MudText>
-        <MudTextField Value="@_acmeConnector" Lines="6" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/connectors" />
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="Konto registrieren">
+                <MudTextField Value="@_acmeAccount" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Order erstellen">
+                <MudTextField Value="@_acmeOrder" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Order finalisieren">
+                <MudTextField Value="@_acmeFinalize" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+                    <thead><tr><th>Parameter</th><th>Standard</th><th>Erklärung</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>validityDays</code></td><td>365</td><td>1 bis 730 Tage</td></tr>
+                        <tr><td><code>keyAlgorithm</code></td><td><code>ECC</code></td><td><code>ECC</code> (P-256) oder <code>RSA</code></td></tr>
+                        <tr><td><code>rsaKeySize</code></td><td>2048</td><td>Nur bei RSA: 2048 oder 3072</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">2.2 Externen Aussteller registrieren</MudText>
-        <MudTextField Value="@_acmeIssuer" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/external-issuers" />
-
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Tipps zur Betriebsführung</MudText>
-        <MudList T="string" Dense="true">
-            <MudListItem Icon="@Icons.Material.Filled.Warning"><strong>Ablaufwarnungen:</strong> <code>GET /api/v1/warnings/expiring</code> liefert Zertifikate, die innerhalb von 30 Tagen ablaufen.</MudListItem>
-            <MudListItem Icon="@Icons.Material.Filled.Backup"><strong>Backup:</strong> Nach jeder ACME-Einrichtung ein verifiziertes Backup erzeugen — siehe Bereich „Betrieb".</MudListItem>
-            <MudListItem Icon="@Icons.Material.Filled.DomainDisabled"><strong>Zonenänderungen:</strong> Wird eine Zone deaktiviert, lehnt der ACME-Server neue Orders ab. Bestehende Zertifikate bleiben gültig.</MudListItem>
-            <MudListItem Icon="@Icons.Material.Filled.Dns"><strong>Connector-Test:</strong> Nach dem Anlegen eines DNS-Connectors den Berechtigungs- und TXT-Test ausführen, bevor ein externer Aussteller zugewiesen wird.</MudListItem>
-        </MudList>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">6. Fehlerbehebung</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Problem</th><th>Lösung</th></tr></thead>
+            <tbody>
+                <tr><td>Konto-Registrierung schlägt fehl</td><td>URL prüfen — muss <code>/acme/directory</code> sein, nicht <code>/api/v1/acme/directory</code>. HomeCA muss vom Client erreichbar sein.</td></tr>
+                <tr><td>„domain validation failed"</td><td>DNS-Name muss unter einer aktiven Ausstellungszone liegen. HomeCA-Logs prüfen: <code>journalctl -u homeca -f</code></td></tr>
+                <tr><td>„Signing failed" / OpenSSL-Fehler</td><td>PEM-Datei prüfen — zwischen den Zertifikatsblöcken muss ein Zeilenumbruch sein.</td></tr>
+                <tr><td>Erneuerung funktioniert, aber Dienst zeigt altes Zertifikat</td><td>Automation in OPNsense fehlt — siehe Schritt 1.4.</td></tr>
+                <tr><td>Zertifikat nicht vertrauenswürdig</td><td>HomeCA Root-CA importieren — siehe Schritt 1.7 oder Tab „Vertrauensstellung".</td></tr>
+            </tbody>
+        </MudSimpleTable>
     </div>;
 
     // ── Code-Schnipsel ───────────────────────────────────────────────────────
@@ -637,7 +749,45 @@
           -H 'Content-Type: application/json' \
           -d '{"name":"lab.example.com","internalIssuanceEnabled":true,"connectorId":null}'
         """;
-    private const string _acmeDirectory = "curl -s http://HOMECA:5080/api/v1/acme/directory";
+    private const string _acmeCertbot = """
+        # Zertifikat mit Certbot ausstellen
+        certbot certonly \
+          --server http://HOMECA:5080/acme/directory \
+          --standalone --preferred-challenges http \
+          -d app.lab.example.com
+        """;
+    private const string _acmeAcmeSh = """
+        # Zertifikat mit acme.sh ausstellen
+        acme.sh --issue \
+          --server http://HOMECA:5080/acme/directory \
+          --webroot /var/www/html \
+          -d app.lab.example.com --keylength ec-256
+        """;
+    private const string _acmeCaddy = """
+        # Caddyfile
+        {
+            acme_ca http://HOMECA:5080/acme/directory
+        }
+
+        app.lab.example.com {
+            reverse_proxy localhost:8080
+        }
+        """;
+    private const string _acmeTraefik = """
+        # traefik.yml (statische Konfiguration)
+        certificatesResolvers:
+          homeca:
+            acme:
+              caServer: http://HOMECA:5080/acme/directory
+              email: admin@lab.example.com
+              storage: /etc/traefik/acme.json
+              httpChallenge:
+                entryPoint: web
+        """;
+    private const string _acmeWinAcme = """
+        # win-acme (interaktiv oder per CLI)
+        wacs.exe --baseuri http://HOMECA:5080/acme/directory
+        """;
     private const string _acmeAccount = """
         curl -s http://HOMECA:5080/api/v1/acme/accounts \
           -H 'Content-Type: application/json' \

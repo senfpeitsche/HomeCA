@@ -41,7 +41,14 @@ html, body { background: var(--homeca-canvas); color: var(--homeca-ink); }
 .profile-fact { padding: .6rem .75rem; border: 1px solid rgba(18,51,46,.12); border-radius: 5px; background: rgba(255,255,255,.55); }
 .script-preview textarea { font-family: 'Cascadia Mono', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace; font-size: .85rem; line-height: 1.5; }
 .script-preview .mud-input-outlined-border { background: #f4f7f5; }
-.script-preview textarea, .script-preview .mud-input-slot, .script-preview input { color: #1a2a25 !important; -webkit-text-fill-color: #1a2a25 !important; }
+.script-preview textarea,
+.script-preview textarea[readonly],
+.script-preview textarea:disabled,
+.script-preview .mud-input-slot,
+.script-preview .mud-input-root textarea,
+.script-preview .mud-input-root-outlined textarea,
+.script-preview input,
+.script-preview input[readonly] { color: #1a2a25 !important; -webkit-text-fill-color: #1a2a25 !important; opacity: 1 !important; }
 .empty-panel { max-width: 42rem; }
 .page-loader { margin: -3rem -4.5rem 1.5rem; }
 .mud-button-filled-primary { background-color: var(--homeca-forest) !important; }
