@@ -194,10 +194,10 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
             File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
             File.WriteAllText(Path.Combine(exportPath, "key.pem"), keyPem);
             using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
-            var chainPem = issuer.ExportCertificatePem() + root.ExportCertificatePem();
+            var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
             File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
-            File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + chainPem);
-            File.WriteAllText(Path.Combine(exportPath, "bundle.pem"), keyPem + certPem + chainPem);
+            File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem);
+            File.WriteAllText(Path.Combine(exportPath, "bundle.pem"), keyPem + "\n" + certPem + "\n" + chainPem);
         }
         catch (Exception ex)
         {

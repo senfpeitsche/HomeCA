@@ -435,30 +435,37 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
             var orderUrl = $"{b}/acme/order/{order.Id}";
             AddAcmeHeaders(ctx, acme, orderUrl);
 
-            return Results.Json(FormatOrder(order, b));
+            var formatted = FormatOrder(order, b);
+            var jsonForLog = System.Text.Json.JsonSerializer.Serialize(formatted);
+            logger.LogInformation("ACME finalize response body: {Json}", jsonForLog);
+            logger.LogInformation("ACME finalize response: order {OrderId}, status={Status}, certId={CertId}, certUrl={CertUrl}",
+                order.Id, order.Status, order.CertificateId ?? "null",
+                order.CertificateId is not null ? $"{b}/acme/cert/{order.CertificateId}" : "null");
+            return Results.Json(formatted);
         }
         catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
         catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
     });
 
     // Certificate download (POST-as-GET)
-    app.MapPost("/acme/cert/{certificateId}", async (string certificateId, HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/cert/{certificateId}", async (string certificateId, HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
             var body = await ReadBodyAsync(ctx.Request);
+            logger.LogInformation("ACME cert download: {CertificateId} from {Remote}", certificateId, ctx.Connection.RemoteIpAddress);
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/cert/{certificateId}";
             var jws = acme.VerifyJws(body, expectedUrl);
 
             var pem = await acme.GetCertificatePemAsync(certificateId, ct);
-            if (pem is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Certificate not found.", 404));
+            if (pem is null) { logger.LogWarning("ACME cert {CertificateId}: not found", certificateId); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Certificate not found.", 404)); }
 
+            logger.LogInformation("ACME cert {CertificateId}: returning {Len} bytes PEM", certificateId, pem.Length);
             AddAcmeHeaders(ctx, acme);
-            ctx.Response.ContentType = "application/pem-certificate-chain";
             return Results.Text(pem, "application/pem-certificate-chain");
         }
-        catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-        catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+        catch (AcmeProblemException ex) { logger.LogWarning("ACME cert download error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
+        catch (Exception ex) { logger.LogError(ex, "ACME cert download internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
     });
 
     // revokeCert (stub — accept but log only)

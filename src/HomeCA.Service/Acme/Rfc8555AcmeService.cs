@@ -543,9 +543,9 @@ public sealed class Rfc8555AcmeService
         File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
 
         using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
-        var chainPem = issuer.ExportCertificatePem() + root.ExportCertificatePem();
+        var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
         File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
-        File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + chainPem);
+        File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem);
 
         _logger.LogInformation("Issued RFC 8555 certificate {CertificateId} for {Subject}", id, subject);
         return id;
