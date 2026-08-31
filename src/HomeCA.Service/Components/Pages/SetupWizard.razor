@@ -3,45 +3,158 @@
 @inject UiStrings L
 
 <main class="login-shell">
-    <MudPaper Class="login-card" Elevation="0" Style="max-width: 600px;">
+    <MudPaper Class="login-card" Elevation="0" Style="max-width: 640px;">
         <MudText Typo="Typo.overline" Class="signal-text">ERSTEINRICHTUNG</MudText>
         <MudText Typo="Typo.h4" Class="service-title mb-2">HomeCA Setup-Assistent</MudText>
         <MudText Class="mud-text-secondary mb-4">
-            Dieser Assistent führt dich durch die Ersteinrichtung deiner lokalen PKI.
-            Er erscheint bei jeder Anmeldung, bis alle Schritte abgeschlossen sind.
+            Dieser Assistent konfiguriert deine lokale PKI in drei Schritten.
         </MudText>
 
-        @* Progress indicator — visual only, no built-in navigation *@
+        @* Progress indicator *@
         <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mb-4">
             <MudTimelineItem Color="@StepColor(0)" Size="Size.Small">
-                <MudText Typo="Typo.body2" Style="@StepStyle(0)">1. Zertifizierungsstellen erstellen</MudText>
+                <MudText Typo="Typo.body2" Style="@StepStyle(0)">1. Hostname und Domain</MudText>
             </MudTimelineItem>
             <MudTimelineItem Color="@StepColor(1)" Size="Size.Small">
-                <MudText Typo="Typo.body2" Style="@StepStyle(1)">2. TLS für HomeCA einrichten</MudText>
+                <MudText Typo="Typo.body2" Style="@StepStyle(1)">2. DNS-Connector (optional)</MudText>
             </MudTimelineItem>
             <MudTimelineItem Color="@StepColor(2)" Size="Size.Small">
-                <MudText Typo="Typo.body2" Style="@StepStyle(2)">3. Fertig — Neustart</MudText>
+                <MudText Typo="Typo.body2" Style="@StepStyle(2)">3. Zertifizierungsstellen erstellen</MudText>
             </MudTimelineItem>
         </MudTimeline>
 
         <MudDivider Class="mb-4" />
 
-        @if (_activeStep == 0)
+        @* ── Step 1: Hostname / PublicUrl ──────────────────────────────── *@
+        @if (_step == 0)
         {
-            @* Step 1: Initialize Certificate Authorities *@
+            <MudText Typo="Typo.h6" Class="mb-2">Hostname und Domain festlegen</MudText>
+            <MudText Class="mud-text-secondary mb-3">
+                Unter welchem Namen ist dieser HomeCA-Container im Netzwerk erreichbar?
+                Der Hostname wird als CRL-Verteilungspunkt in alle ausgestellten Zertifikate eingetragen.
+            </MudText>
+
+            <MudForm @ref="_hostnameForm" @bind-IsValid="_hostnameValid">
+                <MudTextField @bind-Value="_hostname" Label="Hostname / FQDN" Placeholder="homeca.home.local"
+                    Required="true" RequiredError="Hostname ist erforderlich"
+                    Validation="@(new Func<string, string?>(ValidateHostname))"
+                    Immediate="true" HelperText="DNS-Name, unter dem HomeCA erreichbar ist (z. B. homeca.home.local)" />
+                <MudNumericField T="int" @bind-Value="_port" Label="Port" Min="1" Max="65535"
+                    HelperText="Standard: 5080 (HTTP)" Class="mt-2" />
+            </MudForm>
+
+            @if (_hostnameConfigured)
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3 mb-3">
+                    PublicUrl gesetzt: <strong>http://@_hostname:@_port</strong>
+                    — diese URL wird als CRL-Verteilungspunkt in Zertifikate eingetragen.
+                </MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _step = 1)" FullWidth="true">
+                    Weiter: DNS-Connector
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                    Disabled="@(!_hostnameValid || _busy)" OnClick="ConfigureHostnameAsync" FullWidth="true" Class="mt-3">
+                    @(_busy ? "Wird gespeichert …" : "Hostname übernehmen")
+                </MudButton>
+            }
+        }
+
+        @* ── Step 2: Optional DNS Connector ───────────────────────────── *@
+        else if (_step == 1)
+        {
+            <MudText Typo="Typo.h6" Class="mb-2">DNS-Connector einrichten (optional)</MudText>
+            <MudText Class="mud-text-secondary mb-3">
+                Ein DNS-Connector wird für automatische DNS-01-Challenges (ACME) und externe Zertifikate benötigt.
+                Für rein interne Zertifikate kannst du diesen Schritt überspringen.
+            </MudText>
+
+            @if (!_showConnectorForm)
+            {
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _showConnectorForm = true)">
+                        DNS-Connector jetzt einrichten
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _step = 2)">
+                        Überspringen — später einrichten
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <MudSelect T="string" Label="Connector-Typ" @bind-Value="_connectorType" Class="mb-2">
+                    <MudSelectItem Value="@("technitium")">Technitium DNS</MudSelectItem>
+                    <MudSelectItem Value="@("hetzner")">Hetzner DNS</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_connectorName" Label="Name" Placeholder="Mein DNS-Server"
+                    Required="true" Immediate="true" Class="mb-2" />
+
+                @if (_connectorType == "technitium")
+                {
+                    <MudTextField @bind-Value="_connectorEndpoint" Label="API-Endpoint"
+                        Placeholder="http://10.0.0.1:5380" Required="true" Immediate="true" Class="mb-2"
+                        HelperText="URL der Technitium-DNS-API" />
+                    <MudTextField @bind-Value="_connectorSecret" Label="API-Token"
+                        InputType="InputType.Password" Required="true" Immediate="true"
+                        HelperText="Technitium API-Token" />
+                }
+                else
+                {
+                    <MudTextField @bind-Value="_connectorSecret" Label="Hetzner DNS API-Token"
+                        InputType="InputType.Password" Required="true" Immediate="true"
+                        HelperText="API-Token aus der Hetzner DNS Console" />
+                }
+
+                @if (!string.IsNullOrEmpty(_connectorError))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_connectorError</MudAlert>
+                }
+                @if (_connectorCreated)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-2 mb-3">DNS-Connector wurde gespeichert.</MudAlert>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _step = 2)" FullWidth="true">
+                        Weiter: CA erstellen
+                    </MudButton>
+                }
+                else
+                {
+                    <div class="d-flex gap-2 mt-3">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                            Disabled="@(_busy || string.IsNullOrWhiteSpace(_connectorName) || string.IsNullOrWhiteSpace(_connectorSecret))"
+                            OnClick="CreateConnectorAsync">
+                            @(_busy ? "Wird gespeichert …" : "Connector speichern")
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => { _showConnectorForm = false; _step = 2; })">
+                            Überspringen
+                        </MudButton>
+                    </div>
+                }
+            }
+        }
+
+        @* ── Step 3: Create CA ────────────────────────────────────────── *@
+        else if (_step == 2)
+        {
             <MudText Typo="Typo.h6" Class="mb-2">Zertifizierungsstellen erstellen</MudText>
             <MudText Class="mud-text-secondary mb-3">
-                HomeCA erstellt eine Root-CA und eine TLS-Issuing-CA.
-                Damit können anschließend Zertifikate für dein Homelab ausgestellt werden.
+                HomeCA erstellt eine Root-CA (10 Jahre) und eine TLS-Issuing-CA (5 Jahre).
+                Danach können Zertifikate für dein Homelab ausgestellt werden.
             </MudText>
+
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                CRL-URL in Zertifikaten: <strong>http://@_hostname:@_port/api/v1/crl/latest</strong>
+            </MudAlert>
 
             @if (_caCreated)
             {
                 <MudAlert Severity="Severity.Success" Class="mb-3">
-                    Root-CA und TLS-Issuing-CA wurden erfolgreich erstellt.
+                    Root-CA und TLS-Issuing-CA wurden erfolgreich erstellt. HomeCA ist einsatzbereit.
                 </MudAlert>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GoToStep2" FullWidth="true">
-                    Weiter: TLS einrichten
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="FinishAsync" Disabled="_busy" FullWidth="true">
+                    @(_busy ? "Wird geladen …" : "Zum Dashboard")
                 </MudButton>
             }
             else
@@ -50,63 +163,6 @@
                     @(_busy ? "CA wird erstellt …" : "CA jetzt erstellen")
                 </MudButton>
             }
-        }
-        else if (_activeStep == 1)
-        {
-            @* Step 2: Configure TLS *@
-            <MudText Typo="Typo.h6" Class="mb-2">TLS für HomeCA aktivieren</MudText>
-            <MudText Class="mud-text-secondary mb-3">
-                Gib den Hostnamen ein, unter dem HomeCA im Netzwerk erreichbar sein soll.
-                HomeCA stellt sich damit ein eigenes TLS-Zertifikat aus und ist danach nur noch über HTTPS erreichbar.
-            </MudText>
-
-            <MudForm @ref="_tlsForm" @bind-IsValid="_tlsValid">
-                <MudTextField @bind-Value="_hostname" Label="Hostname" Placeholder="pki.home.local"
-                    Required="true" RequiredError="Hostname ist erforderlich"
-                    Immediate="true" HelperText="DNS-Name oder FQDN des Containers" />
-                <MudTextField @bind-Value="_ipAddress" Label="IP-Adresse (optional)" Placeholder="10.5.0.131"
-                    Immediate="true" HelperText="Wird als zusätzlicher SAN ins Zertifikat aufgenommen" Class="mt-2" />
-            </MudForm>
-
-            @if (!string.IsNullOrEmpty(_tlsError))
-            {
-                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_tlsError</MudAlert>
-            }
-
-            @if (_tlsActivated)
-            {
-                <MudAlert Severity="Severity.Success" Class="mt-3 mb-3">
-                    TLS-Zertifikat ausgestellt! Der Dienst muss jetzt neu gestartet werden, damit HTTPS aktiv wird.
-                </MudAlert>
-                <MudAlert Severity="Severity.Info" Class="mb-3">
-                    Nach dem Neustart ist HomeCA unter <strong>https://@_hostname:5443</strong> erreichbar.
-                    Installiere vorher die Root-CA im Browser (Trust Anchor auf der Login-Seite).
-                </MudAlert>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CompleteSetupAsync" Disabled="_busy" FullWidth="true">
-                    @(_busy ? "Wird abgeschlossen …" : "Einrichtung abschließen und Dienst neu starten")
-                </MudButton>
-            }
-            else
-            {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_tlsValid || _busy)" OnClick="ActivateTlsAsync" FullWidth="true" Class="mt-3">
-                    @(_busy ? "TLS wird eingerichtet …" : "TLS aktivieren")
-                </MudButton>
-            }
-        }
-        else
-        {
-            @* Step 3: Done — waiting for restart *@
-            <MudText Typo="Typo.h6" Class="mb-2">Einrichtung abgeschlossen</MudText>
-            <MudAlert Severity="Severity.Success" Class="mb-3">
-                HomeCA wird jetzt neu gestartet und ist danach unter HTTPS erreichbar.
-            </MudAlert>
-            <MudText Class="mud-text-secondary mb-3">
-                Falls der Neustart nicht automatisch erfolgt, führe auf dem Proxmox-Host aus:
-            </MudText>
-            <MudTextField Value="@RestartCommand" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" />
-            <MudText Class="mud-text-secondary">
-                Danach erreichbar unter: <strong>https://@_hostname:5443</strong>
-            </MudText>
         }
 
         <MudDivider Class="my-4" />
@@ -123,28 +179,39 @@
     [Parameter] public string InitialPhase { get; set; } = "initial";
 
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
-    private int _activeStep;
-    private bool _busy, _caCreated, _tlsActivated, _tlsValid;
-    private string _hostname = "", _ipAddress = "", _tlsError = "";
-    private MudForm? _tlsForm;
+    private int _step;
+    private bool _busy;
 
-    private string RestartCommand => "bash /opt/homeca/homeca-activate-tls.sh";
+    // Step 1: Hostname
+    private string _hostname = "";
+    private int _port = 5080;
+    private bool _hostnameValid, _hostnameConfigured;
+    private MudForm? _hostnameForm;
 
-    // Timeline step colors based on progress
-    private Color StepColor(int step) => step < _activeStep ? Color.Success : step == _activeStep ? Color.Primary : Color.Default;
-    private string StepStyle(int step) => step == _activeStep ? "font-weight: bold;" : step < _activeStep ? "opacity: 0.6;" : "opacity: 0.4;";
+    // Step 2: DNS Connector
+    private bool _showConnectorForm, _connectorCreated;
+    private string _connectorType = "technitium", _connectorName = "", _connectorSecret = "", _connectorEndpoint = "", _connectorError = "";
+
+    // Step 3: CA
+    private bool _caCreated;
+
+    // Timeline helpers
+    private Color StepColor(int s) => s < _step ? Color.Success : s == _step ? Color.Primary : Color.Default;
+    private string StepStyle(int s) => s == _step ? "font-weight: bold;" : s < _step ? "opacity: 0.6;" : "opacity: 0.4;";
+
+    private static readonly System.Text.RegularExpressions.Regex HostnamePattern = new(
+        @"^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
 
     protected override void OnInitialized()
     {
-        // Resume wizard at the correct step based on current setup phase
-        _activeStep = InitialPhase switch
+        _step = InitialPhase switch
         {
-            "cainitialized" => 1,
-            "tlsconfigured" => 2,
+            "cainitialized" or "tlsconfigured" or "complete" => 2,
+            "passwordchanged" => 0,
             _ => 0
         };
-        _caCreated = _activeStep >= 1;
-        _tlsActivated = _activeStep >= 2;
+        _caCreated = InitialPhase is "cainitialized" or "tlsconfigured" or "complete";
     }
 
     private HttpClient Client()
@@ -155,9 +222,71 @@
         return client;
     }
 
-    // Step 1 → Step 2 transition only after CA is created
-    private void GoToStep2() => _activeStep = 1;
+    private string? ValidateHostname(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (value.Contains(' ')) return "Hostname darf keine Leerzeichen enthalten.";
+        if (value.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return "Nur den Hostnamen eingeben, nicht die URL.";
+        if (!HostnamePattern.IsMatch(value)) return "Kein gültiger Hostname (z. B. homeca.home.local).";
+        return null;
+    }
 
+    // ── Step 1: Configure hostname ─────────────────────────────────────
+    private async Task ConfigureHostnameAsync()
+    {
+        if (_hostnameForm is not null) { await _hostnameForm.Validate(); if (!_hostnameValid) return; }
+        if (string.IsNullOrWhiteSpace(_hostname)) return;
+
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/setup/configure", new { hostname = _hostname, port = _port });
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Hostname konnte nicht gespeichert werden.", Severity.Error);
+                return;
+            }
+            _hostnameConfigured = true;
+            Snackbar.Add($"PublicUrl auf http://{_hostname}:{_port} gesetzt.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    // ── Step 2: Create DNS connector ───────────────────────────────────
+    private async Task CreateConnectorAsync()
+    {
+        _busy = true;
+        _connectorError = "";
+        try
+        {
+            var secrets = new Dictionary<string, string> { ["apiToken"] = _connectorSecret };
+            if (_connectorType == "technitium" && !string.IsNullOrWhiteSpace(_connectorEndpoint))
+                secrets["endpoint"] = _connectorEndpoint;
+
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/connector-instances", new
+            {
+                name = _connectorName,
+                type = _connectorType,
+                secrets
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _connectorError = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            _connectorCreated = true;
+            Snackbar.Add("DNS-Connector gespeichert.", Severity.Success);
+        }
+        catch (Exception ex) { _connectorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    // ── Step 3: Initialize CA ──────────────────────────────────────────
     private async Task InitializeCaAsync()
     {
         _busy = true;
@@ -186,69 +315,7 @@
         finally { _busy = false; }
     }
 
-    private async Task ActivateTlsAsync()
-    {
-        if (_tlsForm is not null)
-        {
-            await _tlsForm.Validate();
-            if (!_tlsValid) return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_hostname))
-        {
-            _tlsError = "Bitte gib einen Hostnamen ein.";
-            return;
-        }
-
-        _busy = true;
-        _tlsError = "";
-        try
-        {
-            using var client = Client();
-            var response = await client.PostAsJsonAsync("api/v1/setup/activate-tls", new { hostname = _hostname, ipAddress = string.IsNullOrWhiteSpace(_ipAddress) ? null : _ipAddress });
-            if (!response.IsSuccessStatusCode)
-            {
-                _tlsError = await response.Content.ReadAsStringAsync();
-                return;
-            }
-            _tlsActivated = true;
-            Snackbar.Add("TLS-Zertifikat ausgestellt.", Severity.Success);
-        }
-        catch (Exception ex) { _tlsError = ex.Message; }
-        finally { _busy = false; }
-    }
-
-    private async Task CompleteSetupAsync()
-    {
-        _busy = true;
-        try
-        {
-            using var client = Client();
-            await client.PostAsync("api/v1/setup/complete", null);
-            _activeStep = 2;
-
-            // Trigger TLS activation via helper script (runs as root, creates systemd override, restarts)
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo("bash", "-c \"sleep 2 && bash /opt/homeca/homeca-activate-tls.sh\"")
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                System.Diagnostics.Process.Start(psi);
-            }
-            catch
-            {
-                // Ignore — user can restart manually
-            }
-
-            await OnSetupComplete.InvokeAsync();
-        }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
-        finally { _busy = false; }
-    }
+    private async Task FinishAsync() => await OnSetupComplete.InvokeAsync();
 
     private async Task SkipWizardAsync()
     {

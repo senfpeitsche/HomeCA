@@ -12,11 +12,11 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("HomeCA.Service")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.0+23d45a560e88b0a9cdf9fbccdccf00e38a79de5c")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.1.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.1+620decccf3a913b071a242965199956543c92a9c")]
 [assembly: System.Reflection.AssemblyProductAttribute("HomeCA.Service")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HomeCA.Service")]
-[assembly: System.Reflection.AssemblyVersionAttribute("0.2.0.0")]
+[assembly: System.Reflection.AssemblyVersionAttribute("0.2.1.0")]
 
 // Von der MSBuild WriteCodeFragment-Klasse generiert.
 

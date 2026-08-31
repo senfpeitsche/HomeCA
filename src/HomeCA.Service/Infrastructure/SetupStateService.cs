@@ -99,6 +99,22 @@ public sealed class SetupStateService
         finally { _gate.Release(); }
     }
 
+    /// <summary>Resets the wizard to the appropriate starting phase so the user can re-run it.</summary>
+    public async Task<SetupState> ResetAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            // Determine the correct starting phase based on what's already done
+            var phase = SetupPhase.PasswordChanged; // password was already changed if the user can call this
+            _current = _current with { SetupPhase = phase, Hostname = null, TlsCertificateId = null };
+            await SaveAsync(ct);
+            _logger.LogInformation("Setup wizard reset to phase {Phase}", phase);
+            return _current;
+        }
+        finally { _gate.Release(); }
+    }
+
     private SetupState Load()
     {
         if (!File.Exists(_statePath))
@@ -151,3 +167,5 @@ public sealed record SetupState
 }
 
 public sealed record ActivateTlsRequest(string Hostname, string? IpAddress = null);
+
+public sealed record ConfigureInstanceRequest(string Hostname, int? Port = 5080);

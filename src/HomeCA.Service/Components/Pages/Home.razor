@@ -14,6 +14,7 @@
             <MudText Typo="Typo.overline" Class="signal-text">@L.LoginSignalText</MudText>
             <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
             <MudText Class="mud-text-secondary">@L.LoginSubtitle</MudText>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@L.DefaultCredentialsHint</MudAlert>
             <MudForm @ref="_loginForm" Class="form-stack" @bind-IsValid="_loginValid">
                 <MudTextField @bind-Value="_loginUser" Label="@L.LoginUsername" Required="true" Immediate="true" />
                 <MudTextField @bind-Value="_loginPassword" Label="@L.LoginPassword" InputType="InputType.Password" Required="true" Immediate="true" />
@@ -215,6 +216,40 @@ else
     private RenderFragment SettingsContent => @<text>
         @if (!string.IsNullOrEmpty(_connectorCheckMessage)) { <MudAlert Severity="@(_connectorCheckMessage.StartsWith("Verbindung hergestellt", StringComparison.Ordinal) ? Severity.Success : Severity.Error)" Class="mb-4">@_connectorCheckMessage</MudAlert> }
         <MudText Typo="Typo.overline" Class="section-kicker">Externe Dienste und Zonen</MudText><MudText Typo="Typo.h3" Class="page-title">Einstellungen</MudText><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ConnectorForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@DomainForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@IssuerForm</MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte DNS-Connectoren</MudText><MudTable Items="_connectors" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Typ</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@context.Type</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginConnectorEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => CheckConnector(context.Id))">@(context.Type == Hetzner ? "Hetzner prüfen" : "Technitium prüfen")</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => TxtTestConnector(context.Id))">TXT-Test</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteConnector(context.Id))">@(_deleteConnectorId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte Domains</MudText><MudTable Items="_domains" Dense="true"><HeaderContent><MudTh>Domain</MudTh><MudTh>Ausstellungszone</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@(context.InternalIssuanceEnabled ? "Intern" : "Extern")</MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginDomainEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteDomain(context.Name))">@(_deleteDomainName == context.Name ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Externe ACME-Issuer</MudText><MudTable Items="_issuers" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Directory-URL</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd><MudText Typo="Typo.caption">@context.DirectoryUrl</MudText></MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginIssuerEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteIssuer(context.Id))">@(_deleteIssuerId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine externen ACME-Issuer registriert.</MudText></NoRecordsContent></MudTable></MudPaper><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ProfileForm</MudPaper></MudItem><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Zielprofile</MudText><MudTable Items="_profiles" Dense="true" Hover="true"><HeaderContent><MudTh>Name</MudTh><MudTh>ID</MudTh><MudTh>Version</MudTh><MudTh>Algorithmus</MudTh><MudTh>Exporte</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@ProfileDisplayName(context)</MudTd><MudTd>@context.Id</MudTd><MudTd>@context.Version</MudTd><MudTd>@ProfileKeyAlgorithm(context)</MudTd><MudTd>@string.Join(", ", ProfileExportFormats(context))</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginProfileEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteProfile(context.Id))">@(_deleteProfileId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Es sind noch keine Zielprofile angelegt.</MudText></NoRecordsContent></MudTable></MudPaper></MudItem></MudGrid>
+        <MudPaper Class="panel mt-4" Elevation="0">
+            <MudText Typo="Typo.h5">TLS für HomeCA-Oberfläche</MudText>
+            <MudText Class="mud-text-secondary mb-3">
+                HomeCA stellt sich selbst ein TLS-Zertifikat aus und ist danach nur noch über HTTPS (Port 5443) erreichbar.
+                Die CA muss dafür bereits eingerichtet sein.
+            </MudText>
+            @if (!string.IsNullOrEmpty(_tlsSettingsSuccess))
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">@_tlsSettingsSuccess</MudAlert>
+                <MudAlert Severity="Severity.Info" Class="mb-3">
+                    Führe auf dem Proxmox-Host aus, um TLS zu aktivieren:
+                </MudAlert>
+                <MudTextField Value="@_tlsRestartCommand" ReadOnly="true" Variant="Variant.Outlined" Lines="1" Class="script-preview mb-3" />
+            }
+            else
+            {
+                <MudForm @ref="_tlsSettingsForm" @bind-IsValid="_tlsSettingsValid">
+                    <MudTextField @bind-Value="_tlsHostname" Label="Hostname" Placeholder="homeca.home.local"
+                        Required="true" RequiredError="Hostname ist erforderlich" Immediate="true"
+                        HelperText="DNS-Name für das TLS-Zertifikat" />
+                    <MudTextField @bind-Value="_tlsIpAddress" Label="IP-Adresse (optional)" Placeholder="10.5.0.131"
+                        Immediate="true" HelperText="Wird als zusätzlicher SAN aufgenommen" Class="mt-2" />
+                </MudForm>
+                @if (!string.IsNullOrEmpty(_tlsSettingsError))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_tlsSettingsError</MudAlert>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3"
+                    Disabled="@(!_tlsSettingsValid || _busy)" OnClick="ActivateTlsAsync">
+                    @(_busy ? "TLS wird eingerichtet …" : "TLS-Zertifikat ausstellen und aktivieren")
+                </MudButton>
+            }
+        </MudPaper>
+        <MudPaper Class="panel mt-4" Elevation="0"><MudText Typo="Typo.h5">Ersteinrichtung</MudText><MudText Class="mud-text-secondary mb-3">Den Setup-Assistenten erneut durchlaufen, um z. B. Hostname, DNS-Connector oder CA-Einrichtung zu wiederholen.</MudText><MudButton Variant="Variant.Outlined" Color="Color.Warning" Disabled="_busy" OnClick="ResetSetupWizardAsync" StartIcon="@Icons.Material.Filled.RestartAlt">Ersteinrichtung wiederholen</MudButton></MudPaper>
     </text>;
 
     private RenderFragment OperationsContent => @<text>
@@ -930,12 +965,63 @@ else
     private async Task OnWizardComplete()
     {
         _showSetupWizard = false;
-        Snackbar.Add("Einrichtung abgeschlossen. Der Dienst wird neu gestartet …", Severity.Success);
+        await LoadAllAsync();
     }
     private async Task OnWizardSkipped()
     {
         _showSetupWizard = false;
         await LoadAllAsync();
+    }
+
+    private async Task ResetSetupWizardAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync("api/v1/setup/reset", null);
+            if (!response.IsSuccessStatusCode) { Snackbar.Add("Zurücksetzen fehlgeschlagen.", Severity.Error); return; }
+            _showSetupWizard = true;
+            _setupPhase = "passwordchanged";
+            Snackbar.Add("Setup-Assistent wird gestartet.", Severity.Info);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    // ── TLS settings ────────────────────────────────────────────────────────
+    private string _tlsHostname = "", _tlsIpAddress = "";
+    private string? _tlsSettingsError, _tlsSettingsSuccess, _tlsRestartCommand;
+    private bool _tlsSettingsValid;
+    private MudForm? _tlsSettingsForm;
+
+    private async Task ActivateTlsAsync()
+    {
+        if (_tlsSettingsForm is not null) { await _tlsSettingsForm.Validate(); if (!_tlsSettingsValid) return; }
+        if (string.IsNullOrWhiteSpace(_tlsHostname)) { _tlsSettingsError = "Hostname ist erforderlich."; return; }
+
+        _busy = true;
+        _tlsSettingsError = null;
+        _tlsSettingsSuccess = null;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/setup/activate-tls", new
+            {
+                hostname = _tlsHostname,
+                ipAddress = string.IsNullOrWhiteSpace(_tlsIpAddress) ? null : _tlsIpAddress
+            });
+            if (!response.IsSuccessStatusCode)
+            {
+                _tlsSettingsError = await response.Content.ReadAsStringAsync();
+                return;
+            }
+            _tlsSettingsSuccess = $"TLS-Zertifikat für {_tlsHostname} ausgestellt. Nach dem Neustart ist HomeCA unter https://{_tlsHostname}:5443 erreichbar.";
+            _tlsRestartCommand = "bash /opt/homeca/homeca-activate-tls.sh";
+            Snackbar.Add("TLS-Zertifikat ausgestellt.", Severity.Success);
+        }
+        catch (Exception ex) { _tlsSettingsError = ex.Message; }
+        finally { _busy = false; }
     }
 
     private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors); private record SshIssueResultDto(string Id, string Authority, string CertificatePath, string Certificate); private record SshCertificateItem(string Id, string Kind, string Identity, string Principals, DateTime IssuedAt, string? ValidUntil); private record SshCaKeyDto(string Authority, string PublicKey);
