@@ -8,7 +8,7 @@
     ".NETCoreApp,Version=v10.0": {
       "HomeCA.Tests/1.0.0": {
         "dependencies": {
-          "HomeCA.Service": "0.1.0",
+          "HomeCA.Service": "0.2.3",
           "Microsoft.NET.Test.Sdk": "17.14.1",
           "xunit": "2.9.3"
         },
@@ -378,7 +378,7 @@
           }
         }
       },
-      "HomeCA.Service/0.1.0": {
+      "HomeCA.Service/0.2.3": {
         "dependencies": {
           "Certes": "3.0.4",
           "Microsoft.AspNetCore.OpenApi": "10.0.11",
@@ -386,8 +386,8 @@
         },
         "runtime": {
           "HomeCA.Service.dll": {
-            "assemblyVersion": "0.1.0.0",
-            "fileVersion": "0.1.0.0"
+            "assemblyVersion": "0.2.3.0",
+            "fileVersion": "0.2.3.0"
           }
         }
       }
@@ -511,7 +511,7 @@
       "path": "xunit.extensibility.execution/2.9.3",
       "hashPath": "xunit.extensibility.execution.2.9.3.nupkg.sha512"
     },
-    "HomeCA.Service/0.1.0": {
+    "HomeCA.Service/0.2.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

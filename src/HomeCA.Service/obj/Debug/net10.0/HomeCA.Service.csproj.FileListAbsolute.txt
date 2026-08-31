@@ -82,8 +82,6 @@ C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\rjsmcshtml.dswa.cache
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\scopedcss\bundle\HomeCA.Service.styles.css
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\tzxjg6is5z-{0}-0n6lrtb02s-0n6lrtb02s.gz
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\0wz98yz2xy-{0}-lftp6ydp6b-lftp6ydp6b.gz
-C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\vpi4081xax-{0}-x1zrhur82l-x1zrhur82l.gz
-C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\c07u70e497-{0}-8obzdx2gwf-8obzdx2gwf.gz
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\ko1ots81n0-{0}-wyu7y4jcvb-wyu7y4jcvb.gz
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\sg42g8g24d-{0}-wfr2hj6447-wfr2hj6447.gz
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\staticwebassets.build.json
@@ -100,3 +98,5 @@ C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\ref\HomeCA.Service.dl
 C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\HomeCA.Service.MvcApplicationPartsAssemblyInfo.cs
 C:\Admin\_work\HomeCA\src\HomeCA.Service\bin\Debug\net10.0\Microsoft.AspNetCore.OpenApi.dll
 C:\Admin\_work\HomeCA\src\HomeCA.Service\bin\Debug\net10.0\Microsoft.OpenApi.dll
+C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\c07u70e497-{0}-o9xzvyt1ce-o9xzvyt1ce.gz
+C:\Admin\_work\HomeCA\src\HomeCA.Service\obj\Debug\net10.0\compressed\vpi4081xax-{0}-mzhaj09p4k-mzhaj09p4k.gz

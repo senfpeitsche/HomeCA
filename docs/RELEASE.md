@@ -2,21 +2,6 @@
 
 Dieses Dokument beschreibt, wie ein neues HomeCA-Release erstellt wird und wie das Zusammenspiel mit den LXC-Installationsscripts funktioniert.
 
-## Privates Repository: GitHub-Token
-
-Solange das Repository privat ist, brauchen die Deploy-Scripts ein GitHub Personal Access Token (PAT) um Releases und Raw-Dateien herunterzuladen. Erstelle ein **Fine-grained PAT** unter:
-
-**GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-
-Benötigte Berechtigungen:
-- **Repository access**: Nur `senfpeitsche/HomeCA`
-- **Contents**: Read-only
-- **Actions**: Read-only (optional, zum Prüfen des Workflow-Status)
-
-Das Token wird beim Aufruf der Scripts als `GITHUB_TOKEN`-Umgebungsvariable übergeben. Details dazu stehen in [LXC-SETUP.md](LXC-SETUP.md).
-
-Sobald das Repository öffentlich gemacht wird, kann `GITHUB_TOKEN` überall weggelassen werden — die Scripts funktionieren dann ohne Authentifizierung.
-
 ## Release erstellen
 
 ### 1. Version in der csproj hochzählen

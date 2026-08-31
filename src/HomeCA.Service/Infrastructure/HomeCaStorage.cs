@@ -22,6 +22,9 @@ public sealed class HomeCaStorage
     }
 
     public string RootPath => _options.RootPath;
+    public string BackupKeyPath => _options.BackupKeyPath;
+
+    public string ResolveBackupPath(string fileName) => Path.Combine(_options.BackupPath, fileName);
 
     public object Describe() => new
     {

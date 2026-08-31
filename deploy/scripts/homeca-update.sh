@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 # HomeCA — update script
 #
-# Run inside the container (private repo):
-#   GITHUB_TOKEN=ghp_… bash <(curl -fsSL \
-#     -H 'Authorization: token ghp_…' -H 'Accept: application/vnd.github.raw' \
-#     'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main')
+# Run inside the container:
+#   bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
 #
 # From the Proxmox host (replace 100 with your CT ID):
-#   curl -fsSL -H 'Authorization: token ghp_…' -H 'Accept: application/vnd.github.raw' \
-#     'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main' \
+#   curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh \
 #     -o /tmp/homeca-update.sh
 #   pct push 100 /tmp/homeca-update.sh /tmp/homeca-update.sh
-#   pct exec 100 -- bash -c "export GITHUB_TOKEN='ghp_…'; bash /tmp/homeca-update.sh"
+#   pct exec 100 -- bash /tmp/homeca-update.sh
 #
 # Environment overrides:
-#   GITHUB_TOKEN       — GitHub PAT for private repo access (required while repo is private)
 #   HOMECA_VERSION     — target release tag (default: latest)
 #   HOMECA_SKIP_BACKUP — set to 1 to skip the pre-update backup (not recommended)
 
@@ -28,63 +24,26 @@ DATA_DIR="/var/lib/homeca"
 BACKUP_DIR="/var/backups/homeca"
 SERVICE="homeca"
 
-# ── Auth + download helpers for private repo ────────────────────────
-GH_AUTH_HEADER=()
-if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  GH_AUTH_HEADER=(-H "Authorization: token ${GITHUB_TOKEN}")
-fi
-
+# ── Download helpers ─────────────────────────────────────────────────
 gh_download_release() {
   local version="$1" asset="$2" dest="$3"
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    local release_url
-    if [[ "$version" == "latest" ]]; then
-      release_url="https://api.github.com/repos/${GH_REPO}/releases/latest"
-    else
-      release_url="https://api.github.com/repos/${GH_REPO}/releases/tags/${version}"
-    fi
-    local asset_url
-    asset_url=$(curl -fsSL "${GH_AUTH_HEADER[@]}" "$release_url" \
-      | grep -o "\"browser_download_url\": *\"[^\"]*${asset}\"" \
-      | head -1 | cut -d'"' -f4)
-    if [[ -z "$asset_url" ]]; then
-      echo "ERROR: Asset '${asset}' not found in release ${version}" >&2
-      return 1
-    fi
-    curl -fsSL "${GH_AUTH_HEADER[@]}" -H "Accept: application/octet-stream" \
-      -o "$dest" -L "$asset_url"
+  local base="https://github.com/${GH_REPO}/releases"
+  if [[ "$version" == "latest" ]]; then
+    curl -fsSL -o "$dest" "${base}/latest/download/${asset}"
   else
-    local base="https://github.com/${GH_REPO}/releases"
-    if [[ "$version" == "latest" ]]; then
-      curl -fsSL -o "$dest" "${base}/latest/download/${asset}"
-    else
-      curl -fsSL -o "$dest" "${base}/download/${version}/${asset}"
-    fi
+    curl -fsSL -o "$dest" "${base}/download/${version}/${asset}"
   fi
 }
 
 gh_raw() {
   local path="$1" dest="${2:--}"
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL "${GH_AUTH_HEADER[@]}" \
-      -H "Accept: application/vnd.github.raw" \
-      -o "$dest" \
-      "https://api.github.com/repos/${GH_REPO}/contents/${path}?ref=main"
-  else
-    curl -fsSL -o "$dest" \
-      "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
-  fi
+  curl -fsSL -o "$dest" \
+    "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
 }
 
 gh_resolve_latest_tag() {
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL "${GH_AUTH_HEADER[@]}" \
-      "https://api.github.com/repos/${GH_REPO}/releases/latest" \
-      | grep '"tag_name"' | head -1 | cut -d'"' -f4
-  else
-    curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
-      | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+' || echo "latest"
-  fi
+  curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
+    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+' || echo "latest"
 }
 
 # ── Colors / helpers ────────────────────────────────────────────────
@@ -188,6 +147,16 @@ if gh_raw "deploy/systemd/homeca.service" /tmp/homeca.service.new 2>/dev/null; t
   rm -f /tmp/homeca.service.new
 else
   msg_ok "Could not fetch remote unit — keeping current"
+fi
+
+# ── Update sudoers drop-in for web-triggered TLS activation ─────────
+msg_info "Refreshing sudoers drop-in …"
+if gh_raw "deploy/sudoers/homeca-tls" /tmp/homeca-tls.sudoers 2>/dev/null; then
+  install -m 0440 /tmp/homeca-tls.sudoers /etc/sudoers.d/homeca-tls
+  rm -f /tmp/homeca-tls.sudoers
+  msg_ok "sudoers drop-in updated"
+else
+  msg_ok "Could not fetch remote sudoers — keeping current"
 fi
 
 # ── Start service ───────────────────────────────────────────────────

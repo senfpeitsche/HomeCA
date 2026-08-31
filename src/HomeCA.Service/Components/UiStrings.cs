@@ -49,6 +49,7 @@ public sealed class UiStrings
     public string NavAuthorities => L("Zertifizierungsstellen", "Certificate Authorities");
     public string NavAutomation => L("Automatik", "Automation");
     public string NavSettings => L("Einstellungen", "Settings");
+    public string NavProfiles => L("Profile", "Profiles");
     public string NavOperations => L("Betrieb", "Operations");
     public string NavHelp => L("Hilfe", "Help");
 

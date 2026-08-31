@@ -2,11 +2,6 @@
 # HomeCA LXC — Proxmox one-liner entry script
 #
 # Usage (paste into Proxmox shell):
-#   GITHUB_TOKEN=ghp_… bash -c "$(curl -fsSL \
-#     -H 'Authorization: token ghp_…' -H 'Accept: application/vnd.github.raw' \
-#     'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-lxc.sh?ref=main')"
-#
-# Once the repo is public, simplify to:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
 #
 # What it does:
@@ -15,7 +10,6 @@
 #   3. Starts the container and runs the in-container install script
 #
 # Environment overrides (set before running):
-#   GITHUB_TOKEN       — GitHub PAT for private repo access (required while repo is private)
 #   HOMECA_CTID        — container ID          (default: next free ID)
 #   HOMECA_HOSTNAME    — container hostname    (default: homeca)
 #   HOMECA_DISK        — root disk in GB       (default: 8)
@@ -39,24 +33,11 @@ NET="${HOMECA_NET:-dhcp}"
 VERSION="${HOMECA_VERSION:-latest}"
 GH_REPO="senfpeitsche/HomeCA"
 
-# ── Auth + download helpers for private repo ────────────────────────
-GH_AUTH_HEADER=()
-if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  GH_AUTH_HEADER=(-H "Authorization: token ${GITHUB_TOKEN}")
-fi
-
-# Download a raw file from the repo (works for both private and public)
+# ── Download helpers ─────────────────────────────────────────────────
 gh_raw() {
   local path="$1" dest="${2:--}"
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL "${GH_AUTH_HEADER[@]}" \
-      -H "Accept: application/vnd.github.raw" \
-      -o "$dest" \
-      "https://api.github.com/repos/${GH_REPO}/contents/${path}?ref=main"
-  else
-    curl -fsSL -o "$dest" \
-      "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
-  fi
+  curl -fsSL -o "$dest" \
+    "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
 }
 
 # ── Colors / helpers ────────────────────────────────────────────────
@@ -153,7 +134,6 @@ rm -f "$INSTALL_SCRIPT"
 
 if ! pct exec "$CTID" -- bash -c "
   export HOMECA_VERSION='${VERSION}'
-  export GITHUB_TOKEN='${GITHUB_TOKEN:-}'
   bash /tmp/homeca-install.sh
   rm -f /tmp/homeca-install.sh
 "; then

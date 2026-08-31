@@ -2,53 +2,27 @@
 
 Diese Anleitung richtet eine einzelne HomeCA-Instanz in einem Debian-12-LXC ein. HomeCA ist eine private CA: sichere den Container wie ein administratives Kernsystem und veröffentliche ihn nicht direkt im Internet.
 
-## Voraussetzung: GitHub-Token (privates Repository)
-
-Solange das Repository privat ist, benötigen alle Scripts ein GitHub Personal Access Token (PAT). Erstelle ein **Fine-grained PAT** unter:
-
-**GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-
-Benötigte Berechtigungen:
-- **Repository access**: Nur `senfpeitsche/HomeCA`
-- **Contents**: Read-only
-- **Actions**: Read-only (optional)
-
-Das Token wird als `GITHUB_TOKEN`-Umgebungsvariable übergeben und zusätzlich als Header beim ersten curl (zum Herunterladen des Scripts selbst). Sobald das Repository öffentlich ist, kann alles mit `GITHUB_TOKEN` weggelassen werden.
-
 ## Schnellstart — One-Liner-Installation
 
 Öffne die **Proxmox-Shell** (Knoten → Shell im Webinterface) und füge ein:
 
 ```bash
-export GH_TOKEN="ghp_DEIN_TOKEN"
-GITHUB_TOKEN=$GH_TOKEN bash -c "$(curl -fsSL \
-  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
-  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-lxc.sh?ref=main')"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
 ```
 
 Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installiert .NET 10, HomeCA und den systemd-Dienst. Danach ist HomeCA unter `http://127.0.0.1:5080` im Container erreichbar.
-
-Wenn das Repo öffentlich ist, reicht:
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
-```
 
 ### Standardwerte anpassen
 
 Alle Einstellungen lassen sich über Umgebungsvariablen überschreiben:
 
 ```bash
-export GH_TOKEN="ghp_DEIN_TOKEN"
-GITHUB_TOKEN=$GH_TOKEN HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
-  bash -c "$(curl -fsSL \
-  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
-  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-lxc.sh?ref=main')"
+HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
 ```
 
 | Variable | Standard | Beschreibung |
 | --- | --- | --- |
-| `GITHUB_TOKEN` | *(keiner)* | GitHub PAT — erforderlich solange das Repo privat ist |
 | `HOMECA_CTID` | nächste freie ID | Container-ID |
 | `HOMECA_HOSTNAME` | `homeca` | Hostname des LXC |
 | `HOMECA_DISK` | `8` | Root-Disk in GiB |
@@ -64,10 +38,7 @@ GITHUB_TOKEN=$GH_TOKEN HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
 Falls der LXC bereits existiert, kann das Install-Script direkt im Container ausgeführt werden:
 
 ```bash
-export GH_TOKEN="ghp_DEIN_TOKEN"
-GITHUB_TOKEN=$GH_TOKEN bash <(curl -fsSL \
-  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
-  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-install.sh?ref=main')
+bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-install.sh)
 ```
 
 ## Update
@@ -75,31 +46,22 @@ GITHUB_TOKEN=$GH_TOKEN bash <(curl -fsSL \
 ### Direkt im Container:
 
 ```bash
-export GH_TOKEN="ghp_DEIN_TOKEN"
-GITHUB_TOKEN=$GH_TOKEN bash <(curl -fsSL \
-  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
-  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main')
+bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
 ```
 
 ### Vom Proxmox-Host aus (Container-ID anpassen):
 
 ```bash
-export GH_TOKEN="ghp_DEIN_TOKEN"
-curl -fsSL \
-  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
-  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main' \
+curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh \
   -o /tmp/homeca-update.sh
 pct push 100 /tmp/homeca-update.sh /tmp/homeca-update.sh
-pct exec 100 -- bash -c "export GITHUB_TOKEN='$GH_TOKEN'; bash /tmp/homeca-update.sh"
+pct exec 100 -- bash /tmp/homeca-update.sh
 ```
 
 ### Bestimmte Version installieren:
 
 ```bash
-export GH_TOKEN="ghp_DEIN_TOKEN"
-GITHUB_TOKEN=$GH_TOKEN HOMECA_VERSION=v1.3.0 bash <(curl -fsSL \
-  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
-  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main')
+HOMECA_VERSION=v1.3.0 bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
 ```
 
 ### Was das Update-Script macht:

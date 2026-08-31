@@ -9,7 +9,7 @@ User=homeca
 Group=homeca
 WorkingDirectory=/opt/homeca
 ExecStart=/usr/bin/dotnet /opt/homeca/HomeCA.Service.dll
-Restart=on-failure
+Restart=always
 RestartSec=5
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://0.0.0.0:5080

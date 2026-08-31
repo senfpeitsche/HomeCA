@@ -14,7 +14,10 @@
             <MudText Typo="Typo.overline" Class="signal-text">@L.LoginSignalText</MudText>
             <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
             <MudText Class="mud-text-secondary">@L.LoginSubtitle</MudText>
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@L.DefaultCredentialsHint</MudAlert>
+            @if (_isFirstLogin)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@L.DefaultCredentialsHint</MudAlert>
+            }
             <MudForm @ref="_loginForm" Class="form-stack" @bind-IsValid="_loginValid">
                 <MudTextField @bind-Value="_loginUser" Label="@L.LoginUsername" Required="true" Immediate="true" />
                 <MudTextField @bind-Value="_loginPassword" Label="@L.LoginPassword" InputType="InputType.Password" Required="true" Immediate="true" />
@@ -27,13 +30,13 @@
                 <MudExpansionPanel Text="@L.TrustInstallTitle">
                     <MudText Class="mud-text-secondary mb-2">@L.TrustInstallDescription</MudText>
                     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Windows (PowerShell als Administrator)</MudText>
-                    <MudTextField Value="@TrustScriptWindows" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptWindows))" />
+                    <MudTextField Value="@TrustScriptWindows" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptWindows))" />
                     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Linux (Debian/Ubuntu)</MudText>
-                    <MudTextField Value="@TrustScriptLinux" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptLinux))" />
+                    <MudTextField Value="@TrustScriptLinux" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptLinux))" />
                     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">macOS</MudText>
-                    <MudTextField Value="@TrustScriptMacOs" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptMacOs))" />
+                    <MudTextField Value="@TrustScriptMacOs" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptMacOs))" />
                     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Firefox (Enterprise-Richtlinie)</MudText>
-                    <MudTextField Value="@TrustScriptFirefox" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptFirefox))" />
+                    <MudTextField Value="@TrustScriptFirefox" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptFirefox))" />
                 </MudExpansionPanel>
             </MudExpansionPanels>
         </MudPaper>
@@ -68,6 +71,14 @@ else
         <MudAppBar Elevation="0" Class="app-bar">
             <MudText Typo="Typo.h5" Class="app-name">HomeCA <span>LOCAL PKI</span></MudText>
             <MudSpacer />
+            @if (_updateAvailable && !string.IsNullOrEmpty(_latestVersion))
+            {
+                <MudTooltip Text="@($"Version {_latestVersion} verfügbar")">
+                    <MudBadge Content="1" Color="Color.Warning" Overlap="true" Bordered="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.SystemUpdate" Color="Color.Warning" aria-label="Update verfügbar" OnClick="OpenUpdateRelease" />
+                    </MudBadge>
+                </MudTooltip>
+            }
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="@L.RefreshAriaLabel" OnClick="LoadAllAsync" Disabled="_busy" />
             <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="Logout">@L.LogoutButton</MudButton>
         </MudAppBar>
@@ -90,20 +101,83 @@ else
             else if (_section == "authorities") { @AuthoritiesContent }
             else if (_section == "automation") { @AutomationContent }
             else if (_section == "settings") { @SettingsContent }
+            else if (_section == "profiles") { @ProfilesContent }
             else if (_section == "operations") { @OperationsContent }
             else if (_section == "help") { <HelpContent /> }
+
+            @* ── Global dialogs (visible from any section) ── *@
+            <MudDialog @bind-Visible="_pfxDialogVisible"><TitleContent><MudText Typo="Typo.h6">PFX-Kennwort festlegen</MudText></TitleContent><DialogContent><MudText Class="mb-3">Das PFX-Archiv wird mit diesem Kennwort verschlüsselt. Verwenden Sie ein starkes Kennwort und geben Sie es nur an das Zielsystem weiter.</MudText><MudTextField @bind-Value="_pfxPassword" Label="Kennwort" InputType="InputType.Password" Required="true" Immediate="true" /><MudTextField Value="_pfxPassword" Label="Kennwort bestätigen" InputType="InputType.Password" ReadOnly="true" Disabled="true" Class="mt-2" /></DialogContent><DialogActions><MudButton OnClick="CancelPfxDialog">Abbrechen</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(string.IsNullOrWhiteSpace(_pfxPassword) || _busy)" OnClick="DownloadPfx">Herunterladen</MudButton></DialogActions></MudDialog>
+            <MudDialog @bind-Visible="_detailsDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })"><TitleContent><MudText Typo="Typo.h6">Zertifikatsdetails</MudText></TitleContent><DialogContent>@if (_certificateDetails is { } d) {
+                <MudSimpleTable Dense="true" Bordered="true" Class="details-table"><tbody>
+                    <tr><td><strong>Subject</strong></td><td>@d.Subject</td></tr>
+                    <tr><td><strong>Aussteller</strong></td><td>@d.Issuer</td></tr>
+                    <tr><td><strong>Seriennummer</strong></td><td style="font-family:monospace">@d.SerialNumber</td></tr>
+                    <tr><td><strong>SHA-256-Fingerabdruck</strong></td><td style="font-family:monospace;word-break:break-all">@d.Sha256Fingerprint</td></tr>
+                    <tr><td><strong>Gültig ab</strong></td><td>@Date(d.ValidFrom)</td></tr>
+                    <tr><td><strong>Gültig bis</strong></td><td>@Date(d.ExpiresAt)</td></tr>
+                    <tr><td><strong>Algorithmus</strong></td><td>@d.KeyAlgorithm (@(d.KeySize) Bit)</td></tr>
+                    <tr><td><strong>Verwendung</strong></td><td>@d.Usage</td></tr>
+                    <tr><td><strong>DNS-Namen</strong></td><td>@(d.DnsNames.Count > 0 ? string.Join(", ", d.DnsNames) : "—")</td></tr>
+                    <tr><td><strong>IP-Adressen</strong></td><td>@(d.IpAddresses.Count > 0 ? string.Join(", ", d.IpAddresses) : "—")</td></tr>
+                    <tr><td><strong>Erweiterte Schlüsselverwendung</strong></td><td>@(d.EnhancedKeyUsages.Count > 0 ? string.Join(", ", d.EnhancedKeyUsages) : "—")</td></tr>
+                    <tr><td><strong>Zertifikat-ID</strong></td><td style="font-family:monospace">@d.Id</td></tr>
+                </tbody></MudSimpleTable>
+            }</DialogContent><DialogActions><MudButton OnClick="CloseDetailsDialog">Schließen</MudButton></DialogActions></MudDialog>
+            <MudDialog @bind-Visible="_sshCertDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })"><TitleContent><MudText Typo="Typo.h6">SSH-Zertifikat — @_sshCertDialogIdentity</MudText></TitleContent><DialogContent><MudText Class="mb-3">Kopieren Sie den Zertifikatsinhalt oder laden Sie die Datei herunter.</MudText><MudTextField Value="@_sshCertDialogContent" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(_sshCertDialogContent ?? ""))" />
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.h6" Class="mb-2">@(_sshCertDialogKind == "host" ? "Host-Zertifikat einspielen" : "Benutzerzertifikat verwenden")</MudText>
+            @if (_sshCertDialogKind == "host") {
+                <MudText Class="mud-text-secondary mb-2">Speichere das Zertifikat auf dem Server neben dem Host-Key und aktiviere es in der sshd_config.</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">1. Zertifikat auf den Server schreiben</MudText>
+                <MudTextField Value="@SshHostDeployScript" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostDeployScript))" />
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">2. sshd_config ergänzen</MudText>
+                <MudTextField Value="@SshHostSshdConfigScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostSshdConfigScript))" />
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">3. SSH-Daemon neu laden</MudText>
+                <MudTextField Value="@SshReloadSshdScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshReloadSshdScript))" />
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Damit Clients das Host-Zertifikat akzeptieren, muss die Host-CA in <code>known_hosts</code> eingetragen sein — siehe Abschnitt „Vertrauensstellung" unten.</MudAlert>
+            } else {
+                <MudText Class="mud-text-secondary mb-2">Speichere das Zertifikat neben dem privaten Schlüssel. SSH findet es automatisch über die Namenskonvention.</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">1. Zertifikat speichern</MudText>
+                <MudTextField Value="@SshUserDeployScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserDeployScript))" />
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">2. Verbindung testen</MudText>
+                <MudTextField Value="@SshUserTestScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserTestScript))" />
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Damit der Server das Benutzerzertifikat akzeptiert, muss <code>TrustedUserCAKeys</code> in der <code>sshd_config</code> konfiguriert sein — siehe Abschnitt „Vertrauensstellung" unten.</MudAlert>
+            }
+            <MudDivider Class="my-4" />
+            <MudExpansionPanels MultiExpansion="true" Elevation="0">
+                <MudExpansionPanel Text="Vertrauensstellung einrichten">
+                    @if (_sshCertDialogKind == "host") {
+                        <MudText Class="mud-text-secondary mb-2">Trage die Host-CA in die <code>known_hosts</code> der Clients ein, damit signierte Host-Keys ohne Fingerprint-Abfrage akzeptiert werden.</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Einzelner Benutzer</MudText>
+                        <MudTextField Value="@SshHostTrustUserScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostTrustUserScript))" />
+                        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Systemweit</MudText>
+                        <MudTextField Value="@SshHostTrustSystemScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostTrustSystemScript))" />
+                    } else {
+                        <MudText Class="mud-text-secondary mb-2">Konfiguriere den Zielserver, damit er Benutzerzertifikate der User-CA akzeptiert.</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">User-CA auf den Server kopieren und sshd_config ergänzen</MudText>
+                        <MudTextField Value="@SshUserTrustScript" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserTrustScript))" />
+                    }
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="Zertifikat prüfen">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Zertifikatsinhalt anzeigen</MudText>
+                    <MudTextField Value="@SshVerifyScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshVerifyScript))" />
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+            </DialogContent><DialogActions><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="DownloadSshCertificateFile">Herunterladen</MudButton><MudButton OnClick="CloseSshCertDialog">Schließen</MudButton></DialogActions></MudDialog>
+
         </MudMainContent>
     </MudLayout>
 }
 
 @code {
-    private (string Key, string Value)[] Nav => [("overview", L.NavOverview), ("certificates", L.NavCertificates), ("authorities", L.NavAuthorities), ("automation", L.NavAutomation), ("settings", L.NavSettings), ("operations", L.NavOperations), ("help", L.NavHelp)];
+    private (string Key, string Value)[] Nav => [("overview", L.NavOverview), ("certificates", L.NavCertificates), ("authorities", L.NavAuthorities), ("automation", L.NavAutomation), ("settings", L.NavSettings), ("profiles", L.NavProfiles), ("operations", L.NavOperations), ("help", L.NavHelp)];
     private const string Tls = "TLS", ClientUsage = "mTLS", Ecc = "ECC", Rsa = "RSA", RootAuthority = "root", IntermediateAuthority = "intermediate", HostKind = "host", UserKind = "user", Hetzner = "hetzner", Technitium = "technitium", Unspecified = "unspecified", KeyCompromise = "keyCompromise", CessationOfOperation = "cessationOfOperation";
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private string? _token, _loginUser, _loginPassword, _loginError, _pageError, _connectorCheckMessage, _editingConnectorId, _editingDomainName, _editingAuthorityId, _editingProfileId, _deleteAuthorityId, _deleteProfileId, _deleteCertificateId;
     private string _section = "overview";
     private bool _busy, _loading, _loginValid, _mustChangePassword, _showSetupWizard;
     private string _setupPhase = "initial";
+    private bool _isFirstLogin = true;
     private List<DnsCheckResult> _dnsCheckResults = [];
     private MudForm? _loginForm, _changePasswordForm;
     private string _currentPassword = "", _newPassword = "", _confirmPassword = "";
@@ -129,6 +203,10 @@ else
     private string? _sshCertDialogContent, _sshCertDialogIdentity, _sshCertDialogKind, _deleteSshCertificateId;
     private string? _deleteConnectorId, _deleteDomainName, _editingPlanId, _deletePlanId;
     private string _lastBackupFileName = "";
+    private string? _deleteBackupFileName;
+    private List<BackupListItem> _backups = [];
+    private bool _updateAvailable;
+    private string? _latestVersion, _releaseUrl;
 
     private RenderFragment OverviewContent => @<text>
         <MudText Typo="Typo.overline" Class="section-kicker">@L.OverviewKicker</MudText><MudText Typo="Typo.h3" Class="page-title">@L.OverviewTitle</MudText>
@@ -143,64 +221,6 @@ else
         <MudGrid><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudTabs Rounded="false" PanelClass="pt-4"><MudTabPanel Text="TLS- und mTLS-Zertifikat">@CertificateIssueForm</MudTabPanel><MudTabPanel Text="SSH-Zertifikat">@SshIssueForm</MudTabPanel><MudTabPanel Text="Interne ACME">@AcmeForm</MudTabPanel></MudTabs></MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel issue-note" Elevation="0">@CertificateProfileSummary</MudPaper></MudItem></MudGrid>
         <MudPaper Class="panel"><MudText Typo="Typo.h5">Zertifikatsinventar</MudText>@CertificateTable(_certificates)</MudPaper>
         <MudPaper Class="panel"><MudText Typo="Typo.h5">SSH-Zertifikatsinventar</MudText><MudTable Items="_sshCertificates" Dense="true" Hover="true"><HeaderContent><MudTh>Identität</MudTh><MudTh>Art</MudTh><MudTh>Principals</MudTh><MudTh>Ausgestellt</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Identity</MudTd><MudTd>@(context.Kind == "host" ? "Host" : "Benutzer")</MudTd><MudTd>@context.Principals</MudTd><MudTd>@Date(context.IssuedAt)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadSshCertificate(context.Id, context.Identity, context.Kind))">Zertifikat</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteSshCertificate(context.Id))">@(_deleteSshCertificateId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine SSH-Zertifikate ausgestellt.</MudText></NoRecordsContent></MudTable></MudPaper>
-        <MudDialog @bind-Visible="_pfxDialogVisible"><TitleContent><MudText Typo="Typo.h6">PFX-Kennwort festlegen</MudText></TitleContent><DialogContent><MudText Class="mb-3">Das PFX-Archiv wird mit diesem Kennwort verschlüsselt. Verwenden Sie ein starkes Kennwort und geben Sie es nur an das Zielsystem weiter.</MudText><MudTextField @bind-Value="_pfxPassword" Label="Kennwort" InputType="InputType.Password" Required="true" Immediate="true" /><MudTextField Value="_pfxPassword" Label="Kennwort bestätigen" InputType="InputType.Password" ReadOnly="true" Disabled="true" Class="mt-2" /></DialogContent><DialogActions><MudButton OnClick="CancelPfxDialog">Abbrechen</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(string.IsNullOrWhiteSpace(_pfxPassword) || _busy)" OnClick="DownloadPfx">Herunterladen</MudButton></DialogActions></MudDialog>
-        <MudDialog @bind-Visible="_detailsDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })"><TitleContent><MudText Typo="Typo.h6">Zertifikatsdetails</MudText></TitleContent><DialogContent>@if (_certificateDetails is { } d) {
-            <MudSimpleTable Dense="true" Bordered="true" Class="details-table"><tbody>
-                <tr><td><strong>Subject</strong></td><td>@d.Subject</td></tr>
-                <tr><td><strong>Aussteller</strong></td><td>@d.Issuer</td></tr>
-                <tr><td><strong>Seriennummer</strong></td><td style="font-family:monospace">@d.SerialNumber</td></tr>
-                <tr><td><strong>SHA-256-Fingerabdruck</strong></td><td style="font-family:monospace;word-break:break-all">@d.Sha256Fingerprint</td></tr>
-                <tr><td><strong>Gültig ab</strong></td><td>@Date(d.ValidFrom)</td></tr>
-                <tr><td><strong>Gültig bis</strong></td><td>@Date(d.ExpiresAt)</td></tr>
-                <tr><td><strong>Algorithmus</strong></td><td>@d.KeyAlgorithm (@(d.KeySize) Bit)</td></tr>
-                <tr><td><strong>Verwendung</strong></td><td>@d.Usage</td></tr>
-                <tr><td><strong>DNS-Namen</strong></td><td>@(d.DnsNames.Count > 0 ? string.Join(", ", d.DnsNames) : "—")</td></tr>
-                <tr><td><strong>IP-Adressen</strong></td><td>@(d.IpAddresses.Count > 0 ? string.Join(", ", d.IpAddresses) : "—")</td></tr>
-                <tr><td><strong>Erweiterte Schlüsselverwendung</strong></td><td>@(d.EnhancedKeyUsages.Count > 0 ? string.Join(", ", d.EnhancedKeyUsages) : "—")</td></tr>
-                <tr><td><strong>Zertifikat-ID</strong></td><td style="font-family:monospace">@d.Id</td></tr>
-            </tbody></MudSimpleTable>
-        }</DialogContent><DialogActions><MudButton OnClick="CloseDetailsDialog">Schließen</MudButton></DialogActions></MudDialog>
-        <MudDialog @bind-Visible="_sshCertDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })"><TitleContent><MudText Typo="Typo.h6">SSH-Zertifikat — @_sshCertDialogIdentity</MudText></TitleContent><DialogContent><MudText Class="mb-3">Kopieren Sie den Zertifikatsinhalt oder laden Sie die Datei herunter.</MudText><MudTextField Value="@_sshCertDialogContent" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(_sshCertDialogContent ?? ""))" />
-        <MudDivider Class="my-4" />
-        <MudText Typo="Typo.h6" Class="mb-2">@(_sshCertDialogKind == "host" ? "Host-Zertifikat einspielen" : "Benutzerzertifikat verwenden")</MudText>
-        @if (_sshCertDialogKind == "host") {
-            <MudText Class="mud-text-secondary mb-2">Speichere das Zertifikat auf dem Server neben dem Host-Key und aktiviere es in der sshd_config.</MudText>
-            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">1. Zertifikat auf den Server schreiben</MudText>
-            <MudTextField Value="@SshHostDeployScript" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostDeployScript))" />
-            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">2. sshd_config ergänzen</MudText>
-            <MudTextField Value="@SshHostSshdConfigScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostSshdConfigScript))" />
-            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">3. SSH-Daemon neu laden</MudText>
-            <MudTextField Value="@SshReloadSshdScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshReloadSshdScript))" />
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Damit Clients das Host-Zertifikat akzeptieren, muss die Host-CA in <code>known_hosts</code> eingetragen sein — siehe Abschnitt „Vertrauensstellung" unten.</MudAlert>
-        } else {
-            <MudText Class="mud-text-secondary mb-2">Speichere das Zertifikat neben dem privaten Schlüssel. SSH findet es automatisch über die Namenskonvention.</MudText>
-            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">1. Zertifikat speichern</MudText>
-            <MudTextField Value="@SshUserDeployScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserDeployScript))" />
-            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">2. Verbindung testen</MudText>
-            <MudTextField Value="@SshUserTestScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserTestScript))" />
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Damit der Server das Benutzerzertifikat akzeptiert, muss <code>TrustedUserCAKeys</code> in der <code>sshd_config</code> konfiguriert sein — siehe Abschnitt „Vertrauensstellung" unten.</MudAlert>
-        }
-        <MudDivider Class="my-4" />
-        <MudExpansionPanels MultiExpansion="true" Elevation="0">
-            <MudExpansionPanel Text="Vertrauensstellung einrichten">
-                @if (_sshCertDialogKind == "host") {
-                    <MudText Class="mud-text-secondary mb-2">Trage die Host-CA in die <code>known_hosts</code> der Clients ein, damit signierte Host-Keys ohne Fingerprint-Abfrage akzeptiert werden.</MudText>
-                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Einzelner Benutzer</MudText>
-                    <MudTextField Value="@SshHostTrustUserScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostTrustUserScript))" />
-                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Systemweit</MudText>
-                    <MudTextField Value="@SshHostTrustSystemScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostTrustSystemScript))" />
-                } else {
-                    <MudText Class="mud-text-secondary mb-2">Konfiguriere den Zielserver, damit er Benutzerzertifikate der User-CA akzeptiert.</MudText>
-                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">User-CA auf den Server kopieren und sshd_config ergänzen</MudText>
-                    <MudTextField Value="@SshUserTrustScript" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserTrustScript))" />
-                }
-            </MudExpansionPanel>
-            <MudExpansionPanel Text="Zertifikat prüfen">
-                <MudText Typo="Typo.subtitle2" Class="mb-1">Zertifikatsinhalt anzeigen</MudText>
-                <MudTextField Value="@SshVerifyScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshVerifyScript))" />
-            </MudExpansionPanel>
-        </MudExpansionPanels>
-        </DialogContent><DialogActions><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="DownloadSshCertificateFile">Herunterladen</MudButton><MudButton OnClick="CloseSshCertDialog">Schließen</MudButton></DialogActions></MudDialog>
     </text>;
 
     private RenderFragment AuthoritiesContent => @<text>
@@ -215,7 +235,7 @@ else
 
     private RenderFragment SettingsContent => @<text>
         @if (!string.IsNullOrEmpty(_connectorCheckMessage)) { <MudAlert Severity="@(_connectorCheckMessage.StartsWith("Verbindung hergestellt", StringComparison.Ordinal) ? Severity.Success : Severity.Error)" Class="mb-4">@_connectorCheckMessage</MudAlert> }
-        <MudText Typo="Typo.overline" Class="section-kicker">Externe Dienste und Zonen</MudText><MudText Typo="Typo.h3" Class="page-title">Einstellungen</MudText><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ConnectorForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@DomainForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@IssuerForm</MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte DNS-Connectoren</MudText><MudTable Items="_connectors" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Typ</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@context.Type</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginConnectorEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => CheckConnector(context.Id))">@(context.Type == Hetzner ? "Hetzner prüfen" : "Technitium prüfen")</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => TxtTestConnector(context.Id))">TXT-Test</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteConnector(context.Id))">@(_deleteConnectorId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte Domains</MudText><MudTable Items="_domains" Dense="true"><HeaderContent><MudTh>Domain</MudTh><MudTh>Ausstellungszone</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@(context.InternalIssuanceEnabled ? "Intern" : "Extern")</MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginDomainEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteDomain(context.Name))">@(_deleteDomainName == context.Name ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Externe ACME-Issuer</MudText><MudTable Items="_issuers" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Directory-URL</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd><MudText Typo="Typo.caption">@context.DirectoryUrl</MudText></MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginIssuerEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteIssuer(context.Id))">@(_deleteIssuerId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine externen ACME-Issuer registriert.</MudText></NoRecordsContent></MudTable></MudPaper><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ProfileForm</MudPaper></MudItem><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Zielprofile</MudText><MudTable Items="_profiles" Dense="true" Hover="true"><HeaderContent><MudTh>Name</MudTh><MudTh>ID</MudTh><MudTh>Version</MudTh><MudTh>Algorithmus</MudTh><MudTh>Exporte</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@ProfileDisplayName(context)</MudTd><MudTd>@context.Id</MudTd><MudTd>@context.Version</MudTd><MudTd>@ProfileKeyAlgorithm(context)</MudTd><MudTd>@string.Join(", ", ProfileExportFormats(context))</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginProfileEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteProfile(context.Id))">@(_deleteProfileId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Es sind noch keine Zielprofile angelegt.</MudText></NoRecordsContent></MudTable></MudPaper></MudItem></MudGrid>
+        <MudText Typo="Typo.overline" Class="section-kicker">Externe Dienste und Zonen</MudText><MudText Typo="Typo.h3" Class="page-title">Einstellungen</MudText><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ConnectorForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@DomainForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@IssuerForm</MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte DNS-Connectoren</MudText><MudTable Items="_connectors" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Typ</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@context.Type</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginConnectorEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => CheckConnector(context.Id))">@(context.Type == Hetzner ? "Hetzner prüfen" : "Technitium prüfen")</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => TxtTestConnector(context.Id))">TXT-Test</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteConnector(context.Id))">@(_deleteConnectorId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte Domains</MudText><MudTable Items="_domains" Dense="true"><HeaderContent><MudTh>Domain</MudTh><MudTh>Ausstellungszone</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@(context.InternalIssuanceEnabled ? "Intern" : "Extern")</MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginDomainEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteDomain(context.Name))">@(_deleteDomainName == context.Name ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Externe ACME-Issuer</MudText><MudTable Items="_issuers" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Directory-URL</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd><MudText Typo="Typo.caption">@context.DirectoryUrl</MudText></MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginIssuerEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteIssuer(context.Id))">@(_deleteIssuerId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine externen ACME-Issuer registriert.</MudText></NoRecordsContent></MudTable></MudPaper>
         <MudPaper Class="panel mt-4" Elevation="0">
             <MudText Typo="Typo.h5">TLS für HomeCA-Oberfläche</MudText>
             <MudText Class="mud-text-secondary mb-3">
@@ -225,10 +245,29 @@ else
             @if (!string.IsNullOrEmpty(_tlsSettingsSuccess))
             {
                 <MudAlert Severity="Severity.Success" Class="mb-3">@_tlsSettingsSuccess</MudAlert>
-                <MudAlert Severity="Severity.Info" Class="mb-3">
-                    Führe auf dem Proxmox-Host aus, um TLS zu aktivieren:
-                </MudAlert>
-                <MudTextField Value="@_tlsRestartCommand" ReadOnly="true" Variant="Variant.Outlined" Lines="1" Class="script-preview mb-3" />
+                @if (_tlsActivated)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        HomeCA startet neu und ist gleich unter HTTPS erreichbar. Diese Seite wird automatisch weitergeleitet.
+                    </MudAlert>
+                    <MudProgressLinear Indeterminate="true" Color="Color.Secondary" Class="mb-3" />
+                }
+                else
+                {
+                    @if (!string.IsNullOrEmpty(_tlsActivateError))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_tlsActivateError</MudAlert>
+                        <MudAlert Severity="Severity.Info" Class="mb-3">
+                            Alternativ auf dem Host ausführen:
+                        </MudAlert>
+                        <MudTextField Value="@_tlsRestartCommand" ReadOnly="true" Variant="Variant.Outlined" Lines="2" Class="script-preview mb-3" />
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" Class="mt-3"
+                        Disabled="_busy" OnClick="ApplyTlsAndRestartAsync"
+                        StartIcon="@Icons.Material.Filled.RestartAlt">
+                        @(_busy ? "TLS wird aktiviert …" : "TLS jetzt aktivieren und neu starten")
+                    </MudButton>
+                }
             }
             else
             {
@@ -252,8 +291,34 @@ else
         <MudPaper Class="panel mt-4" Elevation="0"><MudText Typo="Typo.h5">Ersteinrichtung</MudText><MudText Class="mud-text-secondary mb-3">Den Setup-Assistenten erneut durchlaufen, um z. B. Hostname, DNS-Connector oder CA-Einrichtung zu wiederholen.</MudText><MudButton Variant="Variant.Outlined" Color="Color.Warning" Disabled="_busy" OnClick="ResetSetupWizardAsync" StartIcon="@Icons.Material.Filled.RestartAlt">Ersteinrichtung wiederholen</MudButton></MudPaper>
     </text>;
 
+    private RenderFragment ProfilesContent => @<text>
+        <MudText Typo="Typo.overline" Class="section-kicker">Zielsysteme und Exportvorgaben</MudText><MudText Typo="Typo.h3" Class="page-title">Profile</MudText>
+        <MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ProfileForm</MudPaper></MudItem><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Zielprofile</MudText><MudTable Items="_profiles" Dense="true" Hover="true"><HeaderContent><MudTh>Name</MudTh><MudTh>ID</MudTh><MudTh>Version</MudTh><MudTh>Algorithmus</MudTh><MudTh>Exporte</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@ProfileDisplayName(context)</MudTd><MudTd>@context.Id</MudTd><MudTd>@context.Version</MudTd><MudTd>@ProfileKeyAlgorithm(context)</MudTd><MudTd>@string.Join(", ", ProfileExportFormats(context))</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginProfileEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteProfile(context.Id))">@(_deleteProfileId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Es sind noch keine Zielprofile angelegt.</MudText></NoRecordsContent></MudTable></MudPaper></MudItem></MudGrid>
+    </text>;
+
     private RenderFragment OperationsContent => @<text>
-        <MudText Typo="Typo.overline" Class="section-kicker">Sperrung und Wiederherstellbarkeit</MudText><MudText Typo="Typo.h3" Class="page-title">Betrieb</MudText><MudGrid><MudItem xs="12" lg="5"><MudPaper Class="panel" Elevation="0">@RevocationForm<MudDivider Class="my-4" /><MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="GenerateCrl">Sperrliste erzeugen</MudButton></MudPaper></MudItem><MudItem xs="12" lg="7"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Sperrungen</MudText><MudTable Items="_revocations" Dense="true"><HeaderContent><MudTh>Seriennummer</MudTh><MudTh>Grund</MudTh><MudTh>Datum</MudTh></HeaderContent><RowTemplate><MudTd>@context.SerialNumber</MudTd><MudTd>@context.Reason</MudTd><MudTd>@Date(context.RevokedAt)</MudTd></RowTemplate></MudTable></MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Verschlüsseltes Backup</MudText><MudText Class="mb-3">Erstellt ein verschlüsseltes Archiv der HomeCA-Daten.</MudText><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateBackup">Backup erstellen</MudButton>@if (!string.IsNullOrEmpty(_lastBackupFileName)) { <MudButton Color="Color.Default" Variant="Variant.Outlined" Disabled="_busy" OnClick="VerifyBackup" Class="ml-2">@_lastBackupFileName verifizieren</MudButton> }</MudPaper>
+        <MudText Typo="Typo.overline" Class="section-kicker">Sperrung und Wiederherstellbarkeit</MudText><MudText Typo="Typo.h3" Class="page-title">Betrieb</MudText><MudGrid><MudItem xs="12" lg="5"><MudPaper Class="panel" Elevation="0">@RevocationForm<MudDivider Class="my-4" /><MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="GenerateCrl">Sperrliste erzeugen</MudButton></MudPaper></MudItem><MudItem xs="12" lg="7"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Sperrungen</MudText><MudTable Items="_revocations" Dense="true"><HeaderContent><MudTh>Seriennummer</MudTh><MudTh>Grund</MudTh><MudTh>Datum</MudTh></HeaderContent><RowTemplate><MudTd>@context.SerialNumber</MudTd><MudTd>@context.Reason</MudTd><MudTd>@Date(context.RevokedAt)</MudTd></RowTemplate></MudTable></MudPaper></MudItem></MudGrid>
+        <MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Backup-Schlüssel</MudText><MudText Class="mb-3">Der 32-Byte AES-256-Schlüssel verschlüsselt alle Backups. Sichern Sie diesen Schlüssel getrennt von den Backups auf.</MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="DownloadBackupKey" StartIcon="@Icons.Material.Filled.Download">Schlüssel herunterladen</MudButton>
+            <MudFileUpload T="IBrowserFile" Accept=".key" FilesChanged="UploadBackupKey" Class="d-inline-flex ml-2" MaximumFileCount="1"><ActivatorContent><MudButton Variant="Variant.Outlined" Color="Color.Default" Disabled="_busy" StartIcon="@Icons.Material.Filled.Upload">Schlüssel hochladen</MudButton></ActivatorContent></MudFileUpload>
+        </MudPaper>
+        <MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Verschlüsseltes Backup</MudText><MudText Class="mb-3">Erstellt ein verschlüsseltes Archiv der HomeCA-Daten.</MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateBackup" StartIcon="@Icons.Material.Filled.AddCircle">Backup erstellen</MudButton>
+            <MudFileUpload T="IBrowserFile" Accept=".hcab" FilesChanged="UploadBackup" Class="d-inline-flex ml-2" MaximumFileCount="1"><ActivatorContent><MudButton Variant="Variant.Outlined" Color="Color.Default" Disabled="_busy" StartIcon="@Icons.Material.Filled.Upload">Backup hochladen</MudButton></ActivatorContent></MudFileUpload>
+            <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="LoadBackupList" StartIcon="@Icons.Material.Filled.Refresh" Class="ml-2">Aktualisieren</MudButton>
+            @if (_backups.Count > 0) {
+            <MudTable Items="_backups" Dense="true" Class="mt-4"><HeaderContent><MudTh>Dateiname</MudTh><MudTh>Größe</MudTh><MudTh>Erstellt</MudTh><MudTh></MudTh></HeaderContent><RowTemplate>
+                <MudTd DataLabel="Dateiname">@context.FileName</MudTd>
+                <MudTd DataLabel="Größe">@FormatBytes(context.Size)</MudTd>
+                <MudTd DataLabel="Erstellt">@Date(context.CreatedAt)</MudTd>
+                <MudTd>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadBackupByName(context.FileName))" StartIcon="@Icons.Material.Filled.Download">Download</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => VerifyBackupByName(context.FileName))">Verifizieren</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteBackup(context.FileName))">@(_deleteBackupFileName == context.FileName ? "Löschen bestätigen" : "Löschen")</MudButton>
+                </MudTd>
+            </RowTemplate><NoRecordsContent><MudText Class="pa-4">Keine Backups vorhanden.</MudText></NoRecordsContent></MudTable>
+            }
+        </MudPaper>
     </text>;
 
     private string _dnsNames = "", _ipAddresses = "", _keyAlgorithm = "ECC", _certificateUsage = "TLS", _selectedProfileId = "", _sshKind = "host", _sshIdentity = "", _sshPrincipals = "", _sshPublicKey = "", _renewalCertificate = "", _connectorName = "", _connectorType = "hetzner", _connectorSecret = "", _connectorEndpoint = "", _domainName = "", _domainConnector = "", _issuerName = "", _issuerUrl = "", _issuerConnector = "", _serialNumber = "", _revocationReason = "unspecified", _acmeContact = "", _acmeAccountId = "", _acmeIdentifiers = "", _acmeOrderId = "", _authorityName = "", _authoritySubject = "CN=HomeCA Root CA", _authorityType = "root", _authorityParent = "", _authorityKeyAlgorithm = "ECC", _profileId = "", _profileVersion = "1.0", _profileDisplayName = "", _profilePurpose = "", _profileKeyAlgorithm = "ECC", _profileExportFormats = "PEM", _profileDocumentation = "", _profileRenewalScript = "";
@@ -281,7 +346,7 @@ else
         if (!string.IsNullOrEmpty(_token)) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
         return client;
     }
-    private async Task LoadInstanceAsync() { try { using var client = Client(); var instance = await client.GetFromJsonAsync<Instance>("api/v1/instance", _json); if (instance?.IsInitialized == false && !Host.IsDevelopment()) _loginError = "Die lokale Administration ist noch nicht eingerichtet. Richten Sie sie über die Setup-API vom Loopback-Host ein."; } catch { } }
+    private async Task LoadInstanceAsync() { try { using var client = Client(); await client.GetFromJsonAsync<Instance>("api/v1/instance", _json); var phase = await client.GetFromJsonAsync<SetupPhaseDto>("api/v1/setup/phase", _json); _isFirstLogin = phase?.Phase == "initial"; } catch { } }
     private async Task LoginAsync()
     {
         await _loginForm!.Validate(); if (!_loginValid) return;
@@ -314,9 +379,9 @@ else
     private async Task LoadAllAsync()
     {
         if (string.IsNullOrEmpty(_token)) return; _loading = true; _pageError = null;
-        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; _sshCertificates = await Get<List<SshCertificateItem>>(client,"api/v1/ssh-certificates") ?? []; SyncProfileSelection(); }
+        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; _sshCertificates = await Get<List<SshCertificateItem>>(client,"api/v1/ssh-certificates") ?? []; _backups = await Get<List<BackupListItem>>(client,"api/v1/backups") ?? []; SyncProfileSelection(); }
         catch { _pageError = "Die Verwaltungsdaten konnten nicht geladen werden. Prüfen Sie die Verbindung oder melden Sie sich erneut an."; }
-        finally { _loading = false; }
+        finally { _loading = false; await CheckForUpdateAsync(); }
     }
     private async Task<T?> Get<T>(HttpClient client, string path) { var response = await client.GetAsync(path); if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) { Logout(); throw new InvalidOperationException(); } response.EnsureSuccessStatusCode(); return await response.Content.ReadFromJsonAsync<T>(_json); }
     private async Task Post(string path, object? body = null)
@@ -774,15 +839,91 @@ else
     }
     private async Task CreateBackup()
     {
-        _busy = true; try { using var client = Client(); var response = await client.PostAsync("api/v1/backups", null); response.EnsureSuccessStatusCode(); var backup = await response.Content.ReadFromJsonAsync<Backup>(_json); _lastBackupFileName = backup?.FileName ?? ""; Snackbar.Add($"Backup {backup?.FileName} erstellt.", Severity.Success); } catch { Snackbar.Add("Backup konnte nicht erstellt werden.", Severity.Error); } finally { _busy = false; }
+        _busy = true; try { using var client = Client(); var response = await client.PostAsync("api/v1/backups", null); response.EnsureSuccessStatusCode(); var backup = await response.Content.ReadFromJsonAsync<Backup>(_json); _lastBackupFileName = backup?.FileName ?? ""; Snackbar.Add($"Backup {backup?.FileName} erstellt.", Severity.Success); await LoadBackupList(); } catch { Snackbar.Add("Backup konnte nicht erstellt werden.", Severity.Error); } finally { _busy = false; }
     }
-    private async Task VerifyBackup()
+    private async Task UploadBackup(IBrowserFile? file)
     {
-        if (string.IsNullOrWhiteSpace(_lastBackupFileName)) { Snackbar.Add("Es wurde noch kein Backup erstellt.", Severity.Warning); return; }
+        if (file is null) return;
         _busy = true;
-        try { using var client = Client(); var response = await client.PostAsync($"api/v1/backups/{Uri.EscapeDataString(_lastBackupFileName)}/verify", null); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); Snackbar.Add($"Backup {_lastBackupFileName} wurde erfolgreich verifiziert.", Severity.Success); }
+        try
+        {
+            using var client = Client();
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream(maxAllowedSize: 512 * 1024 * 1024);
+            content.Add(new StreamContent(stream), "file", file.Name);
+            var response = await client.PutAsync("api/v1/backups", content);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            Snackbar.Add($"Backup {file.Name} hochgeladen.", Severity.Success);
+            await LoadBackupList();
+        }
+        catch (Exception exception) { Snackbar.Add($"Backup-Upload fehlgeschlagen: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task DownloadBackupKey()
+    {
+        _busy = true;
+        try { using var client = Client(); var response = await client.GetAsync("api/v1/backup-key"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); var bytes = await response.Content.ReadAsByteArrayAsync(); await JS.InvokeVoidAsync("homeca.download", "backup.key", "application/octet-stream", Convert.ToBase64String(bytes)); Snackbar.Add("Backup-Schlüssel heruntergeladen.", Severity.Success); }
+        catch (Exception exception) { Snackbar.Add($"Schlüssel-Download fehlgeschlagen: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task UploadBackupKey(IBrowserFile? file)
+    {
+        if (file is null) return;
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream(maxAllowedSize: 1024);
+            content.Add(new StreamContent(stream), "file", file.Name);
+            var response = await client.PutAsync("api/v1/backup-key", content);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            Snackbar.Add("Backup-Schlüssel hochgeladen.", Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add($"Schlüssel-Upload fehlgeschlagen: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task LoadBackupList()
+    {
+        try { using var client = Client(); _backups = await client.GetFromJsonAsync<List<BackupListItem>>("api/v1/backups", _json) ?? []; }
+        catch { _backups = []; }
+    }
+    private async Task CheckForUpdateAsync()
+    {
+        try { using var client = Client(); var result = await client.GetFromJsonAsync<UpdateCheckDto>("api/v1/update-check", _json); if (result is not null) { _updateAvailable = result.UpdateAvailable; _latestVersion = result.LatestVersion; _releaseUrl = result.ReleaseUrl; } }
+        catch { /* silent — update check is best-effort */ }
+    }
+    private async Task OpenUpdateRelease()
+    {
+        if (!string.IsNullOrEmpty(_releaseUrl)) await JS.InvokeVoidAsync("open", _releaseUrl, "_blank");
+    }
+    private async Task DownloadBackupByName(string fileName)
+    {
+        _busy = true;
+        try { using var client = Client(); var response = await client.GetAsync($"api/v1/backups/{Uri.EscapeDataString(fileName)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); var bytes = await response.Content.ReadAsByteArrayAsync(); await JS.InvokeVoidAsync("homeca.download", fileName, "application/octet-stream", Convert.ToBase64String(bytes)); Snackbar.Add($"Backup {fileName} heruntergeladen.", Severity.Success); }
+        catch (Exception exception) { Snackbar.Add($"Backup-Download fehlgeschlagen: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task VerifyBackupByName(string fileName)
+    {
+        _busy = true;
+        try { using var client = Client(); var response = await client.PostAsync($"api/v1/backups/{Uri.EscapeDataString(fileName)}/verify", null); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); Snackbar.Add($"Backup {fileName} wurde erfolgreich verifiziert.", Severity.Success); }
         catch (Exception exception) { Snackbar.Add($"Backup-Verifizierung fehlgeschlagen: {exception.Message}", Severity.Error); }
         finally { _busy = false; }
+    }
+    private async Task DeleteBackup(string fileName)
+    {
+        if (_deleteBackupFileName != fileName) { _deleteBackupFileName = fileName; Snackbar.Add("Klicken Sie erneut auf Löschen, um das Backup zu entfernen.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.DeleteAsync($"api/v1/backups/{Uri.EscapeDataString(fileName)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); _deleteBackupFileName = null; Snackbar.Add($"Backup {fileName} gelöscht.", Severity.Success); await LoadBackupList(); }
+        catch (Exception exception) { Snackbar.Add($"Backup konnte nicht gelöscht werden: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
+    }
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
     }
     private static string[] Split(string value) => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     private async Task<string> ReadApiError(HttpResponseMessage response)
@@ -805,7 +946,7 @@ else
     private string TrustScriptLinux => $"curl -o /tmp/homeca-root-ca.crt {BaseUrl}/api/v1/trust-anchor/pem\nsudo cp /tmp/homeca-root-ca.crt /usr/local/share/ca-certificates/homeca-root-ca.crt\nsudo update-ca-certificates";
     private string TrustScriptMacOs => $"curl -o /tmp/homeca-root-ca.pem {BaseUrl}/api/v1/trust-anchor/pem\nsudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/homeca-root-ca.pem";
     private string TrustScriptFirefox => "{\n  \"policies\": { \"Certificates\": { \"ImportEnterpriseRoots\": true,\n    \"Install\": [\"" + BaseUrl + "/api/v1/trust-anchor/pem\"] } }\n}";
-    private async Task CopyToClipboard(string text) { await JS.InvokeVoidAsync("navigator.clipboard.writeText", text); Snackbar.Add(L.TrustInstallCopied, Severity.Success); }
+    private async Task CopyToClipboard(string text) { await JS.InvokeVoidAsync("homeca.copyToClipboard", text); Snackbar.Add(L.TrustInstallCopied, Severity.Success); }
 
     // ── SSH deployment scripts ──────────────────────────────────────────────
     private string SshCertFileName => $"{_sshCertDialogIdentity ?? "ssh"}-cert.pub";
@@ -941,6 +1082,7 @@ else
 
     // ── Setup wizard integration ────────────────────────────────────────────
     private record SetupStateDto(string Phase, bool IsComplete);
+    private record SetupPhaseDto(string Phase);
     private async Task CheckSetupStateAsync()
     {
         try
@@ -991,8 +1133,8 @@ else
 
     // ── TLS settings ────────────────────────────────────────────────────────
     private string _tlsHostname = "", _tlsIpAddress = "";
-    private string? _tlsSettingsError, _tlsSettingsSuccess, _tlsRestartCommand;
-    private bool _tlsSettingsValid;
+    private string? _tlsSettingsError, _tlsSettingsSuccess, _tlsRestartCommand, _tlsActivateError;
+    private bool _tlsSettingsValid, _tlsActivated;
     private MudForm? _tlsSettingsForm;
 
     private async Task ActivateTlsAsync()
@@ -1024,5 +1166,39 @@ else
         finally { _busy = false; }
     }
 
-    private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors); private record SshIssueResultDto(string Id, string Authority, string CertificatePath, string Certificate); private record SshCertificateItem(string Id, string Kind, string Identity, string Principals, DateTime IssuedAt, string? ValidUntil); private record SshCaKeyDto(string Authority, string PublicKey);
+    private async Task ApplyTlsAndRestartAsync()
+    {
+        _busy = true;
+        _tlsActivateError = null;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync("api/v1/system/activate-tls", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _tlsActivateError = $"Aktivierung fehlgeschlagen: {body}";
+                _tlsRestartCommand = "bash /opt/homeca/homeca-activate-tls.sh";
+                return;
+            }
+            _tlsActivated = true;
+            Snackbar.Add("TLS wird aktiviert — HomeCA startet neu.", Severity.Success);
+
+            // Redirect to HTTPS after a short delay to let the service restart
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(6000);
+                var httpsUrl = $"https://{_tlsHostname}:5443";
+                await InvokeAsync(() => Navigation.NavigateTo(httpsUrl, true));
+            });
+        }
+        catch (Exception ex)
+        {
+            _tlsActivateError = ex.Message;
+            _tlsRestartCommand = "bash /opt/homeca/homeca-activate-tls.sh";
+        }
+        finally { _busy = false; }
+    }
+
+    private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record BackupListItem(string FileName, long Size, DateTimeOffset CreatedAt); private record UpdateCheckDto(string CurrentVersion, string? LatestVersion, bool UpdateAvailable, string? ReleaseUrl); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors); private record SshIssueResultDto(string Id, string Authority, string CertificatePath, string Certificate); private record SshCertificateItem(string Id, string Kind, string Identity, string Principals, DateTime IssuedAt, string? ValidUntil); private record SshCaKeyDto(string Authority, string PublicKey);
 }

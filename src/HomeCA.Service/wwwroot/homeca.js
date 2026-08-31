@@ -8,3 +8,28 @@ window.homeca.download = (fileName, contentType, base64) => {
   anchor.click();
   URL.revokeObjectURL(url);
 };
+
+window.homeca.copyToClipboard = async (text) => {
+  // Try modern Clipboard API first (works on HTTPS / localhost)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch { }
+  }
+  // Fallback for HTTP: use a temporary textarea + execCommand
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand("copy");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+};

@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 # HomeCA — in-container install script
 #
-# Called automatically by homeca-lxc.sh, or run manually inside a Debian 12 LXC.
-# For private repo, download via API first:
-#   GITHUB_TOKEN=ghp_… bash <(curl -fsSL \
-#     -H 'Authorization: token ghp_…' -H 'Accept: application/vnd.github.raw' \
-#     'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-install.sh?ref=main')
+# Called automatically by homeca-lxc.sh, or run manually inside a Debian 12 LXC:
+#   bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-install.sh)
 #
 # Environment overrides:
-#   GITHUB_TOKEN      — GitHub PAT for private repo access (required while repo is private)
 #   HOMECA_VERSION    — release tag (default: latest)
 
 set -euo pipefail
@@ -22,69 +18,26 @@ BACKUP_DIR="/var/backups/homeca"
 CONFIG_DIR="/etc/homeca"
 SERVICE_FILE="/etc/systemd/system/homeca.service"
 
-# ── Auth + download helpers for private repo ────────────────────────
-GH_AUTH_HEADER=()
-if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  GH_AUTH_HEADER=(-H "Authorization: token ${GITHUB_TOKEN}")
-fi
-
-# Download a release asset (works for both private and public repos)
+# ── Download helpers ─────────────────────────────────────────────────
 gh_download_release() {
   local version="$1" asset="$2" dest="$3"
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    # Private repo: use API to find asset URL, then download with octet-stream accept
-    local release_url
-    if [[ "$version" == "latest" ]]; then
-      release_url="https://api.github.com/repos/${GH_REPO}/releases/latest"
-    else
-      release_url="https://api.github.com/repos/${GH_REPO}/releases/tags/${version}"
-    fi
-    local asset_url
-    asset_url=$(curl -fsSL "${GH_AUTH_HEADER[@]}" "$release_url" \
-      | grep -o "\"browser_download_url\": *\"[^\"]*${asset}\"" \
-      | head -1 | cut -d'"' -f4)
-    if [[ -z "$asset_url" ]]; then
-      echo "ERROR: Asset '${asset}' not found in release ${version}" >&2
-      return 1
-    fi
-    # For private repos, browser_download_url needs auth + redirect follow
-    curl -fsSL "${GH_AUTH_HEADER[@]}" -H "Accept: application/octet-stream" \
-      -o "$dest" -L "$asset_url"
+  local base="https://github.com/${GH_REPO}/releases"
+  if [[ "$version" == "latest" ]]; then
+    curl -fsSL -o "$dest" "${base}/latest/download/${asset}"
   else
-    # Public repo: direct download
-    local base="https://github.com/${GH_REPO}/releases"
-    if [[ "$version" == "latest" ]]; then
-      curl -fsSL -o "$dest" "${base}/latest/download/${asset}"
-    else
-      curl -fsSL -o "$dest" "${base}/download/${version}/${asset}"
-    fi
+    curl -fsSL -o "$dest" "${base}/download/${version}/${asset}"
   fi
 }
 
-# Download a raw file from the repo
 gh_raw() {
   local path="$1" dest="${2:--}"
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL "${GH_AUTH_HEADER[@]}" \
-      -H "Accept: application/vnd.github.raw" \
-      -o "$dest" \
-      "https://api.github.com/repos/${GH_REPO}/contents/${path}?ref=main"
-  else
-    curl -fsSL -o "$dest" \
-      "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
-  fi
+  curl -fsSL -o "$dest" \
+    "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
 }
 
-# Resolve the latest release tag
 gh_resolve_latest_tag() {
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL "${GH_AUTH_HEADER[@]}" \
-      "https://api.github.com/repos/${GH_REPO}/releases/latest" \
-      | grep '"tag_name"' | head -1 | cut -d'"' -f4
-  else
-    curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
-      | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+' || echo "latest"
-  fi
+  curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
+    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+' || echo "latest"
 }
 
 # ── Colors / helpers ────────────────────────────────────────────────
@@ -168,6 +121,15 @@ gh_raw "deploy/scripts/homeca-activate-tls.sh" "${APP_DIR}/homeca-activate-tls.s
 chmod 0755 "${APP_DIR}/homeca-activate-tls.sh"
 msg_ok "TLS helper installed"
 
+# ── sudoers for web-triggered TLS activation ────────────────────────
+msg_info "Installing sudoers drop-in for TLS activation …"
+cat > /etc/sudoers.d/homeca-tls << 'SUDOERS'
+# Allow the homeca service user to activate TLS from the web UI.
+homeca ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl restart homeca, /usr/bin/mkdir -p /etc/systemd/system/homeca.service.d, /usr/bin/tee /etc/systemd/system/homeca.service.d/tls.conf
+SUDOERS
+chmod 0440 /etc/sudoers.d/homeca-tls
+msg_ok "sudoers drop-in installed"
+
 # ── systemd unit ────────────────────────────────────────────────────
 msg_info "Installing systemd service …"
 cat > "$SERVICE_FILE" << 'UNIT'
@@ -182,7 +144,7 @@ User=homeca
 Group=homeca
 WorkingDirectory=/opt/homeca
 ExecStart=/usr/bin/dotnet /opt/homeca/HomeCA.Service.dll
-Restart=on-failure
+Restart=always
 RestartSec=5
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://0.0.0.0:5080

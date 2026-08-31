@@ -1,0 +1,4 @@
+# Allow the homeca service user to activate TLS from the web UI.
+# Grants passwordless sudo for the minimum set of commands needed to
+# write the systemd override, reload the daemon, and restart the service.
+homeca ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl restart homeca, /usr/bin/mkdir -p /etc/systemd/system/homeca.service.d, /usr/bin/tee /etc/systemd/system/homeca.service.d/tls.conf

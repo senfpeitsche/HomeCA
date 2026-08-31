@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "HomeCA.Service/0.1.0": {
+      "HomeCA.Service/0.2.3": {
         "dependencies": {
           "Certes": "3.0.4",
           "Microsoft.AspNetCore.OpenApi": "10.0.11",
@@ -74,7 +74,7 @@
     }
   },
   "libraries": {
-    "HomeCA.Service/0.1.0": {
+    "HomeCA.Service/0.2.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

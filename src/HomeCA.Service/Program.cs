@@ -44,6 +44,7 @@ builder.Services.AddSingleton<RevocationRegistry>();
 builder.Services.AddSingleton<CrlService>();
 builder.Services.AddSingleton<BearerTokenFilter>();
 builder.Services.AddSingleton<LoginRateLimiter>();
+builder.Services.AddSingleton<UpdateCheckService>();
 builder.Services.AddScoped<UiStrings>();
 builder.Services.AddHostedService<RenewalBackgroundService>();
 builder.Services.AddHealthChecks();
@@ -93,6 +94,8 @@ using (var scope = app.Services.CreateScope())
 // ── Public endpoints (no authentication) ────────────────────────────────────
 
 app.MapHealthChecks("/health");
+app.MapGet("/api/v1/setup/phase", (SetupStateService setupState) =>
+    Results.Ok(new { phase = setupState.Current.SetupPhase.ToString().ToLowerInvariant() }));
 app.MapGet("/api/v1/version", () =>
 {
     var assembly = Assembly.GetEntryAssembly()!;
@@ -101,6 +104,8 @@ app.MapGet("/api/v1/version", () =>
     var commit = informational.Contains('+') ? informational.Split('+')[1] : null;
     return Results.Ok(new { version, commit, runtime = Environment.Version.ToString() });
 });
+app.MapGet("/api/v1/update-check", async (UpdateCheckService updateCheck, CancellationToken ct) =>
+    Results.Ok(await updateCheck.CheckAsync(ct)));
 app.MapGet("/api/v1/instance", (HomeCaStorage storage) =>
 {
     var informational = Assembly.GetEntryAssembly()!
@@ -265,6 +270,95 @@ api.MapPost("/setup/complete", async (SetupStateService setupState, Cancellation
     return Results.Ok(new { phase = "complete", isComplete = true });
 });
 
+api.MapPost("/system/activate-tls", async (SetupStateService setupState, HomeCaStorage storage, IHostApplicationLifetime lifetime, ILogger<Program> logger, CancellationToken ct) =>
+{
+    // Verify that TLS configuration has been generated
+    const string tlsConfigPath = "/etc/homeca/tls.json";
+    if (!File.Exists(tlsConfigPath))
+        return Results.Conflict(new { detail = "TLS-Konfiguration nicht gefunden. Bitte zuerst ein TLS-Zertifikat ausstellen." });
+
+    string tlsJson;
+    try
+    {
+        tlsJson = await File.ReadAllTextAsync(tlsConfigPath, ct);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to read TLS configuration from {Path}", tlsConfigPath);
+        return Results.Problem("TLS-Konfigurationsdatei konnte nicht gelesen werden.");
+    }
+
+    var tlsConfig = System.Text.Json.JsonSerializer.Deserialize<TlsConfigDto>(tlsJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    if (tlsConfig is null || string.IsNullOrWhiteSpace(tlsConfig.HttpsUrl) || string.IsNullOrWhiteSpace(tlsConfig.PfxPath))
+        return Results.Conflict(new { detail = "TLS-Konfiguration ist ungültig." });
+
+    if (!File.Exists(tlsConfig.PfxPath))
+        return Results.Conflict(new { detail = $"Zertifikatsdatei nicht gefunden: {tlsConfig.PfxPath}" });
+
+    // Write the systemd override that switches Kestrel to HTTPS
+    const string overrideDir = "/etc/systemd/system/homeca.service.d";
+    const string overridePath = "/etc/systemd/system/homeca.service.d/tls.conf";
+    try
+    {
+        Directory.CreateDirectory(overrideDir);
+        var overrideContent = $"""
+            [Service]
+            Environment=ASPNETCORE_URLS={tlsConfig.HttpsUrl}
+            Environment=ASPNETCORE_Kestrel__Certificates__Default__Path={tlsConfig.PfxPath}
+            Environment=Storage__PublicUrl={tlsConfig.PublicUrl}
+            """;
+        // Normalize indentation — heredoc-style content must not have leading spaces
+        overrideContent = string.Join('\n', overrideContent.Split('\n').Select(l => l.TrimStart()));
+        await File.WriteAllTextAsync(overridePath, overrideContent, ct);
+        logger.LogInformation("Wrote systemd TLS override to {Path}", overridePath);
+    }
+    catch (UnauthorizedAccessException)
+    {
+        // The homeca user cannot write to /etc/systemd/system directly — use sudo helper
+        logger.LogWarning("Direct write to {Path} failed, attempting via sudo", overridePath);
+        var mkdirResult = RunProcess("sudo", $"mkdir -p {overrideDir}");
+        if (!mkdirResult.Success)
+            return Results.Problem($"Systemd-Override-Verzeichnis konnte nicht erstellt werden: {mkdirResult.Error}");
+
+        var overrideLines = new[]
+        {
+            "[Service]",
+            $"Environment=ASPNETCORE_URLS={tlsConfig.HttpsUrl}",
+            $"Environment=ASPNETCORE_Kestrel__Certificates__Default__Path={tlsConfig.PfxPath}",
+            $"Environment=Storage__PublicUrl={tlsConfig.PublicUrl}",
+            ""
+        };
+        var overrideContent = string.Join('\n', overrideLines);
+        // Write via sudo tee
+        var teeResult = RunProcess("sudo", $"tee {overridePath}", overrideContent);
+        if (!teeResult.Success)
+            return Results.Problem($"Systemd-Override konnte nicht geschrieben werden: {teeResult.Error}");
+    }
+
+    // Reload systemd to pick up the override, then restart the service
+    var reload = RunProcess("sudo", "systemctl daemon-reload");
+    if (!reload.Success)
+    {
+        logger.LogError("systemctl daemon-reload failed: {Error}", reload.Error);
+        return Results.Problem($"systemctl daemon-reload fehlgeschlagen: {reload.Error}");
+    }
+
+    logger.LogInformation("TLS activation complete — restarting service via systemctl");
+
+    // Fire-and-forget: restart the service. The response must be sent before we die.
+    _ = Task.Run(async () =>
+    {
+        await Task.Delay(500); // give the HTTP response time to flush
+        RunProcess("sudo", "systemctl restart homeca");
+    });
+
+    return Results.Ok(new
+    {
+        message = "TLS wird aktiviert. HomeCA startet neu und ist gleich unter HTTPS erreichbar.",
+        publicUrl = tlsConfig.PublicUrl
+    });
+});
+
 api.MapPost("/setup/reset", async (SetupStateService setupState, CancellationToken ct) =>
 {
     var state = await setupState.ResetAsync(ct);
@@ -349,27 +443,37 @@ api.MapDelete("/certificates/{id}", async (string id, HttpRequest httpRequest, C
 api.MapGet("/certificates/{id}/export/pem", async (string id, HomeCaStorage storage) =>
 {
     var path = Path.Combine(storage.RootPath, "exports", id, "certificate.pem");
-    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}.pem");
+    if (!File.Exists(path)) return Results.NotFound();
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(path, "application/x-pem-file", $"{name}.pem");
 });
 api.MapGet("/certificates/{id}/export/chain", async (string id, HomeCaStorage storage) =>
 {
     var path = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
-    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-chain.pem");
+    if (!File.Exists(path)) return Results.NotFound();
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(path, "application/x-pem-file", $"{name}-chain.pem");
 });
 api.MapGet("/certificates/{id}/export/key", async (string id, HomeCaStorage storage) =>
 {
     var path = Path.Combine(storage.RootPath, "exports", id, "key.pem");
-    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-key.pem");
+    if (!File.Exists(path)) return Results.NotFound();
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(path, "application/x-pem-file", $"{name}-key.pem");
 });
 api.MapGet("/certificates/{id}/export/fullchain", async (string id, HomeCaStorage storage) =>
 {
     var path = Path.Combine(storage.RootPath, "exports", id, "fullchain.pem");
-    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-fullchain.pem");
+    if (!File.Exists(path)) return Results.NotFound();
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(path, "application/x-pem-file", $"{name}-fullchain.pem");
 });
 api.MapGet("/certificates/{id}/export/bundle", async (string id, HomeCaStorage storage) =>
 {
     var path = Path.Combine(storage.RootPath, "exports", id, "bundle.pem");
-    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-bundle.pem");
+    if (!File.Exists(path)) return Results.NotFound();
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(path, "application/x-pem-file", $"{name}-bundle.pem");
 });
 api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest request, HomeCaStorage storage) =>
 {
@@ -377,7 +481,8 @@ api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest 
     if (!File.Exists(pfxPath)) return Results.NotFound();
     using var certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
     var bytes = certificate.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12, request.Password);
-    return Results.File(bytes, "application/x-pkcs12", $"{id}.pfx");
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(bytes, "application/x-pkcs12", $"{name}.pfx");
 });
 
 // SSH
@@ -543,6 +648,73 @@ api.MapPost("/backups", async (HomeCaStorage storage, ILogger<Program> logger, C
     }
 });
 api.MapPost("/backups/{fileName}/verify", async (string fileName, HomeCaStorage storage, CancellationToken ct) => Results.Ok(await storage.VerifyBackupAsync(fileName, ct)));
+api.MapGet("/backups/{fileName}", (string fileName, HomeCaStorage storage) =>
+{
+    var safeName = Path.GetFileName(fileName);
+    if (!string.Equals(safeName, fileName, StringComparison.Ordinal) || !safeName.EndsWith(".hcab", StringComparison.OrdinalIgnoreCase))
+        return Results.BadRequest(new { detail = "Invalid backup file name." });
+    var path = storage.ResolveBackupPath(safeName);
+    return !File.Exists(path) ? Results.NotFound(new { detail = "Backup not found." }) : Results.File(path, "application/octet-stream", safeName);
+});
+api.MapPut("/backups", async (HttpRequest request, HomeCaStorage storage, ILogger<Program> logger, CancellationToken ct) =>
+{
+    if (!request.HasFormContentType) return Results.BadRequest(new { detail = "Multipart form data required." });
+    var form = await request.ReadFormAsync(ct);
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0) return Results.BadRequest(new { detail = "No file uploaded." });
+    var safeName = Path.GetFileName(file.FileName);
+    if (!safeName.EndsWith(".hcab", StringComparison.OrdinalIgnoreCase)) return Results.BadRequest(new { detail = "Only .hcab backup files are accepted." });
+    var targetPath = storage.ResolveBackupPath(safeName);
+    if (File.Exists(targetPath)) return Results.Conflict(new { detail = $"Backup '{safeName}' already exists." });
+    await using var stream = File.Create(targetPath);
+    await file.CopyToAsync(stream, ct);
+    logger.LogInformation("Uploaded backup {BackupFile}", safeName);
+    return Results.Created($"/api/v1/backups/{safeName}", new { fileName = safeName });
+});
+api.MapGet("/backups", (HomeCaStorage storage) =>
+{
+    var dir = storage.ResolveBackupPath(".");
+    if (!Directory.Exists(dir)) return Results.Ok(Array.Empty<object>());
+    var files = Directory.GetFiles(dir, "*.hcab")
+        .Select(f => new FileInfo(f))
+        .OrderByDescending(f => f.CreationTimeUtc)
+        .Select(f => new { fileName = f.Name, size = f.Length, createdAt = f.CreationTimeUtc })
+        .ToArray();
+    return Results.Ok(files);
+});
+api.MapDelete("/backups/{fileName}", (string fileName, HomeCaStorage storage, ILogger<Program> logger) =>
+{
+    var safeName = Path.GetFileName(fileName);
+    if (!string.Equals(safeName, fileName, StringComparison.Ordinal) || !safeName.EndsWith(".hcab", StringComparison.OrdinalIgnoreCase))
+        return Results.BadRequest(new { detail = "Invalid backup file name." });
+    var path = storage.ResolveBackupPath(safeName);
+    if (!File.Exists(path)) return Results.NotFound(new { detail = "Backup not found." });
+    File.Delete(path);
+    logger.LogInformation("Deleted backup {BackupFile}", safeName);
+    return Results.NoContent();
+});
+
+// Backup key
+api.MapGet("/backup-key", async (HomeCaStorage storage, CancellationToken ct) =>
+{
+    var keyPath = storage.BackupKeyPath;
+    if (!File.Exists(keyPath)) return Results.NotFound(new { detail = "Backup key not found." });
+    var bytes = await File.ReadAllBytesAsync(keyPath, ct);
+    return Results.File(bytes, "application/octet-stream", "backup.key");
+});
+api.MapPut("/backup-key", async (HttpRequest request, HomeCaStorage storage, ILogger<Program> logger, CancellationToken ct) =>
+{
+    if (!request.HasFormContentType) return Results.BadRequest(new { detail = "Multipart form data required." });
+    var form = await request.ReadFormAsync(ct);
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0) return Results.BadRequest(new { detail = "No file uploaded." });
+    if (file.Length != 32) return Results.BadRequest(new { detail = "The backup key must be exactly 32 bytes (AES-256)." });
+    var keyPath = storage.BackupKeyPath;
+    await using var stream = File.Create(keyPath);
+    await file.CopyToAsync(stream, ct);
+    logger.LogInformation("Backup key uploaded to {Path}", keyPath);
+    return Results.NoContent();
+});
 
 // Audit
 api.MapGet("/audit", async (HttpRequest request, LocalAdministrationService administration, CancellationToken ct) =>
@@ -559,3 +731,52 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
+
+/// <summary>Extracts a filesystem-safe download name from the certificate's CN, falling back to the hex ID.</summary>
+static string CertificateDownloadName(HomeCaStorage storage, string id)
+{
+    try
+    {
+        var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
+        if (!File.Exists(pfxPath)) return id;
+        using var certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+        var cn = certificate.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, false);
+        if (string.IsNullOrWhiteSpace(cn)) return id;
+        // Replace characters that are unsafe in filenames
+        var sanitized = string.Concat(cn.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim().TrimEnd('.');
+        return string.IsNullOrWhiteSpace(sanitized) ? id : sanitized;
+    }
+    catch
+    {
+        return id;
+    }
+}
+
+/// <summary>Runs an external process with optional stdin and returns success + output.</summary>
+static ProcessResult RunProcess(string fileName, string arguments, string? stdin = null)
+{
+    using var process = new System.Diagnostics.Process();
+    process.StartInfo = new System.Diagnostics.ProcessStartInfo
+    {
+        FileName = fileName,
+        Arguments = arguments,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        RedirectStandardInput = stdin is not null,
+        UseShellExecute = false,
+        CreateNoWindow = true
+    };
+    process.Start();
+    if (stdin is not null)
+    {
+        process.StandardInput.Write(stdin);
+        process.StandardInput.Close();
+    }
+    var output = process.StandardOutput.ReadToEnd();
+    var error = process.StandardError.ReadToEnd();
+    process.WaitForExit(TimeSpan.FromSeconds(30));
+    return new ProcessResult(process.ExitCode == 0, output.Trim(), error.Trim());
+}
+
+record ProcessResult(bool Success, string Output, string Error);
+record TlsConfigDto(string? HttpsUrl, string? PfxPath, string? PublicUrl, string? Hostname);

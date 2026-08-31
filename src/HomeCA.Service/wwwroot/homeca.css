@@ -39,7 +39,9 @@ html, body { background: var(--homeca-canvas); color: var(--homeca-ink); }
 .chip-row { display: flex; flex-wrap: wrap; gap: .5rem; margin: .25rem 0; }
 .profile-facts { display: grid; gap: .5rem; font-size: .95rem; }
 .profile-fact { padding: .6rem .75rem; border: 1px solid rgba(18,51,46,.12); border-radius: 5px; background: rgba(255,255,255,.55); }
-.script-preview textarea { font-family: Consolas, "Courier New", monospace; }
+.script-preview textarea { font-family: 'Cascadia Mono', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace; font-size: .85rem; line-height: 1.5; }
+.script-preview .mud-input-outlined-border { background: #1a2a25; }
+.script-preview textarea { color: #d4e8de; }
 .empty-panel { max-width: 42rem; }
 .page-loader { margin: -3rem -4.5rem 1.5rem; }
 .mud-button-filled-primary { background-color: var(--homeca-forest) !important; }
