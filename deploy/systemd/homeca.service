@@ -12,7 +12,7 @@ ExecStart=/usr/bin/dotnet /opt/homeca/HomeCA.Service.dll
 Restart=on-failure
 RestartSec=5
 Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+Environment=ASPNETCORE_URLS=http://0.0.0.0:5080
 Environment=Storage__RootPath=/var/lib/homeca
 Environment=Storage__BackupPath=/var/backups/homeca
 Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
@@ -20,7 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/homeca /var/backups/homeca
+ReadWritePaths=/var/lib/homeca /var/backups/homeca /etc/homeca
 
 [Install]
 WantedBy=multi-user.target

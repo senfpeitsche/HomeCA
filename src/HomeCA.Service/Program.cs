@@ -21,6 +21,7 @@ builder.Services
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddSingleton<HomeCaStorage>();
+builder.Services.AddSingleton<SetupStateService>();
 builder.Services.AddSingleton<LocalAdministrationService>();
 builder.Services.AddSingleton<CertificateAuthorityService>();
 builder.Services.AddSingleton<CertificateIssuanceService>();
@@ -144,16 +145,100 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
 
 var api = app.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>();
 
-api.MapPost("/change-password", async (ChangePasswordRequest request, HttpContext context, LocalAdministrationService administration, CancellationToken ct) =>
+// ── Setup wizard endpoints (authenticated) ──────────────────────────────────
+
+api.MapGet("/setup/state", (SetupStateService setupState) => Results.Ok(new
+{
+    phase = setupState.Current.SetupPhase.ToString().ToLowerInvariant(),
+    isComplete = setupState.IsSetupComplete,
+    hostname = setupState.Current.Hostname,
+    tlsCertificateId = setupState.Current.TlsCertificateId
+}));
+
+api.MapPost("/setup/skip", async (SetupStateService setupState, CancellationToken ct) =>
+{
+    var state = await setupState.SkipWizardAsync(ct);
+    return Results.Ok(new { phase = state.SetupPhase.ToString().ToLowerInvariant(), isComplete = true });
+});
+
+api.MapPost("/setup/activate-tls", async (ActivateTlsRequest request, SetupStateService setupState, CertificateIssuanceService issuance, HomeCaStorage storage, ILogger<Program> logger, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Hostname))
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["hostname"] = ["Hostname is required."] });
+
+    try
+    {
+        // Collect SANs: hostname + optional IPs
+        var dnsNames = new List<string> { request.Hostname };
+        var ipAddresses = new List<string>();
+        if (!string.IsNullOrWhiteSpace(request.IpAddress))
+            ipAddresses.Add(request.IpAddress);
+
+        // Issue TLS certificate for this HomeCA instance
+        var issueRequest = new IssueCertificateRequest("TLS", dnsNames, ipAddresses, 365, "ECC");
+        var result = await issuance.IssueAsync(issueRequest, ct);
+
+        // Store hostname and certificate ID in setup state
+        await setupState.SetHostnameAsync(request.Hostname, ct);
+        await setupState.SetTlsCertificateIdAsync(result.Id, ct);
+
+        // Write TLS configuration file (readable by the restart helper)
+        var pfxPath = Path.Combine(storage.RootPath, "certificates", result.Id, "certificate.pfx");
+        var httpsUrl = "https://0.0.0.0:5443";
+        var tlsConfig = new
+        {
+            httpsUrl,
+            pfxPath,
+            publicUrl = $"https://{request.Hostname}:5443",
+            hostname = request.Hostname
+        };
+        var tlsConfigPath = Path.Combine(Path.GetDirectoryName(storage.RootPath)!, "..", "etc", "homeca", "tls.json");
+        // Normalize: /etc/homeca/tls.json
+        tlsConfigPath = "/etc/homeca/tls.json";
+        await File.WriteAllTextAsync(tlsConfigPath, System.Text.Json.JsonSerializer.Serialize(tlsConfig, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), ct);
+
+        // Advance setup state
+        await setupState.AdvanceAsync(SetupPhase.CaInitialized, ct);
+
+        logger.LogInformation("TLS activated for {Hostname}, certificate {CertificateId}. Restart required.", request.Hostname, result.Id);
+
+        return Results.Ok(new
+        {
+            certificateId = result.Id,
+            hostname = request.Hostname,
+            httpsUrl,
+            message = "TLS configured. Restart the HomeCA service to apply: systemctl restart homeca"
+        });
+    }
+    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+    {
+        return Results.Conflict(new { detail = ex.Message });
+    }
+});
+
+api.MapPost("/setup/complete", async (SetupStateService setupState, CancellationToken ct) =>
+{
+    await setupState.AdvanceAsync(SetupPhase.TlsConfigured, ct);
+    return Results.Ok(new { phase = "complete", isComplete = true });
+});
+
+api.MapPost("/change-password", async (ChangePasswordRequest request, HttpContext context, LocalAdministrationService administration, SetupStateService setupState, CancellationToken ct) =>
 {
     var token = context.Request.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
     if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 12)
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["Das neue Passwort muss mindestens 12 Zeichen lang sein."] });
-    return await administration.ChangePasswordAsync(token, request, ct) ? Results.NoContent() : Results.Unauthorized();
+    if (!await administration.ChangePasswordAsync(token, request, ct)) return Results.Unauthorized();
+    await setupState.AdvanceAsync(SetupPhase.Initial, ct);
+    return Results.NoContent();
 });
 
 // Authorities
-api.MapPost("/authorities/initialize", async (CertificateAuthorityService authorities, CancellationToken ct) => Results.Ok(await authorities.InitializeAsync(ct)));
+api.MapPost("/authorities/initialize", async (CertificateAuthorityService authorities, SetupStateService setupState, CancellationToken ct) =>
+{
+    var result = await authorities.InitializeAsync(ct);
+    await setupState.AdvanceAsync(SetupPhase.PasswordChanged, ct);
+    return Results.Ok(result);
+});
 api.MapGet("/authorities", async (CertificateAuthorityService authorities, CancellationToken ct) => Results.Ok(await authorities.ListAsync(ct)));
 api.MapPost("/authorities", async (CreateAuthorityRequest request, CertificateAuthorityService authorities, CancellationToken ct) =>
 {

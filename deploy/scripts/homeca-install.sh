@@ -162,6 +162,12 @@ chown -R root:root "$APP_DIR"
 chmod 0755 "$APP_DIR"
 msg_ok "HomeCA ${VERSION} deployed to ${APP_DIR}"
 
+# ── TLS activation helper ──────────────────────────────────────────
+msg_info "Installing TLS activation helper …"
+gh_raw "deploy/scripts/homeca-activate-tls.sh" "${APP_DIR}/homeca-activate-tls.sh"
+chmod 0755 "${APP_DIR}/homeca-activate-tls.sh"
+msg_ok "TLS helper installed"
+
 # ── systemd unit ────────────────────────────────────────────────────
 msg_info "Installing systemd service …"
 cat > "$SERVICE_FILE" << 'UNIT'
@@ -179,7 +185,7 @@ ExecStart=/usr/bin/dotnet /opt/homeca/HomeCA.Service.dll
 Restart=on-failure
 RestartSec=5
 Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+Environment=ASPNETCORE_URLS=http://0.0.0.0:5080
 Environment=Storage__RootPath=/var/lib/homeca
 Environment=Storage__BackupPath=/var/backups/homeca
 Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
@@ -187,7 +193,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/homeca /var/backups/homeca
+ReadWritePaths=/var/lib/homeca /var/backups/homeca /etc/homeca
 
 [Install]
 WantedBy=multi-user.target

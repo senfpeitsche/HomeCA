@@ -56,6 +56,10 @@ else if (_mustChangePassword)
         </MudPaper>
     </main>
 }
+else if (_showSetupWizard)
+{
+    <SetupWizard Token="@_token" InitialPhase="@_setupPhase" OnSetupComplete="OnWizardComplete" OnSkipped="OnWizardSkipped" />
+}
 else
 {
     <MudLayout>
@@ -96,7 +100,8 @@ else
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private string? _token, _loginUser, _loginPassword, _loginError, _pageError, _connectorCheckMessage, _editingConnectorId, _editingDomainName, _editingAuthorityId, _editingProfileId, _deleteAuthorityId, _deleteProfileId, _deleteCertificateId;
     private string _section = "overview";
-    private bool _busy, _loading, _loginValid, _mustChangePassword;
+    private bool _busy, _loading, _loginValid, _mustChangePassword, _showSetupWizard;
+    private string _setupPhase = "initial";
     private MudForm? _loginForm, _changePasswordForm;
     private string _currentPassword = "", _newPassword = "", _confirmPassword = "";
     private string? _changePasswordError, _changePasswordSuccess;
@@ -244,7 +249,7 @@ else
     {
         await _loginForm!.Validate(); if (!_loginValid) return;
         _busy = true; _loginError = null;
-        try { using var client = Client(); var response = await client.PostAsJsonAsync("api/v1/login", new { userName = _loginUser, password = _loginPassword }); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(); var result = await response.Content.ReadFromJsonAsync<LoginResult>(_json); _token = result?.AccessToken ?? throw new InvalidOperationException(); _mustChangePassword = result.MustChangePassword; if (!_mustChangePassword) { await LoadAllAsync(); } }
+        try { using var client = Client(); var response = await client.PostAsJsonAsync("api/v1/login", new { userName = _loginUser, password = _loginPassword }); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(); var result = await response.Content.ReadFromJsonAsync<LoginResult>(_json); _token = result?.AccessToken ?? throw new InvalidOperationException(); _mustChangePassword = result.MustChangePassword; if (!_mustChangePassword) { await CheckSetupStateAsync(); if (!_showSetupWizard) await LoadAllAsync(); } }
         catch { _loginError = "Benutzername oder Passwort sind nicht korrekt."; }
         finally { _busy = false; }
     }
@@ -836,5 +841,40 @@ else
     private static string ProfileRenewalScript(TargetProfileDto? profile) => string.IsNullOrWhiteSpace(profile?.RenewalScriptTemplate) ? "# Kein profilspezifisches Skript hinterlegt." : profile.RenewalScriptTemplate;
     private static string Date(DateTime value) => value.ToLocalTime().ToString("d", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
     private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
+
+    // ── Setup wizard integration ────────────────────────────────────────────
+    private record SetupStateDto(string Phase, bool IsComplete);
+    private async Task CheckSetupStateAsync()
+    {
+        try
+        {
+            using var client = Client();
+            var state = await client.GetFromJsonAsync<SetupStateDto>("api/v1/setup/state", _json);
+            if (state is not null && !state.IsComplete)
+            {
+                _showSetupWizard = true;
+                _setupPhase = state.Phase;
+            }
+            else
+            {
+                _showSetupWizard = false;
+            }
+        }
+        catch
+        {
+            _showSetupWizard = false;
+        }
+    }
+    private async Task OnWizardComplete()
+    {
+        _showSetupWizard = false;
+        Snackbar.Add("Einrichtung abgeschlossen. Der Dienst wird neu gestartet …", Severity.Success);
+    }
+    private async Task OnWizardSkipped()
+    {
+        _showSetupWizard = false;
+        await LoadAllAsync();
+    }
+
     private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors); private record SshIssueResultDto(string Id, string Authority, string CertificatePath, string Certificate); private record SshCertificateItem(string Id, string Kind, string Identity, string Principals, DateTime IssuedAt, string? ValidUntil); private record SshCaKeyDto(string Authority, string PublicKey);
 }

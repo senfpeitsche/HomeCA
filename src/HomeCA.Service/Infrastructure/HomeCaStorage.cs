@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
+using System.Text.Json.Serialization;
+
 namespace HomeCA.Service.Infrastructure;
 
 public sealed class HomeCaStorage
@@ -98,7 +100,14 @@ public sealed class HomeCaStorage
         var stateFile = Path.Combine(_options.RootPath, "state", "homeca-state.json");
         if (!File.Exists(stateFile))
         {
-            File.WriteAllText(stateFile, JsonSerializer.Serialize(new { version = 1, createdAt = DateTimeOffset.UtcNow }));
+            var initialState = new SetupState();
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+            };
+            File.WriteAllText(stateFile, JsonSerializer.Serialize(initialState, jsonOptions));
         }
     }
 }

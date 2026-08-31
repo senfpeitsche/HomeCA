@@ -1,0 +1,239 @@
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject UiStrings L
+
+<main class="login-shell">
+    <MudPaper Class="login-card" Elevation="0" Style="max-width: 600px;">
+        <MudText Typo="Typo.overline" Class="signal-text">ERSTEINRICHTUNG</MudText>
+        <MudText Typo="Typo.h4" Class="service-title mb-2">HomeCA Setup-Assistent</MudText>
+        <MudText Class="mud-text-secondary mb-4">
+            Dieser Assistent führt dich durch die Ersteinrichtung deiner lokalen PKI.
+            Er erscheint bei jeder Anmeldung, bis alle Schritte abgeschlossen sind.
+        </MudText>
+
+        <MudStepper @bind-ActiveIndex="_activeStep" NonLinear="false" Color="Color.Primary" Variant="Variant.Filled" Class="mb-4">
+            <MudStep Title="CA erstellen" />
+            <MudStep Title="TLS einrichten" />
+            <MudStep Title="Fertig" />
+        </MudStepper>
+
+        @if (_activeStep == 0)
+        {
+            @* Step 1: Initialize Certificate Authorities *@
+            <MudText Typo="Typo.h6" Class="mb-2">Zertifizierungsstellen erstellen</MudText>
+            <MudText Class="mud-text-secondary mb-3">
+                HomeCA erstellt eine Root-CA und eine TLS-Issuing-CA.
+                Damit können anschließend Zertifikate für dein Homelab ausgestellt werden.
+            </MudText>
+
+            @if (_caCreated)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">
+                    Root-CA und TLS-Issuing-CA wurden erfolgreich erstellt.
+                </MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GoToStep2" FullWidth="true">
+                    Weiter: TLS einrichten
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="InitializeCaAsync" FullWidth="true">
+                    @(_busy ? "CA wird erstellt …" : "CA jetzt erstellen")
+                </MudButton>
+            }
+        }
+        else if (_activeStep == 1)
+        {
+            @* Step 2: Configure TLS *@
+            <MudText Typo="Typo.h6" Class="mb-2">TLS für HomeCA aktivieren</MudText>
+            <MudText Class="mud-text-secondary mb-3">
+                Gib den Hostnamen ein, unter dem HomeCA im Netzwerk erreichbar sein soll.
+                HomeCA stellt sich damit ein eigenes TLS-Zertifikat aus und ist danach nur noch über HTTPS erreichbar.
+            </MudText>
+
+            <MudForm @ref="_tlsForm" @bind-IsValid="_tlsValid">
+                <MudTextField @bind-Value="_hostname" Label="Hostname" Placeholder="pki.home.local"
+                    Required="true" Immediate="true" HelperText="DNS-Name oder FQDN des Containers" />
+                <MudTextField @bind-Value="_ipAddress" Label="IP-Adresse (optional)" Placeholder="10.5.0.131"
+                    Immediate="true" HelperText="Wird als zusätzlicher SAN ins Zertifikat aufgenommen" Class="mt-2" />
+            </MudForm>
+
+            @if (!string.IsNullOrEmpty(_tlsError))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_tlsError</MudAlert>
+            }
+
+            @if (_tlsActivated)
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3 mb-3">
+                    TLS-Zertifikat ausgestellt! Der Dienst muss jetzt neu gestartet werden, damit HTTPS aktiv wird.
+                </MudAlert>
+                <MudAlert Severity="Severity.Info" Class="mb-3">
+                    Nach dem Neustart ist HomeCA unter <strong>https://@_hostname:5443</strong> erreichbar.
+                    Installiere vorher die Root-CA im Browser (Trust Anchor auf der Login-Seite).
+                </MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CompleteSetupAsync" Disabled="_busy" FullWidth="true">
+                    @(_busy ? "Wird abgeschlossen …" : "Einrichtung abschließen und Dienst neu starten")
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_tlsValid || _busy)" OnClick="ActivateTlsAsync" FullWidth="true" Class="mt-3">
+                    @(_busy ? "TLS wird eingerichtet …" : "TLS aktivieren")
+                </MudButton>
+            }
+        }
+        else
+        {
+            @* Step 3: Done — waiting for restart *@
+            <MudText Typo="Typo.h6" Class="mb-2">Einrichtung abgeschlossen</MudText>
+            <MudAlert Severity="Severity.Success" Class="mb-3">
+                HomeCA wird jetzt neu gestartet und ist danach unter HTTPS erreichbar.
+            </MudAlert>
+            <MudText Class="mud-text-secondary mb-3">
+                Falls der Neustart nicht automatisch erfolgt, führe auf dem Proxmox-Host aus:
+            </MudText>
+            <MudTextField Value="@RestartCommand" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" />
+            <MudText Class="mud-text-secondary">
+                Danach erreichbar unter: <strong>https://@_hostname:5443</strong>
+            </MudText>
+        }
+
+        <MudDivider Class="my-4" />
+        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small" OnClick="SkipWizardAsync" Disabled="_busy">
+            Assistent überspringen (nicht empfohlen)
+        </MudButton>
+    </MudPaper>
+</main>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [Parameter] public EventCallback OnSetupComplete { get; set; }
+    [Parameter] public EventCallback OnSkipped { get; set; }
+    [Parameter] public string InitialPhase { get; set; } = "initial";
+
+    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
+    private int _activeStep;
+    private bool _busy, _caCreated, _tlsActivated, _tlsValid;
+    private string _hostname = "", _ipAddress = "", _tlsError = "";
+    private MudForm? _tlsForm;
+
+    private string RestartCommand => "bash /opt/homeca/homeca-activate-tls.sh";
+
+    protected override void OnInitialized()
+    {
+        // Resume wizard at the correct step based on current setup phase
+        _activeStep = InitialPhase switch
+        {
+            "caInitialized" or "caiInitialized" => 1,
+            "tlsConfigured" => 2,
+            _ => 0
+        };
+        _caCreated = _activeStep >= 1;
+        _tlsActivated = _activeStep >= 2;
+    }
+
+    private HttpClient Client()
+    {
+        var client = new HttpClient { BaseAddress = new Uri(Navigation.BaseUri) };
+        if (!string.IsNullOrEmpty(Token))
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Token);
+        return client;
+    }
+
+    private void GoToStep2() => _activeStep = 1;
+
+    private async Task InitializeCaAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync("api/v1/authorities/initialize", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                // If CAs already exist, treat as success
+                if (error.Contains("already configured", StringComparison.OrdinalIgnoreCase))
+                {
+                    _caCreated = true;
+                    Snackbar.Add("Zertifizierungsstellen sind bereits eingerichtet.", Severity.Info);
+                }
+                else
+                {
+                    Snackbar.Add($"CA-Erstellung fehlgeschlagen: {error}", Severity.Error);
+                }
+                return;
+            }
+            _caCreated = true;
+            Snackbar.Add("Root-CA und TLS-Issuing-CA wurden erstellt.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task ActivateTlsAsync()
+    {
+        _busy = true;
+        _tlsError = "";
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/setup/activate-tls", new { hostname = _hostname, ipAddress = string.IsNullOrWhiteSpace(_ipAddress) ? null : _ipAddress });
+            if (!response.IsSuccessStatusCode)
+            {
+                _tlsError = await response.Content.ReadAsStringAsync();
+                return;
+            }
+            _tlsActivated = true;
+            Snackbar.Add("TLS-Zertifikat ausgestellt.", Severity.Success);
+        }
+        catch (Exception ex) { _tlsError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task CompleteSetupAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            await client.PostAsync("api/v1/setup/complete", null);
+            _activeStep = 2;
+
+            // Trigger TLS activation via helper script (runs as root, creates systemd override, restarts)
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("bash", "-c \"sleep 2 && bash /opt/homeca/homeca-activate-tls.sh\"")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch
+            {
+                // Ignore — user can restart manually
+            }
+
+            await OnSetupComplete.InvokeAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task SkipWizardAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            await client.PostAsync("api/v1/setup/skip", null);
+            await OnSkipped.InvokeAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+}
