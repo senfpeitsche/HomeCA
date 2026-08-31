@@ -24,15 +24,15 @@
         <MudPaper Class="login-card mt-4" Elevation="0">
             <MudExpansionPanels MultiExpansion="true" Elevation="0">
                 <MudExpansionPanel Text="@L.TrustInstallTitle">
-                    <MudText Class="mud-text-secondary mb-3">@L.TrustInstallDescription</MudText>
-                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Windows (PowerShell als Administrator)</MudText>
-                    <MudTextField Value="@TrustScriptWindows" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptWindows))" />
-                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Linux (Debian/Ubuntu)</MudText>
-                    <MudTextField Value="@TrustScriptLinux" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptLinux))" />
-                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">macOS</MudText>
-                    <MudTextField Value="@TrustScriptMacOs" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptMacOs))" />
-                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Firefox (Enterprise-Richtlinie)</MudText>
-                    <MudTextField Value="@TrustScriptFirefox" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptFirefox))" />
+                    <MudText Class="mud-text-secondary mb-2">@L.TrustInstallDescription</MudText>
+                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Windows (PowerShell als Administrator)</MudText>
+                    <MudTextField Value="@TrustScriptWindows" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptWindows))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Linux (Debian/Ubuntu)</MudText>
+                    <MudTextField Value="@TrustScriptLinux" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptLinux))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">macOS</MudText>
+                    <MudTextField Value="@TrustScriptMacOs" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptMacOs))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Firefox (Enterprise-Richtlinie)</MudText>
+                    <MudTextField Value="@TrustScriptFirefox" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptFirefox))" />
                 </MudExpansionPanel>
             </MudExpansionPanels>
         </MudPaper>
@@ -45,6 +45,7 @@ else if (_mustChangePassword)
             <MudText Typo="Typo.overline" Class="signal-text">@L.LoginSignalText</MudText>
             <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
             <MudText Class="mud-text-secondary">@L.ChangePasswordDescription</MudText>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">@L.DefaultCredentialsHint</MudAlert>
             <MudForm @ref="_changePasswordForm" Class="form-stack" @bind-IsValid="_changePasswordValid">
                 <MudTextField @bind-Value="_currentPassword" Label="@L.CurrentPassword" InputType="InputType.Password" Required="true" Immediate="true" />
                 <MudTextField @bind-Value="_newPassword" Label="@L.NewPassword" InputType="InputType.Password" Required="true" Immediate="true" Validation="@(new Func<string, string?>(ValidateNewPassword))" />
@@ -102,6 +103,7 @@ else
     private string _section = "overview";
     private bool _busy, _loading, _loginValid, _mustChangePassword, _showSetupWizard;
     private string _setupPhase = "initial";
+    private List<DnsCheckResult> _dnsCheckResults = [];
     private MudForm? _loginForm, _changePasswordForm;
     private string _currentPassword = "", _newPassword = "", _confirmPassword = "";
     private string? _changePasswordError, _changePasswordSuccess;
@@ -225,7 +227,7 @@ else
 
     private RenderFragment CertificateTable(IEnumerable<Certificate> items) => @<MudTable Items="items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"><HeaderContent><MudTh>Subject</MudTh><MudTh>Algorithmus</MudTh><MudTh>Läuft ab</MudTh><MudTh>Download</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd DataLabel="Subject">@context.Subject</MudTd><MudTd DataLabel="Algorithmus">@context.KeyAlgorithm</MudTd><MudTd DataLabel="Läuft ab">@Date(context.ExpiresAt)</MudTd><MudTd DataLabel="Download"><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "pem"))">PEM</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "key"))">Key</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "chain"))">Chain</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "fullchain"))">Fullchain</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "bundle"))">Bundle</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => OpenPfxDialog(context.Id))">PFX</MudButton></MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => ShowCertificateDetails(context.Id))">Details</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteCertificate(context.Id))">@(_deleteCertificateId == context.Id ? "Widerruf bestätigen" : "Widerrufen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine Zertifikate ausgestellt.</MudText></NoRecordsContent></MudTable>;
     private RenderFragment AuthorityForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingAuthorityId is null ? "CA anlegen" : "CA verwalten")</MudText><MudTextField @bind-Value="_authorityName" Label="Name" Required="true" /><MudTextField @bind-Value="_authoritySubject" Label="Subject (DN)" Required="true" Disabled="@(_editingAuthorityId is not null)" /><MudSelect T="string" Label="Typ" @bind-Value="_authorityType" Disabled="@(_editingAuthorityId is not null)"><MudSelectItem Value="@RootAuthority">Root-CA</MudSelectItem><MudSelectItem Value="@IntermediateAuthority">Intermediate-CA</MudSelectItem></MudSelect>@if (_authorityType == IntermediateAuthority) { <MudSelect T="string" Label="Übergeordnete Root-CA" @bind-Value="_authorityParent" Required="true" Disabled="@(_editingAuthorityId is not null)">@foreach(var authority in _authorities.Where(a => a.Type == RootAuthority && a.IsActive && !a.IsRevoked)) { <MudSelectItem Value="@authority.Id">@authority.Name</MudSelectItem> }</MudSelect> }<MudNumericField T="int" @bind-Value="_authorityValidityDays" Label="Laufzeit (Tage)" Min="1" Max="7300" Disabled="@(_editingAuthorityId is not null)" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_authorityKeyAlgorithm" Disabled="@(_editingAuthorityId is not null)"><MudSelectItem Value="@Ecc">ECC P-256</MudSelectItem><MudSelectItem Value="@Rsa">RSA 3072</MudSelectItem></MudSelect><MudNumericField T="int" @bind-Value="_authorityCrlValidityDays" Label="CRL-Gültigkeit (Tage)" Min="1" Max="365" />@if (_editingAuthorityId is not null) { <MudCheckBox @bind-Value="_authorityActive" Label="Für neue Ausstellungen aktiv" /> }<MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAuthority">@(_editingAuthorityId is null ? "CA erstellen" : "Änderungen speichern")</MudButton>@if (_editingAuthorityId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelAuthorityEdit">Bearbeiten abbrechen</MudButton> }</div>;
-    private RenderFragment CertificateIssueForm => @<div class="form-stack"><div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 1</MudText><MudText Typo="Typo.h6">Zielsystem wählen</MudText><MudText Class="mud-text-secondary">Das Zielprofil setzt Standardwerte für Algorithmus, Laufzeit, Exporte und Einspielhinweise.</MudText></div><MudSelect T="string" Label="Zielprofil" Value="_selectedProfileId" ValueChanged="SelectProfile" Required="true">@foreach (var profile in _profiles) { <MudSelectItem Value="@profile.Id">@ProfileDisplayName(profile)</MudSelectItem> }</MudSelect><div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 2</MudText><MudText Typo="Typo.h6">Zertifikat definieren</MudText></div><MudSelect T="string" Label="Verwendung" @bind-Value="_certificateUsage"><MudSelectItem T="string" Value="@Tls">TLS-Server</MudSelectItem><MudSelectItem T="string" Value="@ClientUsage">mTLS / Client</MudSelectItem></MudSelect><MudTextField @bind-Value="_dnsNames" Label="DNS-Namen" HelperText="@DnsHelperText" Required="@ProfileRequiresDnsName(SelectedProfile)" /><MudTextField @bind-Value="_ipAddresses" Label="IP-Adressen" HelperText="@IpHelperText" Disabled="@(!AllowsIpAddresses)" /><MudNumericField T="int" @bind-Value="_validityDays" Label="Gültigkeit in Tagen" Min="1" Max="@EffectiveValidityLimit" HelperText="@ValidityHelperText" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_keyAlgorithm" Disabled="@ProfileForcesRsa"><MudSelectItem T="string" Value="@Ecc">ECC</MudSelectItem><MudSelectItem T="string" Value="@Rsa">RSA</MudSelectItem></MudSelect>@if (ProfileForcesRsa) { <MudAlert Severity="Severity.Info" Dense="true">Dieses Zielprofil erzwingt RSA. Die Abweichung zur Standardwahl ECC ist hier bewusst sichtbar.</MudAlert> }@if (_keyAlgorithm == Rsa) { <MudNumericField T="int" @bind-Value="_rsaKeySize" Label="RSA-Schlüssellänge" Min="2048" Max="3072" HelperText="Legacy-Profile verwenden RSA 2048 oder 3072 Bit." /> }<div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 3</MudText><MudText Typo="Typo.h6">Deployment-Paket erzeugen</MudText><MudText Class="mud-text-secondary">HomeCA speichert beim Ausstellen einen versionsierten Snapshot mit Exporten, Anleitung, Prüfsummen und Erneuerungsskript.</MudText></div><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="IssueCertificate">@CertificateActionLabel</MudButton></div>;
+    private RenderFragment CertificateIssueForm => @<div class="form-stack"><div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 1</MudText><MudText Typo="Typo.h6">Zielsystem wählen</MudText><MudText Class="mud-text-secondary">Das Zielprofil setzt Standardwerte für Algorithmus, Laufzeit, Exporte und Einspielhinweise.</MudText></div><MudSelect T="string" Label="Zielprofil" Value="_selectedProfileId" ValueChanged="SelectProfile" Required="true">@foreach (var profile in _profiles) { <MudSelectItem Value="@profile.Id">@ProfileDisplayName(profile)</MudSelectItem> }</MudSelect><div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 2</MudText><MudText Typo="Typo.h6">Zertifikat definieren</MudText></div><MudSelect T="string" Label="Verwendung" @bind-Value="_certificateUsage"><MudSelectItem T="string" Value="@Tls">TLS-Server</MudSelectItem><MudSelectItem T="string" Value="@ClientUsage">mTLS / Client</MudSelectItem></MudSelect><MudTextField @bind-Value="_dnsNames" Label="DNS-Namen" HelperText="@DnsHelperText" Required="@ProfileRequiresDnsName(SelectedProfile)" Validation="@(new Func<string, string?>(ValidateDnsNames))" Immediate="true" /><MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Dns" Disabled="@(_busy || string.IsNullOrWhiteSpace(_dnsNames))" OnClick="CheckDnsNamesAsync" Class="mt-n2">DNS prüfen</MudButton>@if (_dnsCheckResults.Count > 0) { <div class="mt-1">@foreach (var r in _dnsCheckResults) { <MudAlert Severity="@r.Severity" Dense="true" Class="mb-1">@r.Message</MudAlert> }</div> }<MudTextField @bind-Value="_ipAddresses" Label="IP-Adressen" HelperText="@IpHelperText" Disabled="@(!AllowsIpAddresses)" /><MudNumericField T="int" @bind-Value="_validityDays" Label="Gültigkeit in Tagen" Min="1" Max="@EffectiveValidityLimit" HelperText="@ValidityHelperText" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_keyAlgorithm" Disabled="@ProfileForcesRsa"><MudSelectItem T="string" Value="@Ecc">ECC</MudSelectItem><MudSelectItem T="string" Value="@Rsa">RSA</MudSelectItem></MudSelect>@if (ProfileForcesRsa) { <MudAlert Severity="Severity.Info" Dense="true">Dieses Zielprofil erzwingt RSA. Die Abweichung zur Standardwahl ECC ist hier bewusst sichtbar.</MudAlert> }@if (_keyAlgorithm == Rsa) { <MudNumericField T="int" @bind-Value="_rsaKeySize" Label="RSA-Schlüssellänge" Min="2048" Max="3072" HelperText="Legacy-Profile verwenden RSA 2048 oder 3072 Bit." /> }<div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 3</MudText><MudText Typo="Typo.h6">Deployment-Paket erzeugen</MudText><MudText Class="mud-text-secondary">HomeCA speichert beim Ausstellen einen versionsierten Snapshot mit Exporten, Anleitung, Prüfsummen und Erneuerungsskript.</MudText></div><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="IssueCertificate">@CertificateActionLabel</MudButton></div>;
     private RenderFragment CertificateProfileSummary => @<div class="profile-summary"><MudText Typo="Typo.h6">Ausstellungsweg</MudText><MudText>Die privaten Schlüssel und Exportpfade verbleiben auf dem HomeCA-Host. Der Ablauf startet mit dem Zielsystem und leitet daraus die Zertifikatsparameter ab.</MudText>@if (SelectedProfile is { } profile) { <MudDivider Class="my-4" /><MudText Typo="Typo.overline" Class="section-kicker">Aktives Zielprofil</MudText><MudText Typo="Typo.h5" Class="page-title compact-title">@ProfileDisplayName(profile)</MudText><MudText>@ProfilePurpose(profile)</MudText><MudText Typo="Typo.caption">Version @ProfileVersion(profile)</MudText><div class="chip-row">@foreach (var format in ProfileExportFormats(profile)) { <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">@format</MudChip> }</div><div class="profile-facts"><div class="profile-fact"><strong>Standardalgorithmus:</strong> @ProfileKeyAlgorithm(profile)</div><div class="profile-fact"><strong>Maximale Laufzeit:</strong> @ProfileMaximumValidityDays(profile) Tage</div><div class="profile-fact"><strong>DNS-SAN:</strong> @(ProfileRequiresDnsName(profile) ? "erforderlich" : "optional")</div><div class="profile-fact"><strong>IP-SAN:</strong> @(ProfileAllowsIpAddress(profile) ? "erlaubt" : "nicht vorgesehen")</div></div><MudAlert Severity="Severity.Info" Dense="true">Deployment-Paket: @string.Join(", ", ProfileExportFormats(profile)) sowie profilgebundene Anleitung und Skript-Snapshot.</MudAlert><MudText Typo="Typo.body2" Class="mt-3">@ProfileDocumentation(profile)</MudText><MudText Typo="Typo.caption" Class="mt-2">Skript-Vorschau</MudText><MudTextField Value="@ProfileRenewalScript(profile)" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" /> } else { <MudAlert Severity="Severity.Warning" Dense="true">Es ist kein Zielprofil geladen. Ohne Profil fehlen Exporte und profilbezogene Vorgaben.</MudAlert> }</div>;
     private RenderFragment ProfileForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingProfileId is null ? "Zielprofil anlegen" : "Zielprofil bearbeiten")</MudText><MudTextField @bind-Value="_profileId" Label="Profil-ID" Required="true" HelperText="Kleinbuchstaben, Zahlen und Bindestriche." Disabled="@(_editingProfileId is not null)" /><MudTextField @bind-Value="_profileDisplayName" Label="Anzeigename" Required="true" /><MudTextField @bind-Value="_profileVersion" Label="Version" Required="true" /><MudTextField @bind-Value="_profilePurpose" Label="Einsatzzweck" Required="true" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_profileKeyAlgorithm"><MudSelectItem Value="@Ecc">ECC</MudSelectItem><MudSelectItem Value="@Rsa">RSA</MudSelectItem></MudSelect><MudTextField @bind-Value="_profileExportFormats" Label="Exportformate" HelperText="Durch Kommas trennen, z. B. PEM, PFX, DER." Required="true" /><MudNumericField T="int" @bind-Value="_profileMaximumValidityDays" Label="Maximale Laufzeit (Tage)" Min="1" Max="730" /><MudCheckBox @bind-Value="_profileRequiresDnsName" Label="DNS-Name erforderlich" /><MudCheckBox @bind-Value="_profileAllowsIpAddress" Label="IP-SAN erlauben" /><MudTextField @bind-Value="_profileDocumentation" Label="Installationshinweise" Lines="5" Required="true" /><MudTextField @bind-Value="_profileRenewalScript" Label="Erneuerungsskript" Lines="5" Required="true" /><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveProfile">@(_editingProfileId is null ? "Profil speichern" : "Änderungen speichern")</MudButton>@if (_editingProfileId is not null) { <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="CancelProfileEdit">Bearbeiten abbrechen</MudButton> }</div>;
     private RenderFragment SshIssueForm => @<div class="form-stack"><MudSelect T="string" Label="Art" @bind-Value="_sshKind"><MudSelectItem T="string" Value="@HostKind">Host</MudSelectItem><MudSelectItem T="string" Value="@UserKind">Benutzer</MudSelectItem></MudSelect><MudTextField @bind-Value="_sshIdentity" Label="Identität" Required="true" /><MudTextField @bind-Value="_sshPrincipals" Label="Principals" Required="true" HelperText="Durch Kommas trennen" /><MudTextField @bind-Value="_sshPublicKey" Label="Öffentlicher SSH-Schlüssel" Required="true" Lines="3" /><MudNumericField T="int" @bind-Value="_validityDays" Label="Gültigkeit in Tagen" Min="1" Max="3650" /><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="IssueSsh">SSH-Zertifikat ausstellen</MudButton></div>;
@@ -841,6 +843,66 @@ else
     private static string ProfileRenewalScript(TargetProfileDto? profile) => string.IsNullOrWhiteSpace(profile?.RenewalScriptTemplate) ? "# Kein profilspezifisches Skript hinterlegt." : profile.RenewalScriptTemplate;
     private static string Date(DateTime value) => value.ToLocalTime().ToString("d", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
     private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
+
+    // ── DNS name validation and checking ──────────────────────────────────────
+    private static readonly System.Text.RegularExpressions.Regex DnsNamePattern = new(
+        @"^(\*\.)?([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private string? ValidateDnsNames(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null; // Required is handled separately
+        foreach (var name in Split(value))
+        {
+            if (name.Length > 253) return $"'{name}' ist zu lang (max. 253 Zeichen).";
+            if (name.Contains(' ')) return $"'{name}' enthält Leerzeichen.";
+            if (name.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || name.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                return $"'{name}' sieht nach einer URL aus — nur den Hostnamen eingeben.";
+            if (!DnsNamePattern.IsMatch(name))
+                return $"'{name}' ist kein gültiger DNS-Name.";
+        }
+        return null;
+    }
+
+    private record DnsCheckResult(Severity Severity, string Message);
+
+    private async Task CheckDnsNamesAsync()
+    {
+        _dnsCheckResults = [];
+        if (string.IsNullOrWhiteSpace(_dnsNames)) return;
+
+        _busy = true;
+        try
+        {
+            foreach (var name in Split(_dnsNames))
+            {
+                if (name.StartsWith("*."))
+                {
+                    _dnsCheckResults.Add(new DnsCheckResult(Severity.Info, $"{name} — Wildcard-Zertifikat, DNS-Auflösung nicht prüfbar."));
+                    continue;
+                }
+
+                try
+                {
+                    var addresses = await System.Net.Dns.GetHostAddressesAsync(name);
+                    if (addresses.Length > 0)
+                    {
+                        var ips = string.Join(", ", addresses.Select(a => a.ToString()));
+                        _dnsCheckResults.Add(new DnsCheckResult(Severity.Success, $"{name} → {ips}"));
+                    }
+                    else
+                    {
+                        _dnsCheckResults.Add(new DnsCheckResult(Severity.Warning, $"{name} — keine IP-Adresse gefunden."));
+                    }
+                }
+                catch
+                {
+                    _dnsCheckResults.Add(new DnsCheckResult(Severity.Warning, $"{name} — konnte nicht aufgelöst werden. Ist der DNS-Eintrag schon erstellt?"));
+                }
+            }
+        }
+        finally { _busy = false; }
+    }
 
     // ── Setup wizard integration ────────────────────────────────────────────
     private record SetupStateDto(string Phase, bool IsComplete);

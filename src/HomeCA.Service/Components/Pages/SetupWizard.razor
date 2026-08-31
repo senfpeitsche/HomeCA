@@ -11,11 +11,20 @@
             Er erscheint bei jeder Anmeldung, bis alle Schritte abgeschlossen sind.
         </MudText>
 
-        <MudStepper @bind-ActiveIndex="_activeStep" NonLinear="false" Color="Color.Primary" Variant="Variant.Filled" Class="mb-4">
-            <MudStep Title="CA erstellen" />
-            <MudStep Title="TLS einrichten" />
-            <MudStep Title="Fertig" />
-        </MudStepper>
+        @* Progress indicator — visual only, no built-in navigation *@
+        <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mb-4">
+            <MudTimelineItem Color="@StepColor(0)" Size="Size.Small">
+                <MudText Typo="Typo.body2" Style="@StepStyle(0)">1. Zertifizierungsstellen erstellen</MudText>
+            </MudTimelineItem>
+            <MudTimelineItem Color="@StepColor(1)" Size="Size.Small">
+                <MudText Typo="Typo.body2" Style="@StepStyle(1)">2. TLS für HomeCA einrichten</MudText>
+            </MudTimelineItem>
+            <MudTimelineItem Color="@StepColor(2)" Size="Size.Small">
+                <MudText Typo="Typo.body2" Style="@StepStyle(2)">3. Fertig — Neustart</MudText>
+            </MudTimelineItem>
+        </MudTimeline>
+
+        <MudDivider Class="mb-4" />
 
         @if (_activeStep == 0)
         {
@@ -53,7 +62,8 @@
 
             <MudForm @ref="_tlsForm" @bind-IsValid="_tlsValid">
                 <MudTextField @bind-Value="_hostname" Label="Hostname" Placeholder="pki.home.local"
-                    Required="true" Immediate="true" HelperText="DNS-Name oder FQDN des Containers" />
+                    Required="true" RequiredError="Hostname ist erforderlich"
+                    Immediate="true" HelperText="DNS-Name oder FQDN des Containers" />
                 <MudTextField @bind-Value="_ipAddress" Label="IP-Adresse (optional)" Placeholder="10.5.0.131"
                     Immediate="true" HelperText="Wird als zusätzlicher SAN ins Zertifikat aufgenommen" Class="mt-2" />
             </MudForm>
@@ -120,13 +130,17 @@
 
     private string RestartCommand => "bash /opt/homeca/homeca-activate-tls.sh";
 
+    // Timeline step colors based on progress
+    private Color StepColor(int step) => step < _activeStep ? Color.Success : step == _activeStep ? Color.Primary : Color.Default;
+    private string StepStyle(int step) => step == _activeStep ? "font-weight: bold;" : step < _activeStep ? "opacity: 0.6;" : "opacity: 0.4;";
+
     protected override void OnInitialized()
     {
         // Resume wizard at the correct step based on current setup phase
         _activeStep = InitialPhase switch
         {
-            "caInitialized" or "caiInitialized" => 1,
-            "tlsConfigured" => 2,
+            "cainitialized" => 1,
+            "tlsconfigured" => 2,
             _ => 0
         };
         _caCreated = _activeStep >= 1;
@@ -141,6 +155,7 @@
         return client;
     }
 
+    // Step 1 → Step 2 transition only after CA is created
     private void GoToStep2() => _activeStep = 1;
 
     private async Task InitializeCaAsync()
@@ -153,7 +168,6 @@
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
-                // If CAs already exist, treat as success
                 if (error.Contains("already configured", StringComparison.OrdinalIgnoreCase))
                 {
                     _caCreated = true;
@@ -174,6 +188,18 @@
 
     private async Task ActivateTlsAsync()
     {
+        if (_tlsForm is not null)
+        {
+            await _tlsForm.Validate();
+            if (!_tlsValid) return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_hostname))
+        {
+            _tlsError = "Bitte gib einen Hostnamen ein.";
+            return;
+        }
+
         _busy = true;
         _tlsError = "";
         try

@@ -27,6 +27,7 @@ public sealed class UiStrings
     // ── Password Change ──────────────────────────────────────────────────────
     public string ChangePasswordTitle => L("Passwort ändern", "Change Password");
     public string ChangePasswordDescription => L("Das Standardpasswort muss vor der ersten Nutzung geändert werden.", "The default password must be changed before first use.");
+    public string DefaultCredentialsHint => L("Erstanmeldung: Benutzername admin, Passwort admin", "First login: username admin, password admin");
     public string CurrentPassword => L("Aktuelles Passwort", "Current Password");
     public string NewPassword => L("Neues Passwort", "New Password");
     public string ConfirmNewPassword => L("Neues Passwort bestätigen", "Confirm New Password");
