@@ -3,11 +3,12 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using HomeCA.Service.Infrastructure;
 using HomeCA.Service.Deployments;
+using HomeCA.Service.Revocation;
 using Microsoft.Extensions.Options;
 
 namespace HomeCA.Service.Pki;
 
-public sealed class CertificateIssuanceService(HomeCaStorage storage, DeploymentPackageService deployments, CertificateAuthorityService authorities, IOptions<HomeCaStorageOptions> options, ILogger<CertificateIssuanceService> logger)
+public sealed class CertificateIssuanceService(HomeCaStorage storage, DeploymentPackageService deployments, CertificateAuthorityService authorities, RevocationRegistry revocations, CrlService crl, IOptions<HomeCaStorageOptions> options, ILogger<CertificateIssuanceService> logger)
 {
     private readonly string _certificateRoot = Path.Combine(storage.RootPath, "certificates");
     private readonly string _exportRoot = Path.Combine(storage.RootPath, "exports");
@@ -99,6 +100,38 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
             id, certificate.Subject, certificate.Issuer, serial, sha256,
             certificate.NotBefore, certificate.NotAfter, keyAlgorithm, keySize,
             usage, dnsNames, ipAddresses, ekuList, Path.Combine(_exportRoot, id)));
+    }
+
+    /// <summary>Revokes a certificate (adds it to the CRL) and deletes its files from disk.</summary>
+    public async Task<bool> RevokeAndDeleteAsync(string id, string reason, CancellationToken cancellationToken)
+    {
+        var pfxPath = Path.Combine(_certificateRoot, id, "certificate.pfx");
+        if (!File.Exists(pfxPath)) return false;
+
+        using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+        var serialNumber = certificate.SerialNumber;
+
+        logger.LogInformation("Revoking certificate {CertificateId} (serial {SerialNumber}), reason: {Reason}", id, serialNumber, reason);
+
+        await revocations.RevokeAsync(serialNumber, reason, cancellationToken);
+
+        try
+        {
+            await crl.GenerateAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "CRL regeneration failed after revoking certificate {CertificateId}; the revocation record is persisted and will be included in the next CRL generation", id);
+        }
+
+        var certificateDirectory = Path.Combine(_certificateRoot, id);
+        if (Directory.Exists(certificateDirectory)) Directory.Delete(certificateDirectory, true);
+
+        var exportDirectory = Path.Combine(_exportRoot, id);
+        if (Directory.Exists(exportDirectory)) Directory.Delete(exportDirectory, true);
+
+        logger.LogInformation("Deleted certificate {CertificateId} files after revocation", id);
+        return true;
     }
 
     public async Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken)

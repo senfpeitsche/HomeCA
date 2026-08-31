@@ -190,6 +190,11 @@ api.MapPost("/certificates", async (IssueCertificateRequest request, Certificate
         throw;
     }
 });
+api.MapDelete("/certificates/{id}", async (string id, HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
+{
+    var reason = httpRequest.Query["reason"].FirstOrDefault() ?? "unspecified";
+    return await certificates.RevokeAndDeleteAsync(id, reason, ct) ? Results.NoContent() : Results.NotFound();
+});
 api.MapGet("/certificates/{id}/export/pem", async (string id, HomeCaStorage storage) =>
 {
     var path = Path.Combine(storage.RootPath, "exports", id, "certificate.pem");
