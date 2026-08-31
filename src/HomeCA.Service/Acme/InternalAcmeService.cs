@@ -57,6 +57,36 @@ public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry do
 
     public async Task<IReadOnlyList<AcmeOrder>> ListOrdersAsync(CancellationToken cancellationToken) => await ReadAsync<List<AcmeOrder>>(_ordersPath, cancellationToken) ?? [];
 
+    public async Task<bool> DeleteAccountAsync(string id, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var accounts = await ReadAsync<List<AcmeAccount>>(_accountsPath, cancellationToken) ?? [];
+            var removed = accounts.RemoveAll(a => a.Id == id);
+            if (removed == 0) return false;
+            await WriteAsync(_accountsPath, accounts, cancellationToken);
+            logger.LogInformation("Deleted ACME account {AccountId}", id);
+            return true;
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<bool> DeleteOrderAsync(string id, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var orders = await ReadAsync<List<AcmeOrder>>(_ordersPath, cancellationToken) ?? [];
+            var removed = orders.RemoveAll(o => o.Id == id);
+            if (removed == 0) return false;
+            await WriteAsync(_ordersPath, orders, cancellationToken);
+            logger.LogInformation("Deleted ACME order {OrderId}", id);
+            return true;
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task<AcmeOrder?> GetOrderAsync(string orderId, CancellationToken cancellationToken) => (await ReadAsync<List<AcmeOrder>>(_ordersPath, cancellationToken) ?? []).FirstOrDefault(order => order.Id == orderId);
 
     public async Task<AcmeOrder> FinalizeOrderAsync(string orderId, FinalizeAcmeOrderRequest request, CancellationToken cancellationToken)

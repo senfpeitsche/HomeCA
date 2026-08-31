@@ -53,6 +53,26 @@ public sealed class UiStrings
     public string NavOperations => L("Betrieb", "Operations");
     public string NavHelp => L("Hilfe", "Help");
 
+    // ── ACME ─────────────────────────────────────────────────────────────────
+    public string NavAcme => L("ACME", "ACME");
+    public string AcmeKicker => L("Automatische Zertifikatsverwaltung", "Automatic Certificate Management");
+    public string AcmeTitle => L("ACME-Verwaltung", "ACME Management");
+    public string AcmeRfc8555Accounts => L("RFC 8555-Konten (OPNsense, acme.sh, Certbot)", "RFC 8555 Accounts (OPNsense, acme.sh, Certbot)");
+    public string AcmeRfc8555Orders => L("RFC 8555-Aufträge", "RFC 8555 Orders");
+    public string AcmeSimplifiedAccounts => L("Vereinfachte API-Konten (curl/Skripte)", "Simplified API Accounts (curl/scripts)");
+    public string AcmeSimplifiedOrders => L("Vereinfachte API-Aufträge", "Simplified API Orders");
+    public string AcmeNoAccounts => L("Noch keine ACME-Konten registriert.", "No ACME accounts registered yet.");
+    public string AcmeNoOrders => L("Noch keine ACME-Aufträge vorhanden.", "No ACME orders yet.");
+    public string AcmeColumnContact => L("Kontakt", "Contact");
+    public string AcmeColumnThumbprint => L("Schlüssel-Thumbprint", "Key Thumbprint");
+    public string AcmeColumnCreated => L("Erstellt", "Created");
+    public string AcmeColumnIdentifiers => L("Identitäten", "Identifiers");
+    public string AcmeColumnStatus => L("Status", "Status");
+    public string AcmeColumnCertificate => L("Zertifikat", "Certificate");
+    public string AcmeExternalIssuers => L("Externe ACME-Aussteller", "External ACME Issuers");
+    public string AcmeExternalCertificates => L("Externe ACME-Zertifikate", "External ACME Certificates");
+    public string AcmeNoExternalCerts => L("Noch keine externen ACME-Zertifikate vorhanden.", "No external ACME certificates yet.");
+
     // ── Help ─────────────────────────────────────────────────────────────────
     public string HelpKicker => L("Anleitungen und Referenz", "Guides and Reference");
     public string HelpTitle => L("Hilfe", "Help");

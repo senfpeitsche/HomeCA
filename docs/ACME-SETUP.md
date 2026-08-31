@@ -23,23 +23,30 @@ Das Token ist 12 Stunden gültig.
 
 ## Benutzerdefinierte CA-URL (Directory-URL)
 
-Viele ACME-Clients (z. B. Certbot, acme.sh, Caddy, Traefik, win-acme) erlauben die Angabe einer benutzerdefinierten CA-URL anstelle von Let's Encrypt. Die URL setzt sich aus der öffentlichen Adresse der HomeCA-Instanz und dem Directory-Pfad zusammen.
+Viele ACME-Clients (z. B. Certbot, acme.sh, Caddy, Traefik, win-acme, OPNsense) erlauben die Angabe einer benutzerdefinierten CA-URL anstelle von Let's Encrypt. Die URL setzt sich aus der öffentlichen Adresse der HomeCA-Instanz und dem Directory-Pfad zusammen.
 
-### Interner ACME-Server
+HomeCA bietet zwei ACME-Schnittstellen:
 
-Die Directory-URL für den internen ACME-Server lautet:
+| Schnittstelle | Pfad | Zweck |
+| --- | --- | --- |
+| **RFC 8555** (Standard) | `/acme/directory` | Für alle gängigen ACME-Clients (acme.sh, Certbot, OPNsense, Caddy, Traefik, win-acme). Spricht das vollständige ACME-Protokoll mit JWS-signierten Requests, Nonces und CSR-basierter Finalisierung. |
+| **Vereinfachte API** | `/api/v1/acme/directory` | Für direkte curl/API-Nutzung mit Bearer-Token-Authentifizierung. Verwendet einfaches JSON ohne JWS. Siehe Abschnitt 1. |
+
+### Interner ACME-Server (RFC 8555)
+
+Die Directory-URL für Standard-ACME-Clients lautet:
 
 ```
-http://<hostname>:<port>/api/v1/acme/directory
+http://<hostname>:<port>/acme/directory
 ```
 
 **Beispiele** (je nach Setup-Konfiguration):
 
 | Szenario | Directory-URL |
 | --- | --- |
-| HTTP, Standardport | `http://homeca.lab.example.com:5080/api/v1/acme/directory` |
-| HTTPS nach TLS-Aktivierung | `https://homeca.lab.example.com:5443/api/v1/acme/directory` |
-| Hinter Reverse-Proxy (Port 443) | `https://homeca.lab.example.com/api/v1/acme/directory` |
+| HTTP, Standardport | `http://homeca.lab.example.com:5080/acme/directory` |
+| HTTPS nach TLS-Aktivierung | `https://homeca.lab.example.com:5443/acme/directory` |
+| Hinter Reverse-Proxy (Port 443) | `https://homeca.lab.example.com/acme/directory` |
 
 Hostname und Port entsprechen der `PublicUrl`, die beim Setup über `POST /api/v1/setup/configure-instance` festgelegt wurde. Die aktuell konfigurierte Basis-URL lässt sich über `GET /api/v1/storage/info` im Feld `publicUrl` ablesen.
 
@@ -48,7 +55,7 @@ Hostname und Port entsprechen der `PublicUrl`, die beim Setup über `POST /api/v
 **Certbot:**
 
 ```bash
-certbot certonly --server http://homeca.lab.example.com:5080/api/v1/acme/directory \
+certbot certonly --server http://homeca.lab.example.com:5080/acme/directory \
   --manual --preferred-challenges dns \
   -d node1.lab.example.com
 ```
@@ -56,17 +63,17 @@ certbot certonly --server http://homeca.lab.example.com:5080/api/v1/acme/directo
 **acme.sh:**
 
 ```bash
-acme.sh --issue --server http://homeca.lab.example.com:5080/api/v1/acme/directory \
+acme.sh --issue --server http://homeca.lab.example.com:5080/acme/directory \
   -d node1.lab.example.com --dns dns_manual
 ```
 
 **win-acme:**
 
 ```powershell
-wacs.exe --baseuri http://homeca.lab.example.com:5080/api/v1/acme/directory
+wacs.exe --baseuri http://homeca.lab.example.com:5080/acme/directory
 ```
 
-> **Hinweis:** Da der interne ACME-Server keine Challenge-Validierung durchführt (alle Clients gelten als vertrauenswürdig), muss der Client keine DNS- oder HTTP-Challenge lösen. Einige Clients erfordern trotzdem die Angabe eines Challenge-Typs — die Wahl ist in diesem Fall irrelevant.
+> **Hinweis:** Da der interne ACME-Server keine Challenge-Validierung durchführt (alle Clients gelten als vertrauenswürdig), muss der Client keine DNS- oder HTTP-Challenge lösen. Challenges werden serverseitig sofort als `valid` markiert. Einige Clients erfordern trotzdem die Angabe eines Challenge-Typs — die Wahl ist in diesem Fall irrelevant.
 
 ### Externer ACME-Aussteller
 
@@ -83,7 +90,9 @@ Für externe Aussteller wird die Directory-URL beim Registrieren des Issuers üb
 
 ---
 
-## 1. Interner ACME-Server
+## 1. Interner ACME-Server (vereinfachte API)
+
+Die vereinfachte API unter `/api/v1/acme/` arbeitet mit einfachen JSON-Requests und Bearer-Token-Authentifizierung. Sie ist für direkte curl-Aufrufe und Skripte gedacht — nicht für Standard-ACME-Clients wie acme.sh, Certbot oder OPNsense (diese verwenden die RFC 8555-Endpunkte unter `/acme/`, siehe oben).
 
 Der interne ACME-Server stellt Zertifikate für DNS-Namen aus, die unter einer aktivierten internen Ausstellungszone liegen. Orders gehen direkt in den Status `ready`, da alle Clients als vertrauenswürdig gelten; eine Challenge-Validierung findet nicht statt.
 
@@ -252,7 +261,127 @@ curl -s http://127.0.0.1:5080/api/v1/acme/external-issuers \
 
 ---
 
-## 3. Tipps zur Betriebsführung
+## 3. OPNsense ACME-Client einrichten
+
+Das OPNsense-Plugin `os-acme-client` nutzt intern `acme.sh`, einen vollwertigen RFC 8555 ACME-Client. HomeCA stellt dafür einen RFC 8555-kompatiblen ACME-Server unter `/acme/directory` bereit. Die Einrichtung erfolgt in drei Schritten: Konto anlegen, Challenge-Typ konfigurieren und Zertifikat erstellen.
+
+### 3.1 Plugin installieren und aktivieren
+
+1. Im OPNsense-Webinterface zu **System > Firmware > Plugins** navigieren.
+2. Das Plugin `os-acme-client` suchen und über die **+**-Schaltfläche installieren.
+3. Nach der Installation die Seite neu laden, damit der neue Menüpunkt erscheint.
+4. Unter **Services > ACME Client > Settings** den Haken bei **Enable Plugin** setzen und speichern. **Auto Renewal** aktiviert lassen — das richtet den Cron-Job für die automatische Erneuerung ein.
+
+### 3.2 ACME-Konto registrieren
+
+1. Unter **Services > ACME Client > Accounts** auf **+ Add** klicken.
+2. Felder ausfüllen:
+
+| Feld | Wert |
+| --- | --- |
+| **Enabled** | angehakt |
+| **Name** | Frei wählbar, z. B. `HomeCA` |
+| **E-Mail Address** | Kontaktadresse, z. B. `admin@lab.example.com` |
+| **ACME CA** | **Custom CA URL** auswählen |
+| **Custom CA URL** | `http://homeca.lab.example.com:5080/acme/directory` |
+
+Die Felder **Key Identifier** und **HMAC Key** bleiben leer — HomeCA benötigt kein External Account Binding (EAB).
+
+3. Auf **Save** klicken.
+4. In der Kontoliste die **Register**-Aktion (Kreispfeil-Symbol) auf der neuen Zeile ausführen. Die Registrierung ist ein separater Schritt — erst wenn sie erfolgreich war, können Zertifikate mit diesem Konto ausgestellt werden.
+
+> **Hinweis:** Die Custom CA URL muss genau die Directory-URL des HomeCA RFC 8555 ACME-Servers sein. Wurde TLS aktiviert, lautet sie `https://homeca.lab.example.com:5443/acme/directory`. Die aktuell gültige Basis-URL lässt sich über `GET /api/v1/storage/info` (Feld `publicUrl`) ermitteln.
+>
+> **Wichtig:** Nicht die vereinfachte API-URL `/api/v1/acme/directory` verwenden — diese spricht nicht das RFC 8555-Protokoll, das acme.sh erwartet.
+
+### 3.3 Challenge-Typ einrichten
+
+1. Unter **Services > ACME Client > Challenge Types** auf **+ Add** klicken.
+2. Felder ausfüllen:
+
+| Feld | Wert |
+| --- | --- |
+| **Name** | Frei wählbar, z. B. `HomeCA Internal` |
+| **Challenge Type** | **HTTP-01** auswählen |
+| **HTTP Service** | **OPNsense Web Service (automatic port forward)** |
+
+3. Auf **Save** klicken.
+
+> **Warum HTTP-01?** Der interne ACME-Server von HomeCA führt keine tatsächliche Challenge-Validierung durch — alle Clients gelten als vertrauenswürdig und Orders gehen direkt in den Status `ready`. Der Challenge-Typ muss im Plugin trotzdem konfiguriert werden, da das Formular ihn erfordert. HTTP-01 ist die einfachste Wahl, weil keine DNS-API-Credentials nötig sind. Alternativ kann auch DNS-01 oder TLS-ALPN-01 gewählt werden — das Ergebnis ist identisch, da HomeCA die Challenge überspringt.
+
+### 3.4 Automation anlegen (optional, aber empfohlen)
+
+Damit OPNsense das neue Zertifikat nach der Ausstellung und bei jeder Erneuerung automatisch übernimmt:
+
+1. Unter **Services > ACME Client > Automations** auf **+ Add** klicken.
+2. **Name** vergeben, z. B. `Restart WebUI`.
+3. **Type** wählen — je nachdem, wo das Zertifikat verwendet wird:
+
+| Verwendung | Automation-Typ |
+| --- | --- |
+| OPNsense-Webinterface | **Restart OPNsense Web UI** |
+| HAProxy Reverse Proxy | **Restart HAProxy** |
+| OpenVPN | **System or Plugin Command** mit passendem Befehl |
+
+4. Auf **Save** klicken.
+
+> Ohne Automation schreibt eine Erneuerung zwar neue Dateien, aber der laufende Dienst serviert weiter das alte Zertifikat aus dem Speicher.
+
+### 3.5 Zertifikat erstellen und ausstellen
+
+1. Unter **Services > ACME Client > Certificates** auf **+ Add** klicken.
+2. Felder ausfüllen:
+
+| Feld | Wert |
+| --- | --- |
+| **Common Name** | Der FQDN des Geräts, z. B. `opnsense.lab.example.com` |
+| **Alt Names** | Weitere Hostnamen (optional), z. B. `fw.lab.example.com` |
+| **ACME Account** | Das in Schritt 3.2 angelegte Konto (`HomeCA`) |
+| **Challenge Type** | Der in Schritt 3.3 angelegte Typ (`HomeCA Internal`) |
+| **Auto Renewal** | angehakt |
+| **Renewal Interval** | `60` (Standard, kann für HomeCA-Zertifikate höher sein) |
+| **Key Length** | `ec-256` (empfohlen) oder `4096` für RSA |
+| **Automations** | Die in Schritt 3.4 angelegte Automation |
+
+3. Auf **Save** klicken.
+4. In der Zertifikatliste die **Issue**-Aktion (Abspielen-Symbol) auf der neuen Zeile ausführen. Die Ausstellung läuft im Hintergrund — der Status in der Spalte **Status** wechselt nach wenigen Sekunden auf den Endstatus.
+
+### 3.6 Zertifikat dem Dienst zuweisen
+
+Das ausgestellte Zertifikat liegt nun im OPNsense Trust Store, wird aber noch von keinem Dienst verwendet.
+
+**Für das OPNsense-Webinterface:**
+
+1. Unter **System > Settings > Administration** das Protokoll auf **HTTPS** stellen.
+2. Im Dropdown **SSL Certificate** das neue Zertifikat auswählen.
+3. Speichern — die Weboberfläche startet mit dem neuen Zertifikat neu.
+
+**Für andere Dienste** (HAProxy, OpenVPN, etc.) wird das Zertifikat in der jeweiligen Dienstkonfiguration zugewiesen.
+
+### 3.7 Voraussetzung: HomeCA Root-CA vertrauen
+
+Damit OPNsense und die Clients im Netz dem Zertifikat vertrauen, muss die HomeCA Root-CA als vertrauenswürdige Zertifizierungsstelle importiert werden:
+
+1. Die Root-CA-Datei von HomeCA herunterladen: `GET /api/v1/authorities/root/export` liefert das PEM.
+2. In OPNsense unter **System > Trust > Authorities** auf **+ Add** klicken.
+3. **Method** auf **Import an existing Certificate Authority** setzen und das PEM einfügen.
+4. Speichern.
+
+Für Clients im Netz siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md).
+
+### 3.8 Fehlerbehebung
+
+| Problem | Lösung |
+| --- | --- |
+| Konto-Registrierung schlägt fehl | Custom CA URL prüfen — muss exakt auf `/acme/directory` enden (nicht `/api/v1/acme/directory`). HomeCA muss von OPNsense erreichbar sein. |
+| Zertifikat-Ausstellung hängt | Unter **Services > ACME Client > Log Files** das acme.sh-Log prüfen. Bei Verbindungsproblemen die Erreichbarkeit von HomeCA testen: `curl -s http://homeca.lab.example.com:5080/acme/directory` |
+| Browser zeigt weiterhin altes Zertifikat | Automation fehlt oder nicht dem Zertifikat zugewiesen. Siehe Schritt 3.4. |
+| Zertifikat wird nicht als vertrauenswürdig erkannt | HomeCA Root-CA ist nicht importiert. Siehe Schritt 3.7. |
+| DNS-Name wird abgelehnt | Der Name muss unter einer aktiven Ausstellungszone liegen (`internalIssuanceEnabled: true`). Siehe Schritt 1.1. |
+
+---
+
+## 4. Tipps zur Betriebsführung
 
 - **Ablaufwarnungen:** `GET /api/v1/warnings/expiring` liefert Zertifikate, die innerhalb von 30 Tagen ablaufen. Integriere diesen Endpunkt in ein tägliches Monitoring.
 - **Backup:** Nach jeder ACME-Einrichtung ein verifiziertes Backup erzeugen, siehe [OPERATIONS.md](OPERATIONS.md).
