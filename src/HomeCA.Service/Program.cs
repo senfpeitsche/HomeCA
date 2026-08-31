@@ -10,6 +10,7 @@ using HomeCA.Service.Revocation;
 using HomeCA.Service.Deployments;
 using HomeCA.Service.Automation;
 using HomeCA.Service.Components;
+using System.Reflection;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -76,7 +77,21 @@ using (var scope = app.Services.CreateScope())
 // ── Public endpoints (no authentication) ────────────────────────────────────
 
 app.MapHealthChecks("/health");
-app.MapGet("/api/v1/instance", (HomeCaStorage storage) => Results.Ok(storage.Describe()));
+app.MapGet("/api/v1/version", () =>
+{
+    var assembly = Assembly.GetEntryAssembly()!;
+    var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+    var version = informational.Split('+')[0];
+    var commit = informational.Contains('+') ? informational.Split('+')[1] : null;
+    return Results.Ok(new { version, commit, runtime = Environment.Version.ToString() });
+});
+app.MapGet("/api/v1/instance", (HomeCaStorage storage) =>
+{
+    var informational = Assembly.GetEntryAssembly()!
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+    var version = informational.Split('+')[0];
+    return Results.Ok(new { version, instance = storage.Describe() });
+});
 app.MapGet("/api/v1/trust-anchor", async (CertificateAuthorityService authorities, CancellationToken ct) =>
 {
     var info = await authorities.GetTrustAnchorInfoAsync(ct);
@@ -230,6 +245,14 @@ api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest 
 });
 
 // SSH
+api.MapGet("/ssh-certificates", async (SshCertificateService certificates, CancellationToken ct) => Results.Ok(await certificates.ListAsync(ct)));
+api.MapGet("/ssh-certificates/{id}/content", async (string id, SshCertificateService certificates, CancellationToken ct) =>
+{
+    var content = await certificates.GetCertificateContentAsync(id, ct);
+    return content is null ? Results.NotFound() : Results.Text(content, "text/plain");
+});
+api.MapDelete("/ssh-certificates/{id}", async (string id, SshCertificateService certificates, CancellationToken ct) =>
+    await certificates.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
 api.MapPost("/ssh-certificates", async (SshIssueRequest request, SshCertificateService certificates, ILogger<Program> logger, CancellationToken ct) =>
 {
     try { return Results.Ok(await certificates.IssueAsync(request, ct)); }
@@ -240,6 +263,11 @@ api.MapPost("/ssh-certificates", async (SshIssueRequest request, SshCertificateS
         logger.LogError(ex, "SSH certificate issuance failed");
         throw;
     }
+});
+api.MapGet("/ssh-ca-keys/{kind}", async (string kind, SshCertificateService certificates, CancellationToken ct) =>
+{
+    var key = await certificates.GetCaPublicKeyAsync(kind, ct);
+    return key is null ? Results.NotFound(new { detail = "SSH CA key not found. Initialize certificate authorities first." }) : Results.Ok(key);
 });
 
 // Domains

@@ -31,7 +31,7 @@ HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Sy
 ### Build and Run
 
 ```bash
-git clone https://github.com/your-org/HomeCA.git
+git clone https://github.com/senfpeitsche/HomeCA.git
 cd HomeCA
 dotnet build
 dotnet run --project src/HomeCA.Service
@@ -102,6 +102,8 @@ All state is file-based (JSON + PFX/PEM files) under a configurable root path. N
 HomeCA runs as a systemd service in a Debian-based LXC container. See:
 
 - [docs/LXC-SETUP.md](docs/LXC-SETUP.md) — Full Proxmox LXC setup guide
+- [docs/SSL-USAGE.md](docs/SSL-USAGE.md) — Issuing and deploying TLS certificates
+- [docs/SSH-USAGE.md](docs/SSH-USAGE.md) — Issuing and deploying SSH certificates
 - [docs/TRUST-INSTALLATION.md](docs/TRUST-INSTALLATION.md) — Installing the Root CA on clients and devices
 - [docs/ACME-SETUP.md](docs/ACME-SETUP.md) — ACME configuration
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — Day-to-day operations

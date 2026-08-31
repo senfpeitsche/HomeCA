@@ -1,7 +1,22 @@
 @inherits LayoutComponentBase
+@using System.Reflection
 
 <MudThemeProvider />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 @Body
+<MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4 mb-2" Style="opacity: 0.5;">
+    HomeCA @_version
+</MudText>
+
+@code {
+    private string _version = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        var informational = Assembly.GetEntryAssembly()?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+        _version = informational.Split('+')[0];
+    }
+}

@@ -111,11 +111,13 @@ else
     private List<Revocation> _revocations = [];
     private List<AcmeAccountFull> _acmeAccounts = [];
     private List<AcmeOrderFull> _acmeOrders = [];
+    private List<SshCertificateItem> _sshCertificates = [];
     private string? _editingIssuerId, _deleteIssuerId;
     private AcmeOrderFull? _checkedOrder;
     private string _pfxPassword = "", _pfxCertificateId = "";
-    private bool _pfxDialogVisible, _detailsDialogVisible;
+    private bool _pfxDialogVisible, _detailsDialogVisible, _sshCertDialogVisible;
     private CertificateDetailsDto? _certificateDetails;
+    private string? _sshCertDialogContent, _sshCertDialogIdentity, _sshCertDialogKind, _deleteSshCertificateId;
     private string? _deleteConnectorId, _deleteDomainName, _editingPlanId, _deletePlanId;
     private string _lastBackupFileName = "";
 
@@ -131,6 +133,7 @@ else
         <MudText Typo="Typo.overline" Class="section-kicker">X.509 und SSH</MudText><MudText Typo="Typo.h3" Class="page-title">Zertifikate ausstellen</MudText>
         <MudGrid><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudTabs Rounded="false" PanelClass="pt-4"><MudTabPanel Text="TLS- und mTLS-Zertifikat">@CertificateIssueForm</MudTabPanel><MudTabPanel Text="SSH-Zertifikat">@SshIssueForm</MudTabPanel><MudTabPanel Text="Interne ACME">@AcmeForm</MudTabPanel></MudTabs></MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel issue-note" Elevation="0">@CertificateProfileSummary</MudPaper></MudItem></MudGrid>
         <MudPaper Class="panel"><MudText Typo="Typo.h5">Zertifikatsinventar</MudText>@CertificateTable(_certificates)</MudPaper>
+        <MudPaper Class="panel"><MudText Typo="Typo.h5">SSH-Zertifikatsinventar</MudText><MudTable Items="_sshCertificates" Dense="true" Hover="true"><HeaderContent><MudTh>Identität</MudTh><MudTh>Art</MudTh><MudTh>Principals</MudTh><MudTh>Ausgestellt</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Identity</MudTd><MudTd>@(context.Kind == "host" ? "Host" : "Benutzer")</MudTd><MudTd>@context.Principals</MudTd><MudTd>@Date(context.IssuedAt)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadSshCertificate(context.Id, context.Identity, context.Kind))">Zertifikat</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteSshCertificate(context.Id))">@(_deleteSshCertificateId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine SSH-Zertifikate ausgestellt.</MudText></NoRecordsContent></MudTable></MudPaper>
         <MudDialog @bind-Visible="_pfxDialogVisible"><TitleContent><MudText Typo="Typo.h6">PFX-Kennwort festlegen</MudText></TitleContent><DialogContent><MudText Class="mb-3">Das PFX-Archiv wird mit diesem Kennwort verschlüsselt. Verwenden Sie ein starkes Kennwort und geben Sie es nur an das Zielsystem weiter.</MudText><MudTextField @bind-Value="_pfxPassword" Label="Kennwort" InputType="InputType.Password" Required="true" Immediate="true" /><MudTextField Value="_pfxPassword" Label="Kennwort bestätigen" InputType="InputType.Password" ReadOnly="true" Disabled="true" Class="mt-2" /></DialogContent><DialogActions><MudButton OnClick="CancelPfxDialog">Abbrechen</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(string.IsNullOrWhiteSpace(_pfxPassword) || _busy)" OnClick="DownloadPfx">Herunterladen</MudButton></DialogActions></MudDialog>
         <MudDialog @bind-Visible="_detailsDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })"><TitleContent><MudText Typo="Typo.h6">Zertifikatsdetails</MudText></TitleContent><DialogContent>@if (_certificateDetails is { } d) {
             <MudSimpleTable Dense="true" Bordered="true" Class="details-table"><tbody>
@@ -148,11 +151,53 @@ else
                 <tr><td><strong>Zertifikat-ID</strong></td><td style="font-family:monospace">@d.Id</td></tr>
             </tbody></MudSimpleTable>
         }</DialogContent><DialogActions><MudButton OnClick="CloseDetailsDialog">Schließen</MudButton></DialogActions></MudDialog>
+        <MudDialog @bind-Visible="_sshCertDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })"><TitleContent><MudText Typo="Typo.h6">SSH-Zertifikat — @_sshCertDialogIdentity</MudText></TitleContent><DialogContent><MudText Class="mb-3">Kopieren Sie den Zertifikatsinhalt oder laden Sie die Datei herunter.</MudText><MudTextField Value="@_sshCertDialogContent" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(_sshCertDialogContent ?? ""))" />
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.h6" Class="mb-2">@(_sshCertDialogKind == "host" ? "Host-Zertifikat einspielen" : "Benutzerzertifikat verwenden")</MudText>
+        @if (_sshCertDialogKind == "host") {
+            <MudText Class="mud-text-secondary mb-2">Speichere das Zertifikat auf dem Server neben dem Host-Key und aktiviere es in der sshd_config.</MudText>
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">1. Zertifikat auf den Server schreiben</MudText>
+            <MudTextField Value="@SshHostDeployScript" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostDeployScript))" />
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">2. sshd_config ergänzen</MudText>
+            <MudTextField Value="@SshHostSshdConfigScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostSshdConfigScript))" />
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">3. SSH-Daemon neu laden</MudText>
+            <MudTextField Value="@SshReloadSshdScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshReloadSshdScript))" />
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Damit Clients das Host-Zertifikat akzeptieren, muss die Host-CA in <code>known_hosts</code> eingetragen sein — siehe Abschnitt „Vertrauensstellung" unten.</MudAlert>
+        } else {
+            <MudText Class="mud-text-secondary mb-2">Speichere das Zertifikat neben dem privaten Schlüssel. SSH findet es automatisch über die Namenskonvention.</MudText>
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">1. Zertifikat speichern</MudText>
+            <MudTextField Value="@SshUserDeployScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserDeployScript))" />
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">2. Verbindung testen</MudText>
+            <MudTextField Value="@SshUserTestScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserTestScript))" />
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Damit der Server das Benutzerzertifikat akzeptiert, muss <code>TrustedUserCAKeys</code> in der <code>sshd_config</code> konfiguriert sein — siehe Abschnitt „Vertrauensstellung" unten.</MudAlert>
+        }
+        <MudDivider Class="my-4" />
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="Vertrauensstellung einrichten">
+                @if (_sshCertDialogKind == "host") {
+                    <MudText Class="mud-text-secondary mb-2">Trage die Host-CA in die <code>known_hosts</code> der Clients ein, damit signierte Host-Keys ohne Fingerprint-Abfrage akzeptiert werden.</MudText>
+                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Einzelner Benutzer</MudText>
+                    <MudTextField Value="@SshHostTrustUserScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostTrustUserScript))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Systemweit</MudText>
+                    <MudTextField Value="@SshHostTrustSystemScript" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshHostTrustSystemScript))" />
+                } else {
+                    <MudText Class="mud-text-secondary mb-2">Konfiguriere den Zielserver, damit er Benutzerzertifikate der User-CA akzeptiert.</MudText>
+                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">User-CA auf den Server kopieren und sshd_config ergänzen</MudText>
+                    <MudTextField Value="@SshUserTrustScript" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshUserTrustScript))" />
+                }
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Zertifikat prüfen">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Zertifikatsinhalt anzeigen</MudText>
+                <MudTextField Value="@SshVerifyScript" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(SshVerifyScript))" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+        </DialogContent><DialogActions><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="DownloadSshCertificateFile">Herunterladen</MudButton><MudButton OnClick="CloseSshCertDialog">Schließen</MudButton></DialogActions></MudDialog>
     </text>;
 
     private RenderFragment AuthoritiesContent => @<text>
         <MudText Typo="Typo.overline" Class="section-kicker">Vertrauenshierarchie und Sperrlisten</MudText><MudText Typo="Typo.h3" Class="page-title">Zertifizierungsstellen</MudText>
         <MudGrid><MudItem xs="12" md="4"><MudPaper Class="panel" Elevation="0">@AuthorityForm</MudPaper></MudItem><MudItem xs="12" md="8"><MudPaper Class="panel" Elevation="0"><MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3"><MudText Typo="Typo.h6">CA-Inventar</MudText><MudSpacer /><MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartIntermediate" Disabled="@(!_authorities.Any(a => a.Type == RootAuthority && a.IsActive && !a.IsRevoked))">Neue Intermediate-CA</MudButton></MudStack><MudTable Items="_authorities" Dense="true" Hover="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Typ</MudTh><MudTh>Subject</MudTh><MudTh>Status</MudTh><MudTh>CRL</MudTh><MudTh>Läuft ab</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@(context.Type == "root" ? "Root" : "Intermediate")</MudTd><MudTd>@context.Subject</MudTd><MudTd><MudChip T="string" Size="Size.Small" Color="@(context.IsRevoked ? Color.Error : context.IsActive ? Color.Success : Color.Default)">@AuthorityStatus(context)</MudChip></MudTd><MudTd>@context.CrlValidityDays Tage</MudTd><MudTd>@Date(context.ExpiresAt)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadAuthority(context.Id, "pem"))">PEM</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadAuthority(context.Id, "der"))">Windows CER</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginAuthorityEdit(context))">Bearbeiten</MudButton>@if (!context.IsRevoked) { <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" OnClick="@(() => RevokeAuthority(context.Id))">Sperren</MudButton> }<MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAuthority(context.Id))">@(_deleteAuthorityId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Legen Sie zuerst eine Root-CA an.</MudText></NoRecordsContent></MudTable></MudPaper></MudItem></MudGrid>
+        <MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">SSH-Zertifizierungsstellen</MudText><MudText Class="mud-text-secondary mb-3">Die öffentlichen Schlüssel der SSH-CAs werden benötigt, um die Vertrauensstellung auf Servern und Clients einzurichten.</MudText><div class="d-flex gap-2 flex-wrap"><MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => DownloadSshCaKey("host"))">Host-CA Public Key</MudButton><MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => DownloadSshCaKey("user"))">User-CA Public Key</MudButton></div></MudPaper>
     </text>;
 
     private RenderFragment AutomationContent => @<text>
@@ -203,7 +248,7 @@ else
         finally { _busy = false; }
     }
     private void Logout() { _token = null; _loginPassword = null; _section = "overview"; _mustChangePassword = false; _currentPassword = ""; _newPassword = ""; _confirmPassword = ""; _changePasswordError = null; _changePasswordSuccess = null; ClearData(); Snackbar.Add("Sie wurden abgemeldet.", Severity.Info); }
-    private void ClearData() { _certificates=[]; _authorities=[]; _domains=[]; _connectors=[]; _profiles=[]; _plans=[]; _issuers=[]; _warnings=[]; _revocations=[]; _acmeAccounts=[]; _acmeOrders=[]; _checkedOrder=null; _selectedProfileId = ""; }
+    private void ClearData() { _certificates=[]; _authorities=[]; _domains=[]; _connectors=[]; _profiles=[]; _plans=[]; _issuers=[]; _warnings=[]; _revocations=[]; _acmeAccounts=[]; _acmeOrders=[]; _sshCertificates=[]; _checkedOrder=null; _selectedProfileId = ""; }
     private async Task ChangePasswordAsync()
     {
         await _changePasswordForm!.Validate(); if (!_changePasswordValid) return;
@@ -226,7 +271,7 @@ else
     private async Task LoadAllAsync()
     {
         if (string.IsNullOrEmpty(_token)) return; _loading = true; _pageError = null;
-        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; SyncProfileSelection(); }
+        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; _sshCertificates = await Get<List<SshCertificateItem>>(client,"api/v1/ssh-certificates") ?? []; SyncProfileSelection(); }
         catch { _pageError = "Die Verwaltungsdaten konnten nicht geladen werden. Prüfen Sie die Verbindung oder melden Sie sich erneut an."; }
         finally { _loading = false; }
     }
@@ -359,7 +404,75 @@ else
         if (_validityDays > EffectiveValidityLimit) { Snackbar.Add($"Dieses Zielprofil erlaubt höchstens {EffectiveValidityLimit} Tage Laufzeit.", Severity.Warning); return; }
         await Post("api/v1/certificates", new { usage = _certificateUsage, dnsNames = Split(_dnsNames), ipAddresses = Split(_ipAddresses), validityDays = _validityDays, keyAlgorithm = _keyAlgorithm, rsaKeySize = _rsaKeySize, targetProfileId = profile.Id });
     }
-    private async Task IssueSsh() { if (string.IsNullOrWhiteSpace(_sshIdentity) || string.IsNullOrWhiteSpace(_sshPrincipals) || string.IsNullOrWhiteSpace(_sshPublicKey)) { Snackbar.Add("Füllen Sie alle Pflichtfelder für das SSH-Zertifikat aus.", Severity.Warning); return; } await Post("api/v1/ssh-certificates", new { kind = _sshKind, identity = _sshIdentity, principals = Split(_sshPrincipals), publicKey = _sshPublicKey, validityDays = _validityDays }); }
+    private async Task IssueSsh()
+    {
+        if (string.IsNullOrWhiteSpace(_sshIdentity) || string.IsNullOrWhiteSpace(_sshPrincipals) || string.IsNullOrWhiteSpace(_sshPublicKey)) { Snackbar.Add("Füllen Sie alle Pflichtfelder für das SSH-Zertifikat aus.", Severity.Warning); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/ssh-certificates", new { kind = _sshKind, identity = _sshIdentity, principals = Split(_sshPrincipals), publicKey = _sshPublicKey, validityDays = _validityDays });
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            var result = await response.Content.ReadFromJsonAsync<SshIssueResultDto>(_json);
+            _sshCertDialogContent = result?.Certificate;
+            _sshCertDialogIdentity = _sshIdentity;
+            _sshCertDialogKind = _sshKind;
+            _sshCertDialogVisible = true;
+            Snackbar.Add("SSH-Zertifikat ausgestellt.", Severity.Success);
+            await LoadAllAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private void CloseSshCertDialog() { _sshCertDialogVisible = false; _sshCertDialogContent = null; _sshCertDialogIdentity = null; _sshCertDialogKind = null; }
+    private async Task DownloadSshCertificateFile()
+    {
+        if (string.IsNullOrEmpty(_sshCertDialogContent)) return;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(_sshCertDialogContent);
+        var name = $"{_sshCertDialogIdentity ?? "ssh"}-cert.pub";
+        await JS.InvokeVoidAsync("homeca.download", name, "text/plain", Convert.ToBase64String(bytes));
+    }
+    private async Task DownloadSshCertificate(string id, string identity, string kind)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.GetAsync($"api/v1/ssh-certificates/{Uri.EscapeDataString(id)}/content");
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            _sshCertDialogContent = await response.Content.ReadAsStringAsync();
+            _sshCertDialogIdentity = identity;
+            _sshCertDialogKind = kind;
+            _sshCertDialogVisible = true;
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task DeleteSshCertificate(string id)
+    {
+        if (_deleteSshCertificateId != id) { _deleteSshCertificateId = id; Snackbar.Add("Klicken Sie erneut auf Löschen, um das SSH-Zertifikat zu entfernen.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.DeleteAsync($"api/v1/ssh-certificates/{Uri.EscapeDataString(id)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); _deleteSshCertificateId = null; Snackbar.Add("SSH-Zertifikat gelöscht.", Severity.Success); await LoadAllAsync(); }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task DownloadSshCaKey(string kind)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.GetAsync($"api/v1/ssh-ca-keys/{Uri.EscapeDataString(kind)}");
+            if (!response.IsSuccessStatusCode) { Snackbar.Add("SSH-CA-Schlüssel nicht gefunden. Bitte zuerst die PKI initialisieren.", Severity.Warning); return; }
+            var key = await response.Content.ReadFromJsonAsync<SshCaKeyDto>(_json);
+            if (key?.PublicKey is null) { Snackbar.Add("SSH-CA-Schlüssel konnte nicht gelesen werden.", Severity.Error); return; }
+            var bytes = System.Text.Encoding.UTF8.GetBytes(key.PublicKey);
+            await JS.InvokeVoidAsync("homeca.download", $"ssh-{kind}-ca.pub", "text/plain", Convert.ToBase64String(bytes));
+            Snackbar.Add($"SSH-{(kind == "host" ? "Host" : "User")}-CA-Schlüssel heruntergeladen.", Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
     private async Task RegisterAcme()
     {
         if (string.IsNullOrWhiteSpace(_acmeContact)) { Snackbar.Add("Ein ACME-Kontakt ist erforderlich.", Severity.Warning); return; }
@@ -651,6 +764,18 @@ else
     private string TrustScriptFirefox => "{\n  \"policies\": { \"Certificates\": { \"ImportEnterpriseRoots\": true,\n    \"Install\": [\"" + BaseUrl + "/api/v1/trust-anchor/pem\"] } }\n}";
     private async Task CopyToClipboard(string text) { await JS.InvokeVoidAsync("navigator.clipboard.writeText", text); Snackbar.Add(L.TrustInstallCopied, Severity.Success); }
 
+    // ── SSH deployment scripts ──────────────────────────────────────────────
+    private string SshCertFileName => $"{_sshCertDialogIdentity ?? "ssh"}-cert.pub";
+    private string SshHostDeployScript => $"# Zertifikat aus der Zwischenablage oder heruntergeladene Datei verwenden\nsudo cp {SshCertFileName} /etc/ssh/ssh_host_ed25519_key-cert.pub\nsudo chmod 644 /etc/ssh/ssh_host_ed25519_key-cert.pub";
+    private string SshHostSshdConfigScript => "# Falls noch nicht vorhanden, in /etc/ssh/sshd_config ergänzen:\nHostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub";
+    private string SshHostTrustUserScript => $"echo \"@cert-authority *.home.lab $(curl -s {BaseUrl}/api/v1/ssh-ca-keys/host -H 'Authorization: Bearer TOKEN' | jq -r '.publicKey')\" >> ~/.ssh/known_hosts";
+    private string SshHostTrustSystemScript => $"curl -s {BaseUrl}/api/v1/ssh-ca-keys/host \\\n  -H 'Authorization: Bearer TOKEN' | jq -r '.publicKey' \\\n  | xargs -I{{}} echo '@cert-authority *.home.lab {{}}' \\\n  | sudo tee -a /etc/ssh/ssh_known_hosts";
+    private string SshUserDeployScript => $"# Zertifikat neben dem privaten Schlüssel ablegen\ncp {SshCertFileName} ~/.ssh/id_ed25519-cert.pub";
+    private string SshUserTestScript => $"ssh -v {(_sshCertDialogIdentity ?? "benutzer")}@server.home.lab";
+    private string SshUserTrustScript => $"# User-CA-Schlüssel auf den Server kopieren\ncurl -s {BaseUrl}/api/v1/ssh-ca-keys/user \\\n  -H 'Authorization: Bearer TOKEN' | jq -r '.publicKey' \\\n  | sudo tee /etc/ssh/trusted-user-ca.pub\n\n# In /etc/ssh/sshd_config ergänzen:\n# TrustedUserCAKeys /etc/ssh/trusted-user-ca.pub\n\nsudo systemctl reload sshd";
+    private string SshVerifyScript => _sshCertDialogKind == "host" ? "ssh-keygen -L -f /etc/ssh/ssh_host_ed25519_key-cert.pub" : "ssh-keygen -L -f ~/.ssh/id_ed25519-cert.pub";
+    private string SshReloadSshdScript => "sudo systemctl reload sshd";
+
     private TargetProfileDto? SelectedProfile => _profiles.FirstOrDefault(profile => profile.Id == _selectedProfileId);
     private bool AllowsIpAddresses => ProfileAllowsIpAddress(SelectedProfile);
     private bool ProfileForcesRsa => string.Equals(ProfileKeyAlgorithm(SelectedProfile), Rsa, StringComparison.OrdinalIgnoreCase);
@@ -710,5 +835,5 @@ else
     private static string ProfileRenewalScript(TargetProfileDto? profile) => string.IsNullOrWhiteSpace(profile?.RenewalScriptTemplate) ? "# Kein profilspezifisches Skript hinterlegt." : profile.RenewalScriptTemplate;
     private static string Date(DateTime value) => value.ToLocalTime().ToString("d", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
     private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
-    private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors);
+    private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors); private record SshIssueResultDto(string Id, string Authority, string CertificatePath, string Certificate); private record SshCertificateItem(string Id, string Kind, string Identity, string Principals, DateTime IssuedAt, string? ValidUntil); private record SshCaKeyDto(string Authority, string PublicKey);
 }

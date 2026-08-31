@@ -275,7 +275,7 @@
     "C:\\Users\\Arndt-Sidney.Steinke\\.nuget\\packages\\": {}
   },
   "project": {
-    "version": "1.0.0",
+    "version": "0.1.0",
     "restore": {
       "projectUniqueName": "C:\\Admin\\_work\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj",
       "projectName": "HomeCA.Service",

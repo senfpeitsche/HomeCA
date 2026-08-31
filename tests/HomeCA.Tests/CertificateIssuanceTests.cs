@@ -1,6 +1,7 @@
 using HomeCA.Service.Pki;
 using HomeCA.Service.Deployments;
 using HomeCA.Service.Profiles;
+using HomeCA.Service.Revocation;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HomeCA.Tests;
@@ -15,8 +16,10 @@ public sealed class CertificateIssuanceTests : IDisposable
         var authorities = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
         await authorities.InitializeAsync(CancellationToken.None);
         var profiles = new TargetProfileRegistry(storage);
-        var deployments = new DeploymentPackageService(profiles);
-        var certificates = new CertificateIssuanceService(storage, deployments, authorities, _fixture.CreateOptions());
+        var deployments = new DeploymentPackageService(profiles, NullLogger<DeploymentPackageService>.Instance);
+        var revocations = new RevocationRegistry(storage, NullLogger<RevocationRegistry>.Instance);
+        var crl = new CrlService(storage, revocations, authorities, NullLogger<CrlService>.Instance);
+        var certificates = new CertificateIssuanceService(storage, deployments, authorities, revocations, crl, _fixture.CreateOptions(), NullLogger<CertificateIssuanceService>.Instance);
         return (authorities, certificates);
     }
 
