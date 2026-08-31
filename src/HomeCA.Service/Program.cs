@@ -195,6 +195,7 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
     {
         ctx.Response.Headers["Replay-Nonce"] = acme.CreateNonce();
         ctx.Response.Headers["Cache-Control"] = "no-store";
+        ctx.Response.StatusCode = 200;
         return Results.Ok();
     });
 
@@ -208,11 +209,12 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
     }
 
     // newAccount
-    app.MapPost("/acme/new-acct", async (HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/new-acct", async (HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
             var body = await ReadBodyAsync(ctx.Request);
+            logger.LogInformation("ACME newAccount: received {Bytes} bytes from {Remote}", body.Length, ctx.Connection.RemoteIpAddress);
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/new-acct";
             var jws = acme.VerifyJws(body, expectedUrl);
 
@@ -247,14 +249,15 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
             var account = await acme.NewAccountAsync(jws.Jwk, contact, ct);
             var accountUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{account.Id}";
             AddAcmeHeaders(ctx, acme, accountUrl);
+            logger.LogInformation("ACME newAccount: registered/found account {AccountId}, url={Url}", account.Id, accountUrl);
             return Results.Json(new { status = account.Status, contact = account.Contact, orders = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{account.Id}/orders" }, statusCode: 201);
         }
-        catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-        catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+        catch (AcmeProblemException ex) { logger.LogWarning("ACME newAccount error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
+        catch (Exception ex) { logger.LogError(ex, "ACME newAccount internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
     });
 
     // Account lookup (POST-as-GET)
-    app.MapPost("/acme/acct/{accountId}", async (string accountId, HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/acct/{accountId}", async (string accountId, HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
@@ -273,11 +276,12 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
     });
 
     // newOrder
-    app.MapPost("/acme/new-order", async (HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/new-order", async (HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
             var body = await ReadBodyAsync(ctx.Request);
+            logger.LogInformation("ACME newOrder: received {Bytes} bytes from {Remote}", body.Length, ctx.Connection.RemoteIpAddress);
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/new-order";
             var jws = acme.VerifyJws(body, expectedUrl);
 
@@ -335,17 +339,19 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
     });
 
     // Authorization (POST-as-GET)
-    app.MapPost("/acme/authz/{authzId}", async (string authzId, HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/authz/{authzId}", async (string authzId, HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
             var body = await ReadBodyAsync(ctx.Request);
+            logger.LogInformation("ACME authz: {AuthzId} from {Remote}", authzId, ctx.Connection.RemoteIpAddress);
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/authz/{authzId}";
             var jws = acme.VerifyJws(body, expectedUrl);
 
             var authz = await acme.GetAuthorizationAsync(authzId, ct);
             if (authz is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Authorization not found.", 404));
 
+            logger.LogInformation("ACME authz {AuthzId}: identifier={Value}, status={Status}", authzId, authz.Identifier.Value, authz.Status);
             var b = AcmeBaseUrl(ctx.Request);
             AddAcmeHeaders(ctx, acme);
             return Results.Json(new
@@ -367,11 +373,12 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
     });
 
     // Challenge (respond to / POST-as-GET)
-    app.MapPost("/acme/chall/{challengeId}", async (string challengeId, HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/chall/{challengeId}", async (string challengeId, HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
             var body = await ReadBodyAsync(ctx.Request);
+            logger.LogInformation("ACME challenge: {ChallengeId}, payload={PayloadLen} bytes from {Remote}", challengeId, body.Length, ctx.Connection.RemoteIpAddress);
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/chall/{challengeId}";
             var jws = acme.VerifyJws(body, expectedUrl);
 
@@ -388,6 +395,7 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
             }
             if (challenge is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Challenge not found.", 404));
 
+            logger.LogInformation("ACME challenge {ChallengeId}: status={Status}", challengeId, challenge.Status);
             AddAcmeHeaders(ctx, acme);
             var result = new Dictionary<string, object?>
             {
@@ -405,11 +413,12 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
     });
 
     // Finalize
-    app.MapPost("/acme/order/{orderId}/finalize", async (string orderId, HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+    app.MapPost("/acme/order/{orderId}/finalize", async (string orderId, HttpContext ctx, Rfc8555AcmeService acme, ILogger<Program> logger, CancellationToken ct) =>
     {
         try
         {
             var body = await ReadBodyAsync(ctx.Request);
+            logger.LogInformation("ACME finalize: order {OrderId} from {Remote}", orderId, ctx.Connection.RemoteIpAddress);
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/order/{orderId}/finalize";
             var jws = acme.VerifyJws(body, expectedUrl);
 

@@ -374,6 +374,7 @@ Für Clients im Netz siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md).
 | Problem | Lösung |
 | --- | --- |
 | Konto-Registrierung schlägt fehl | Custom CA URL prüfen — muss exakt auf `/acme/directory` enden (nicht `/api/v1/acme/directory`). HomeCA muss von OPNsense erreichbar sein. |
+| „domain validation failed (http01)" | Auf dem HomeCA-Server die Logs prüfen: `journalctl -u homeca -f`. Alle ACME-Requests werden mit Prefix `ACME` geloggt. Häufigste Ursachen: (1) DNS-Name ist nicht unter einer aktiven Ausstellungszone (`internalIssuanceEnabled: true`), (2) HomeCA ist von OPNsense nicht erreichbar, (3) OPNsense-CA-Trust fehlt (Root-CA und Issuing-CA importieren unter System > Trust > Authorities). |
 | Zertifikat-Ausstellung hängt | Unter **Services > ACME Client > Log Files** das acme.sh-Log prüfen. Bei Verbindungsproblemen die Erreichbarkeit von HomeCA testen: `curl -s http://homeca.lab.example.com:5080/acme/directory` |
 | Browser zeigt weiterhin altes Zertifikat | Automation fehlt oder nicht dem Zertifikat zugewiesen. Siehe Schritt 3.4. |
 | Zertifikat wird nicht als vertrauenswürdig erkannt | HomeCA Root-CA ist nicht importiert. Siehe Schritt 3.7. |
