@@ -1106,7 +1106,11 @@ static ProcessResult RunProcess(string fileName, string arguments, string? stdin
         RedirectStandardError = true,
         RedirectStandardInput = stdin is not null,
         UseShellExecute = false,
-        CreateNoWindow = true
+        CreateNoWindow = true,
+        // Do not inherit the service's configured working directory. An older
+        // installation can still point at /opt/homeca after the application
+        // was moved, which prevents even `sudo` from being started.
+        WorkingDirectory = "/"
     };
     process.Start();
     if (stdin is not null)

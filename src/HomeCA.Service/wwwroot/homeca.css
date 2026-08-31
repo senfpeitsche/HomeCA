@@ -49,6 +49,12 @@ html, body { background: var(--homeca-canvas); color: var(--homeca-ink); }
 .script-preview .mud-input-root-outlined textarea,
 .script-preview input,
 .script-preview input[readonly] { color: #1a2a25 !important; -webkit-text-fill-color: #1a2a25 !important; opacity: 1 !important; }
+.script-preview-static { position: relative; margin-bottom: .75rem; border: 1px solid #b8c5c0; border-radius: 5px; background: #f4f7f5; }
+.script-preview-static pre { min-height: calc(var(--code-preview-lines, 3) * 1.5em + 1.5rem); margin: 0; padding: .75rem 3.25rem .75rem .875rem; overflow-x: auto; color: #17212b; font: .85rem/1.5 'Cascadia Mono', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace; white-space: pre; }
+.script-preview-static code { color: inherit; font: inherit; }
+.script-preview-static .mud-icon-button { position: absolute; top: .35rem; right: .35rem; color: var(--homeca-forest); }
+.script-preview-static .mud-icon-button:hover { background: rgba(18, 51, 46, .1); }
+.script-preview-static .mud-icon-button:focus-visible { outline: 2px solid var(--homeca-forest); outline-offset: 2px; }
 .empty-panel { max-width: 42rem; }
 .page-loader { margin: -3rem -4.5rem 1.5rem; }
 .mud-button-filled-primary { background-color: var(--homeca-forest) !important; }

@@ -82,7 +82,7 @@
         </MudSimpleTable>
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Zertifikat über die API ausstellen</MudText>
-        <MudTextField Value="@_tlsApiIssue" Lines="8" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/certificates" />
+        <CodePreview Text="@_tlsApiIssue" Lines="8" />
         <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
             <thead><tr><th>Parameter</th><th>Pflicht</th><th>Standard</th><th>Erklärung</th></tr></thead>
             <tbody>
@@ -97,44 +97,44 @@
         </MudSimpleTable>
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">Exportdateien herunterladen</MudText>
-        <MudTextField Value="@_tlsApiExports" Lines="10" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="Exportendpunkte" />
+        <CodePreview Text="@_tlsApiExports" Lines="10" />
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Zertifikate auf Zielsysteme einspielen</MudText>
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
             <MudExpansionPanel Text="Proxmox VE">
-                <MudTextField Value="@_tlsDeployProxmox" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployProxmox" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="nginx">
-                <MudTextField Value="@_tlsDeployNginx" Lines="8" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployNginx" Lines="8" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="HAProxy">
-                <MudTextField Value="@_tlsDeployHaproxy" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployHaproxy" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Windows IIS">
-                <MudTextField Value="@_tlsDeployIis" Lines="6" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployIis" Lines="6" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Windows RDP">
-                <MudTextField Value="@_tlsDeployRdp" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployRdp" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="OPNsense">
                 <MudText Class="pa-2">System > Trust > Certificates > Hinzufügen — Method: „Import an existing Certificate" — Zertifikat (PEM) und privaten Schlüssel einfügen — Speichern, dann unter System > Settings > Administration als Web-GUI-Zertifikat auswählen.</MudText>
             </MudExpansionPanel>
             <MudExpansionPanel Text="Home Assistant">
-                <MudTextField Value="@_tlsDeployHomeAssistant" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployHomeAssistant" Lines="5" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="UniFi OS">
                 <MudText Class="pa-2">Einstellungen > System > Erweitert > TLS-Zertifikat hochladen (<code>certificate.pem</code> und <code>key.pem</code>).</MudText>
                 <MudText Typo="Typo.subtitle2" Class="mt-2">Selbst gehosteter Controller:</MudText>
-                <MudTextField Value="@_tlsDeployUnifi" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployUnifi" Lines="5" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Synology DSM">
                 <MudText Class="pa-2">DSM > Systemsteuerung > Sicherheit > Zertifikat > Hinzufügen > Vorhandenes Zertifikat importieren: Zertifikat (<code>certificate.pem</code>), Privater Schlüssel (<code>key.pem</code>), Zwischenzertifikat (<code>chain.pem</code>).</MudText>
             </MudExpansionPanel>
             <MudExpansionPanel Text="Cisco IOS/IOS-XE">
-                <MudTextField Value="@_tlsDeployCisco" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployCisco" Lines="5" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="TeamCity">
-                <MudTextField Value="@_tlsDeployTeamCity" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_tlsDeployTeamCity" Lines="4" />
             </MudExpansionPanel>
         </MudExpansionPanels>
 
@@ -142,12 +142,12 @@
         <MudText>Navigiere zu <strong>Automatik</strong> in der Seitenleiste. Wähle ein Zertifikat, setze die Anzahl Tage vor Ablauf (Standard: 30) und aktiviere den Plan. Der Hintergrunddienst prüft stündlich alle aktiven Pläne und stellt das Zertifikat automatisch mit denselben SANs, demselben Algorithmus und derselben Laufzeit neu aus.</MudText>
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">Erneuerungsplan per API</MudText>
-        <MudTextField Value="@_tlsApiRenewal" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/renewal-plans" />
+        <CodePreview Text="@_tlsApiRenewal" Lines="7" />
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">5. Zertifikat sperren</MudText>
         <MudText>Im Zertifikatsinventar auf <strong>Widerrufen</strong> klicken. Das Zertifikat wird automatisch in die Sperrliste aufgenommen und die CRL neu generiert.</MudText>
         <MudText Typo="Typo.subtitle2" Class="mt-2">Per API:</MudText>
-        <MudTextField Value="@_tlsApiRevoke" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" />
+        <CodePreview Text="@_tlsApiRevoke" Lines="2" />
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">6. Ablaufwarnungen überwachen</MudText>
         <MudText><code>GET /api/v1/warnings/expiring</code> liefert alle Zertifikate, die innerhalb von 30 Tagen ablaufen. Die Weboberfläche zeigt Ablaufwarnungen auf der Übersichtsseite als orangefarbene Meldung an.</MudText>
@@ -206,10 +206,10 @@
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. SSH-Zertifikat über die API ausstellen</MudText>
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">Host-Zertifikat</MudText>
-        <MudTextField Value="@_sshApiHost" Lines="9" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/ssh-certificates" />
+        <CodePreview Text="@_sshApiHost" Lines="9" />
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">Benutzerzertifikat</MudText>
-        <MudTextField Value="@_sshApiUser" Lines="9" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/ssh-certificates" />
+        <CodePreview Text="@_sshApiUser" Lines="9" />
 
         <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
             <thead><tr><th>Parameter</th><th>Pflicht</th><th>Standard</th><th>Erklärung</th></tr></thead>
@@ -226,21 +226,21 @@
         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">Die CA-Public-Keys sind in der Weboberfläche unter <strong>Zertifizierungsstellen</strong> als Download verfügbar, oder per API unter <code>/api/v1/ssh-ca-keys/host</code> und <code>/api/v1/ssh-ca-keys/user</code>.</MudAlert>
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">Host-CA auf Clients einrichten (keine Fingerprint-Warnungen mehr)</MudText>
-        <MudTextField Value="@_sshTrustHost" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="known_hosts ergänzen" />
+        <CodePreview Text="@_sshTrustHost" Lines="5" />
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">User-CA auf Servern einrichten (kein authorized_keys mehr nötig)</MudText>
-        <MudTextField Value="@_sshTrustUser" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="sshd_config ergänzen" />
+        <CodePreview Text="@_sshTrustUser" Lines="7" />
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Zertifikate auf Zielsystemen einspielen</MudText>
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
             <MudExpansionPanel Text="Host-Zertifikat auf einem Server installieren">
-                <MudTextField Value="@_sshDeployHost" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_sshDeployHost" Lines="7" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Benutzerzertifikat verwenden">
-                <MudTextField Value="@_sshDeployUser" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_sshDeployUser" Lines="4" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Principals einschränken (empfohlen)">
-                <MudTextField Value="@_sshPrincipals" Lines="10" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_sshPrincipals" Lines="10" />
             </MudExpansionPanel>
         </MudExpansionPanels>
 
@@ -281,32 +281,32 @@
 
         <MudText Typo="Typo.h5" Class="mt-4 mb-2">Root-CA-Zertifikat herunterladen</MudText>
         <MudText>HomeCA stellt das Root-CA-Zertifikat ohne Authentifizierung bereit:</MudText>
-        <MudTextField Value="@_trustDownload" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="Download-Endpunkte" />
+        <CodePreview Text="@_trustDownload" Lines="5" />
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Prüfe den SHA-256-Fingerprint immer gegen die Ausgabe des <code>/api/v1/trust-anchor</code>-Endpunkts, bevor du das Zertifikat installierst.</MudAlert>
 
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
             <MudExpansionPanel Text="Windows">
                 <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Einzelner Rechner (als Administrator)</MudText>
-                <MudTextField Value="@_trustWindows" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustWindows" Lines="1" />
                 <MudText Class="mt-2">Alternativ: Doppelklick auf die <code>.cer</code>-Datei > „Zertifikat installieren" > Lokaler Computer > Vertrauenswürdige Stammzertifizierungsstellen.</MudText>
                 <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Per Gruppenrichtlinie (Active Directory)</MudText>
                 <MudText>Computerkonfiguration > Windows-Einstellungen > Sicherheitseinstellungen > Richtlinien öffentlicher Schlüssel > Vertrauenswürdige Stammzertifizierungsstellen > Importieren.</MudText>
             </MudExpansionPanel>
 
             <MudExpansionPanel Text="Linux (Debian/Ubuntu)">
-                <MudTextField Value="@_trustLinux" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustLinux" Lines="2" />
                 <MudText Class="mt-2">Hinweis: Die Datei muss die Endung <code>.crt</code> haben, auch wenn es PEM-Format ist.</MudText>
             </MudExpansionPanel>
 
             <MudExpansionPanel Text="macOS">
-                <MudTextField Value="@_trustMacOs" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustMacOs" Lines="1" />
                 <MudText Class="mt-2">Alternativ: Doppelklick auf die <code>.pem</code>-Datei > Schlüsselbundverwaltung > System > Doppelklick > Vertrauen > „Immer vertrauen".</MudText>
             </MudExpansionPanel>
 
             <MudExpansionPanel Text="Firefox">
                 <MudText Class="pa-2"><strong>Manuell:</strong> Einstellungen > Datenschutz & Sicherheit > Zertifikate > Zertifikate anzeigen > Zertifizierungsstellen > Importieren > „Dieser CA vertrauen, um Websites zu identifizieren" aktivieren.</MudText>
                 <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Per Richtlinie (Enterprise)</MudText>
-                <MudTextField Value="@_trustFirefox" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustFirefox" Lines="7" />
             </MudExpansionPanel>
 
             <MudExpansionPanel Text="OPNsense">
@@ -315,9 +315,9 @@
 
             <MudExpansionPanel Text="Netzwerk-Switches (Cisco, Huawei)">
                 <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Cisco IOS/IOS-XE</MudText>
-                <MudTextField Value="@_trustCisco" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustCisco" Lines="5" />
                 <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Huawei VRP</MudText>
-                <MudTextField Value="@_trustHuawei" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustHuawei" />
             </MudExpansionPanel>
 
             <MudExpansionPanel Text="Android">
@@ -334,12 +334,12 @@
             </MudExpansionPanel>
 
             <MudExpansionPanel Text="Proxmox VE Host">
-                <MudTextField Value="@_trustProxmox" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_trustProxmox" Lines="2" />
             </MudExpansionPanel>
         </MudExpansionPanels>
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">Verifizierung</MudText>
-        <MudTextField Value="@_trustVerify" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Label="Installation prüfen" />
+        <CodePreview Text="@_trustVerify" Lines="5" />
     </div>;
 
     // ── ACME ─────────────────────────────────────────────────────────────────
@@ -427,27 +427,27 @@
 
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
             <MudExpansionPanel Text="Certbot">
-                <MudTextField Value="@_acmeCertbot" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeCertbot" Lines="4" />
                 <MudText Class="mud-text-secondary mt-2">Certbot erwartet einen Challenge-Typ, obwohl HomeCA ihn nicht prüft. <code>--preferred-challenges http</code> ist die einfachste Wahl. Für Standalone-Modus (ohne bestehenden Webserver): <code>--standalone</code> statt <code>--webroot</code>.</MudText>
             </MudExpansionPanel>
             <MudExpansionPanel Text="acme.sh">
-                <MudTextField Value="@_acmeAcmeSh" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeAcmeSh" Lines="4" />
                 <MudText Class="mud-text-secondary mt-2"><code>--webroot</code> legt die Challenge-Datei im angegebenen Verzeichnis ab. Da HomeCA die Challenge nicht abruft, kann ein beliebiges Verzeichnis verwendet werden. Alternativ <code>--standalone</code>.</MudText>
             </MudExpansionPanel>
             <MudExpansionPanel Text="Caddy">
-                <MudTextField Value="@_acmeCaddy" Lines="8" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeCaddy" Lines="8" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Traefik">
-                <MudTextField Value="@_acmeTraefik" Lines="10" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeTraefik" Lines="10" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="win-acme (Windows)">
-                <MudTextField Value="@_acmeWinAcme" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeWinAcme" Lines="2" />
             </MudExpansionPanel>
         </MudExpansionPanels>
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Ausstellungszone anlegen</MudText>
         <MudText>Alle DNS-Namen in ACME-Anfragen müssen unter einer aktiven Ausstellungszone liegen. Zonen werden unter <strong>Einstellungen > Domains</strong> angelegt oder per API:</MudText>
-        <MudTextField Value="@_acmeZone" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/domains" />
+        <CodePreview Text="@_acmeZone" Lines="4" />
         <MudText Class="mud-text-secondary">Beispiel: Zone <code>lab.example.com</code> erlaubt Zertifikate für <code>lab.example.com</code>, <code>gw.lab.example.com</code>, <code>nas.lab.example.com</code>, etc.</MudText>
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Externe ACME-Aussteller</MudText>
@@ -455,10 +455,10 @@
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">4.1 DNS-Connector einrichten</MudText>
         <MudText>Unter <strong>Einstellungen</strong> eine Connector-Instanz anlegen. Unterstützte Typen: <code>technitium</code> und <code>hetzner</code>.</MudText>
-        <MudTextField Value="@_acmeConnector" Lines="6" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/connectors" />
+        <CodePreview Text="@_acmeConnector" Lines="6" />
 
         <MudText Typo="Typo.h6" Class="mt-3 mb-2">4.2 Externen Aussteller registrieren</MudText>
-        <MudTextField Value="@_acmeIssuer" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/external-issuers" />
+        <CodePreview Text="@_acmeIssuer" Lines="5" />
         <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
             <thead><tr><th>CA</th><th>Directory-URL</th></tr></thead>
             <tbody>
@@ -475,13 +475,13 @@
 
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
             <MudExpansionPanel Text="Konto registrieren">
-                <MudTextField Value="@_acmeAccount" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeAccount" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Order erstellen">
-                <MudTextField Value="@_acmeOrder" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeOrder" Lines="4" />
             </MudExpansionPanel>
             <MudExpansionPanel Text="Order finalisieren">
-                <MudTextField Value="@_acmeFinalize" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <CodePreview Text="@_acmeFinalize" Lines="5" />
                 <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
                     <thead><tr><th>Parameter</th><th>Standard</th><th>Erklärung</th></tr></thead>
                     <tbody>

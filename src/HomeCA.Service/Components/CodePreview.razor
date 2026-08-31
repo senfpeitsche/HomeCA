@@ -1,0 +1,20 @@
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject UiStrings L
+
+<div class="script-preview script-preview-static" style="--code-preview-lines: @Lines">
+    <pre><code>@Text</code></pre>
+    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="@CopyLabel" OnClick="CopyAsync" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    [Parameter] public int Lines { get; set; } = 3;
+    [Parameter] public string CopyLabel { get; set; } = "Code kopieren";
+
+    private async Task CopyAsync()
+    {
+        await JS.InvokeVoidAsync("homeca.copyToClipboard", Text);
+        Snackbar.Add(L.TrustInstallCopied, Severity.Success);
+    }
+}
