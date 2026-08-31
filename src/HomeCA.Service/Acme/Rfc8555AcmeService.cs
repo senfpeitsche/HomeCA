@@ -305,8 +305,8 @@ public sealed class Rfc8555AcmeService
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-            var challenge = new Rfc8555Challenge(challengeId, "http-01", token, "valid", DateTimeOffset.UtcNow);
-            var authz = new Rfc8555Authorization(authzIds[i], new Rfc8555Identifier("dns", dnsNames[i]), "valid", [challenge], DateTimeOffset.UtcNow.AddDays(7));
+            var challenge = new Rfc8555Challenge(challengeId, "http-01", token, "pending", null);
+            var authz = new Rfc8555Authorization(authzIds[i], new Rfc8555Identifier("dns", dnsNames[i]), "pending", [challenge], DateTimeOffset.UtcNow.AddDays(7));
             authorizations.Add(authz);
         }
 
@@ -316,8 +316,9 @@ public sealed class Rfc8555AcmeService
         try
         {
             var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-            // Auto-approve: orders go directly to "ready" because this is a trusted internal CA.
-            var order = new Rfc8555Order(orderId, accountId, rfcIdentifiers, authorizations, "ready",
+            // Orders start as "pending" — they move to "ready" once all authorizations are valid.
+            // acme.sh will POST to the challenge endpoint, which auto-approves and transitions the order.
+            var order = new Rfc8555Order(orderId, accountId, rfcIdentifiers, authorizations, "pending",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(7), null, null);
             orders.Add(order);
             await WriteAsync(_ordersPath, orders, ct);
@@ -330,7 +331,22 @@ public sealed class Rfc8555AcmeService
     public async Task<Rfc8555Order?> GetOrderAsync(string orderId, CancellationToken ct)
     {
         var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-        return orders.FirstOrDefault(o => o.Id == orderId);
+        var order = orders.FirstOrDefault(o => o.Id == orderId);
+        if (order is null) return null;
+
+        // Dynamically check if order should transition from pending → ready.
+        if (order.Status == "pending" && order.Authorizations.All(a => a.Status == "valid"))
+        {
+            order = order with { Status = "ready" };
+            // Persist the transition.
+            var index = orders.FindIndex(o => o.Id == orderId);
+            if (index >= 0)
+            {
+                orders[index] = order;
+                await WriteAsync(_ordersPath, orders, ct);
+            }
+        }
+        return order;
     }
 
     public async Task<IReadOnlyList<Rfc8555Order>> ListOrdersAsync(CancellationToken ct) =>
@@ -361,6 +377,66 @@ public sealed class Rfc8555AcmeService
     {
         var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
         return orders.SelectMany(o => o.Authorizations).SelectMany(a => a.Challenges).FirstOrDefault(c => c.Id == challengeId);
+    }
+
+    /// <summary>
+    /// Responds to a challenge by immediately marking it and its parent authorization as valid.
+    /// If all authorizations for the order are now valid, the order transitions to "ready".
+    /// This is the auto-approval mechanism for HomeCA's trusted internal CA.
+    /// </summary>
+    public async Task<Rfc8555Challenge?> RespondToChallengeAsync(string challengeId, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
+            var modified = false;
+
+            for (var oi = 0; oi < orders.Count; oi++)
+            {
+                var order = orders[oi];
+                for (var ai = 0; ai < order.Authorizations.Count; ai++)
+                {
+                    var authz = order.Authorizations[ai];
+                    for (var ci = 0; ci < authz.Challenges.Count; ci++)
+                    {
+                        if (authz.Challenges[ci].Id != challengeId) continue;
+
+                        // Mark challenge as valid.
+                        var updatedChallenge = authz.Challenges[ci] with { Status = "valid", ValidatedAt = DateTimeOffset.UtcNow };
+                        var updatedChallenges = authz.Challenges.ToList();
+                        updatedChallenges[ci] = updatedChallenge;
+
+                        // Mark authorization as valid.
+                        var updatedAuthz = authz with { Status = "valid", Challenges = updatedChallenges };
+                        var updatedAuthzList = order.Authorizations.ToList();
+                        updatedAuthzList[ai] = updatedAuthz;
+
+                        // Check if all authorizations are now valid → order becomes "ready".
+                        var allValid = updatedAuthzList.All(a => a.Status == "valid");
+                        var updatedOrder = order with
+                        {
+                            Authorizations = updatedAuthzList,
+                            Status = allValid && order.Status == "pending" ? "ready" : order.Status
+                        };
+                        orders[oi] = updatedOrder;
+                        modified = true;
+
+                        _logger.LogInformation("Auto-approved challenge {ChallengeId}, authorization {AuthzId} → valid. Order {OrderId} status: {Status}",
+                            challengeId, authz.Id, order.Id, updatedOrder.Status);
+
+                        if (modified)
+                        {
+                            await WriteAsync(_ordersPath, orders, ct);
+                        }
+                        return updatedChallenge;
+                    }
+                }
+            }
+
+            return null;
+        }
+        finally { _gate.Release(); }
     }
 
     /// <summary>
@@ -568,7 +644,7 @@ public sealed record Rfc8555Account(string Id, string Thumbprint, string[] Conta
 
 public sealed record Rfc8555Identifier(string Type, string Value);
 
-public sealed record Rfc8555Challenge(string Id, string Type, string Token, string Status, DateTimeOffset ValidatedAt);
+public sealed record Rfc8555Challenge(string Id, string Type, string Token, string Status, DateTimeOffset? ValidatedAt);
 
 public sealed record Rfc8555Authorization(string Id, Rfc8555Identifier Identifier, string Status, IReadOnlyList<Rfc8555Challenge> Challenges, DateTimeOffset Expires);
 

@@ -375,19 +375,30 @@ app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalo
             var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/chall/{challengeId}";
             var jws = acme.VerifyJws(body, expectedUrl);
 
-            var challenge = await acme.GetChallengeAsync(challengeId, ct);
+            Rfc8555Challenge? challenge;
+            if (jws.Payload.Length > 0)
+            {
+                // Client is responding to the challenge — auto-approve it.
+                challenge = await acme.RespondToChallengeAsync(challengeId, ct);
+            }
+            else
+            {
+                // POST-as-GET — just return current status.
+                challenge = await acme.GetChallengeAsync(challengeId, ct);
+            }
             if (challenge is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Challenge not found.", 404));
 
-            // Challenges are auto-approved in HomeCA — always return valid.
             AddAcmeHeaders(ctx, acme);
-            return Results.Json(new
+            var result = new Dictionary<string, object?>
             {
-                type = challenge.Type,
-                status = challenge.Status,
-                url = expectedUrl,
-                token = challenge.Token,
-                validated = challenge.ValidatedAt.ToString("o")
-            });
+                ["type"] = challenge.Type,
+                ["status"] = challenge.Status,
+                ["url"] = expectedUrl,
+                ["token"] = challenge.Token
+            };
+            if (challenge.ValidatedAt is not null)
+                result["validated"] = challenge.ValidatedAt.Value.ToString("o");
+            return Results.Json(result);
         }
         catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
         catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
