@@ -14,33 +14,33 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = HomeCA.Service
 build_property.RootNamespace = HomeCA.Service
-build_property.ProjectDir = D:\Projekte\HomeCA\src\HomeCA.Service\
+build_property.ProjectDir = C:\Admin\_work\HomeCA\src\HomeCA.Service\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 9.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = D:\Projekte\HomeCA\src\HomeCA.Service
+build_property.MSBuildProjectDirectory = C:\Admin\_work\HomeCA\src\HomeCA.Service
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 10.0
 build_property.EnableCodeStyleSeverity = 
 
-[D:/Projekte/HomeCA/src/HomeCA.Service/Components/App.razor]
+[C:/Admin/_work/HomeCA/src/HomeCA.Service/Components/App.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBcHAucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Projekte/HomeCA/src/HomeCA.Service/Components/Layout/MainLayout.razor]
+[C:/Admin/_work/HomeCA/src/HomeCA.Service/Components/Layout/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTWFpbkxheW91dC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Projekte/HomeCA/src/HomeCA.Service/Components/Pages/Home.razor]
+[C:/Admin/_work/HomeCA/src/HomeCA.Service/Components/Pages/Home.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xIb21lLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Projekte/HomeCA/src/HomeCA.Service/Components/Routes.razor]
+[C:/Admin/_work/HomeCA/src/HomeCA.Service/Components/Routes.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSb3V0ZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Projekte/HomeCA/src/HomeCA.Service/Components/_Imports.razor]
+[C:/Admin/_work/HomeCA/src/HomeCA.Service/Components/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xfSW1wb3J0cy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 

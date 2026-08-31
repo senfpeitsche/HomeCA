@@ -112,8 +112,10 @@ public sealed class TargetProfileRegistry(HomeCaStorage storage)
     private async Task WriteUnsafeAsync(List<TargetProfile> profiles, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        await using var stream = File.Create(_path);
-        await JsonSerializer.SerializeAsync(stream, profiles.OrderBy(profile => profile.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList(), Json, cancellationToken);
+        var temporaryPath = _path + ".tmp";
+        await using (var stream = File.Create(temporaryPath))
+            await JsonSerializer.SerializeAsync(stream, profiles.OrderBy(profile => profile.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList(), Json, cancellationToken);
+        File.Move(temporaryPath, _path, true);
     }
 
     private void EnsureSeed()

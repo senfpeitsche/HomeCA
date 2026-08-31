@@ -6,7 +6,7 @@ using HomeCA.Service.Pki;
 namespace HomeCA.Service.Acme;
 
 /// <summary>Provides the stateful operations behind HomeCA's internal ACME directory.</summary>
-public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry domains, CertificateIssuanceService certificates)
+public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry domains, CertificateIssuanceService certificates, ILogger<InternalAcmeService> logger)
 {
     private readonly string _accountsPath = Path.Combine(storage.RootPath, "state", "acme-accounts.json");
     private readonly string _ordersPath = Path.Combine(storage.RootPath, "state", "acme-orders.json");
@@ -27,6 +27,7 @@ public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry do
             var account = new AcmeAccount(Guid.NewGuid().ToString("N"), request.Contact.Trim(), DateTimeOffset.UtcNow);
             accounts.Add(account);
             await WriteAsync(_accountsPath, accounts, cancellationToken);
+            logger.LogInformation("Registered ACME account {AccountId} ({Contact})", account.Id, account.Contact);
             return account;
         }
         finally { _gate.Release(); }
@@ -46,10 +47,15 @@ public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry do
             var order = new AcmeOrder(Guid.NewGuid().ToString("N"), accountId, normalizedIdentifiers, "ready", DateTimeOffset.UtcNow, null);
             orders.Add(order);
             await WriteAsync(_ordersPath, orders, cancellationToken);
+            logger.LogInformation("Created ACME order {OrderId} for identifiers {Identifiers}", order.Id, string.Join(", ", normalizedIdentifiers));
             return order;
         }
         finally { _gate.Release(); }
     }
+
+    public async Task<IReadOnlyList<AcmeAccount>> ListAccountsAsync(CancellationToken cancellationToken) => await ReadAsync<List<AcmeAccount>>(_accountsPath, cancellationToken) ?? [];
+
+    public async Task<IReadOnlyList<AcmeOrder>> ListOrdersAsync(CancellationToken cancellationToken) => await ReadAsync<List<AcmeOrder>>(_ordersPath, cancellationToken) ?? [];
 
     public async Task<AcmeOrder?> GetOrderAsync(string orderId, CancellationToken cancellationToken) => (await ReadAsync<List<AcmeOrder>>(_ordersPath, cancellationToken) ?? []).FirstOrDefault(order => order.Id == orderId);
 
@@ -68,6 +74,7 @@ public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry do
             order = order with { Status = "valid", CertificateId = result.Id };
             orders[index] = order;
             await WriteAsync(_ordersPath, orders, cancellationToken);
+            logger.LogInformation("Finalized ACME order {OrderId}, issued certificate {CertificateId}", orderId, result.Id);
             return order;
         }
         finally { _gate.Release(); }
@@ -81,8 +88,20 @@ public sealed class InternalAcmeService(HomeCaStorage storage, DomainRegistry do
     }
 
     private static bool IsWithinZone(string name, string zone) => name.Equals(zone, StringComparison.OrdinalIgnoreCase) || name.EndsWith('.' + zone, StringComparison.OrdinalIgnoreCase);
-    private static async Task<T?> ReadAsync<T>(string path, CancellationToken ct) => File.Exists(path) ? await JsonSerializer.DeserializeAsync<T>(File.OpenRead(path), cancellationToken: ct) : default;
-    private static async Task WriteAsync<T>(string path, T value, CancellationToken ct) { await using var stream = File.Create(path); await JsonSerializer.SerializeAsync(stream, value, cancellationToken: ct); }
+    private static async Task<T?> ReadAsync<T>(string path, CancellationToken ct)
+    {
+        if (!File.Exists(path)) return default;
+        await using var stream = File.OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<T>(stream, cancellationToken: ct);
+    }
+
+    private static async Task WriteAsync<T>(string path, T value, CancellationToken ct)
+    {
+        var temporaryPath = path + ".tmp";
+        await using (var stream = File.Create(temporaryPath))
+            await JsonSerializer.SerializeAsync(stream, value, cancellationToken: ct);
+        File.Move(temporaryPath, path, true);
+    }
 }
 
 public sealed record InternalAcmeDirectory(string NewAccount, string NewOrder, string FinalizeOrder);

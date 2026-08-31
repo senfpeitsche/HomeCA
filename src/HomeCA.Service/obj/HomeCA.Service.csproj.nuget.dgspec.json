@@ -1,37 +1,29 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Projekte\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj": {}
+    "C:\\Admin\\_work\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj": {}
   },
   "projects": {
-    "D:\\Projekte\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj": {
+    "C:\\Admin\\_work\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Projekte\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj",
+        "projectUniqueName": "C:\\Admin\\_work\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj",
         "projectName": "HomeCA.Service",
-        "projectPath": "D:\\Projekte\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj",
-        "packagesPath": "C:\\Users\\senfp\\.nuget\\packages\\",
-        "outputPath": "D:\\Projekte\\HomeCA\\src\\HomeCA.Service\\obj\\",
+        "projectPath": "C:\\Admin\\_work\\HomeCA\\src\\HomeCA.Service\\HomeCA.Service.csproj",
+        "packagesPath": "C:\\Users\\Arndt-Sidney.Steinke\\.nuget\\packages\\",
+        "outputPath": "C:\\Admin\\_work\\HomeCA\\src\\HomeCA.Service\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
-          "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
-        ],
         "configFilePaths": [
-          "C:\\Users\\senfp\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\Arndt-Sidney.Steinke\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net10.0": {
-            "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {}
           }
@@ -50,7 +42,6 @@
       },
       "frameworks": {
         "net10.0": {
-          "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
             "Certes": {
@@ -60,8 +51,12 @@
             "Microsoft.AspNetCore.App.Internal.Assets": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[10.0.2, )",
+              "version": "[10.0.11, )",
               "autoReferenced": true
+            },
+            "Microsoft.AspNetCore.OpenApi": {
+              "target": "Package",
+              "version": "[10.0.11, )"
             },
             "MudBlazor": {
               "target": "Package",
@@ -87,7 +82,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.111/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

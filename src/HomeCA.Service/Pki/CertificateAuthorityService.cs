@@ -36,6 +36,32 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         return new IssuingAuthorityPaths(issuer.Id, PathFor(issuer.Id), PathFor(parent.Id), issuer.CrlValidityDays);
     }
 
+    /// <summary>Returns the active root CA certificate (public part only) for trust distribution. No authentication required.</summary>
+    public async Task<AuthorityCertificateExport?> GetTrustAnchorAsync(string format, CancellationToken ct)
+    {
+        var all = await ReadAsync(ct);
+        var root = all.FirstOrDefault(x => x.Type == "root" && x.IsActive && !x.IsRevoked);
+        if (root is null) return null;
+        using var certificate = Load(root);
+        return format.ToLowerInvariant() switch
+        {
+            "pem" => new AuthorityCertificateExport("homeca-root-ca.pem", "application/x-pem-file", Encoding.UTF8.GetBytes(certificate.ExportCertificatePem())),
+            "der" => new AuthorityCertificateExport("homeca-root-ca.cer", "application/pkix-cert", certificate.Export(X509ContentType.Cert)),
+            _ => new AuthorityCertificateExport("homeca-root-ca.pem", "application/x-pem-file", Encoding.UTF8.GetBytes(certificate.ExportCertificatePem()))
+        };
+    }
+
+    /// <summary>Returns trust anchor metadata including fingerprint and subject for verification.</summary>
+    public async Task<TrustAnchorInfo?> GetTrustAnchorInfoAsync(CancellationToken ct)
+    {
+        var all = await ReadAsync(ct);
+        var root = all.FirstOrDefault(x => x.Type == "root" && x.IsActive && !x.IsRevoked);
+        if (root is null) return null;
+        using var certificate = Load(root);
+        var sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(certificate.RawData)).ToLowerInvariant();
+        return new TrustAnchorInfo(root.Subject, sha256, certificate.NotBefore, certificate.NotAfter);
+    }
+
     public async Task<AuthorityInventory> InitializeAsync(CancellationToken ct)
     {
         if ((await ReadAsync(ct)).Count > 0) throw new InvalidOperationException("Certificate authorities are already configured.");
@@ -133,7 +159,13 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         await using var stream = File.OpenRead(_statePath);
         return await JsonSerializer.DeserializeAsync<List<AuthorityState>>(stream, cancellationToken: ct) ?? [];
     }
-    private async Task WriteAsync(List<AuthorityState> all, CancellationToken ct) { await using var stream = File.Create(_statePath); await JsonSerializer.SerializeAsync(stream, all, cancellationToken: ct); }
+    private async Task WriteAsync(List<AuthorityState> all, CancellationToken ct)
+    {
+        var temporaryPath = _statePath + ".tmp";
+        await using (var stream = File.Create(temporaryPath))
+            await JsonSerializer.SerializeAsync(stream, all, cancellationToken: ct);
+        File.Move(temporaryPath, _statePath, true);
+    }
     private X509Certificate2 Load(AuthorityState state) => X509CertificateLoader.LoadPkcs12FromFile(PathFor(state.Id), null);
     private bool HasIssuedCertificates(AuthorityState authority)
     {
@@ -174,3 +206,4 @@ public sealed record IssuingAuthorityPaths(string Id, string IssuingPath, string
 public sealed record AuthorityCertificateExport(string FileName, string ContentType, byte[] Content);
 public sealed record AuthorityInventory(string RootSubject, DateTime RootExpiresAt, string TlsIssuingSubject, DateTime TlsIssuingExpiresAt, string SshHostAuthority, string SshUserAuthority);
 public sealed record CertificateAuthorityInventoryItem(string Id, string Name, string Type, string Subject, DateTime ExpiresAt, string? ParentId, bool IsActive, bool IsRevoked, int CrlValidityDays);
+public sealed record TrustAnchorInfo(string Subject, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt);

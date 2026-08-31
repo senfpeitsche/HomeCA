@@ -1,41 +1,120 @@
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using HomeCA.Service.Infrastructure;
 using HomeCA.Service.Deployments;
+using Microsoft.Extensions.Options;
 
 namespace HomeCA.Service.Pki;
 
-public sealed class CertificateIssuanceService(HomeCaStorage storage, DeploymentPackageService deployments, CertificateAuthorityService authorities)
+public sealed class CertificateIssuanceService(HomeCaStorage storage, DeploymentPackageService deployments, CertificateAuthorityService authorities, IOptions<HomeCaStorageOptions> options, ILogger<CertificateIssuanceService> logger)
 {
     private readonly string _certificateRoot = Path.Combine(storage.RootPath, "certificates");
     private readonly string _exportRoot = Path.Combine(storage.RootPath, "exports");
 
-    public Task<IReadOnlyList<CertificateInventoryItem>> ListAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<CertificateInventoryItem>> ListAsync(CancellationToken cancellationToken, string? search = null, int skip = 0, int take = 100)
     {
         if (!Directory.Exists(_certificateRoot)) return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>([]);
-        var items = Directory.EnumerateDirectories(_certificateRoot)
-            .Select(directory => new { Id = Path.GetFileName(directory), Path = Path.Combine(directory, "certificate.pfx") })
-            .Where(item => File.Exists(item.Path))
-            .Select(item =>
+
+        var items = new List<CertificateInventoryItem>();
+        foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
+        {
+            var id = Path.GetFileName(directory);
+            var pfxPath = Path.Combine(directory, "certificate.pfx");
+            if (!File.Exists(pfxPath)) continue;
+
+            try
             {
-                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(item.Path, null);
-                return new CertificateInventoryItem(item.Id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, item.Id));
-            })
-            .OrderBy(item => item.ExpiresAt)
-            .ToList();
-        return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>(items);
+                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+                items.Add(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, id)));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to load certificate {CertificateId} from {Path}, skipping", id, pfxPath);
+            }
+        }
+
+        var query = items.OrderBy(item => item.ExpiresAt).AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item =>
+                item.Subject.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                item.Id.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var result = query.Skip(skip).Take(Math.Clamp(take, 1, 500)).ToList();
+        return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>(result);
+    }
+
+    /// <summary>Returns detailed certificate metadata including SANs, extensions, fingerprint and issuer chain.</summary>
+    public Task<CertificateDetails?> GetDetailsAsync(string id, CancellationToken cancellationToken)
+    {
+        var pfxPath = Path.Combine(_certificateRoot, id, "certificate.pfx");
+        if (!File.Exists(pfxPath)) return Task.FromResult<CertificateDetails?>(null);
+
+        using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+
+        var dnsNames = new List<string>();
+        var ipAddresses = new List<string>();
+        foreach (var ext in certificate.Extensions)
+        {
+            if (ext.Oid?.Value != "2.5.29.17") continue;
+            var sanExt = new X509SubjectAlternativeNameExtension(ext.RawData, ext.Critical);
+            foreach (var name in sanExt.EnumerateDnsNames()) dnsNames.Add(name);
+            foreach (var ip in sanExt.EnumerateIPAddresses()) ipAddresses.Add(ip.ToString());
+        }
+
+        var keyAlgorithm = certificate.PublicKey.Oid?.Value switch
+        {
+            "1.2.840.10045.2.1" => "ECC",
+            "1.2.840.113549.1.1.1" => "RSA",
+            _ => certificate.PublicKey.Oid?.FriendlyName ?? "Unknown"
+        };
+
+        var keySize = 0;
+        if (keyAlgorithm == "RSA") { using var rsa = certificate.GetRSAPublicKey(); keySize = rsa?.KeySize ?? 0; }
+        else if (keyAlgorithm == "ECC") { using var ecc = certificate.GetECDsaPublicKey(); keySize = ecc?.KeySize ?? 0; }
+
+        var usage = "TLS";
+        var ekuList = new List<string>();
+        foreach (var ext in certificate.Extensions)
+        {
+            if (ext is X509EnhancedKeyUsageExtension eku)
+            {
+                foreach (Oid oid in eku.EnhancedKeyUsages)
+                {
+                    ekuList.Add(oid.FriendlyName ?? oid.Value ?? "Unknown");
+                    if (oid.Value == "1.3.6.1.5.5.7.3.2") usage = "mTLS";
+                }
+                break;
+            }
+        }
+
+        var sha256 = Convert.ToHexString(SHA256.HashData(certificate.RawData)).ToLowerInvariant();
+        var serial = certificate.SerialNumber;
+
+        return Task.FromResult<CertificateDetails?>(new CertificateDetails(
+            id, certificate.Subject, certificate.Issuer, serial, sha256,
+            certificate.NotBefore, certificate.NotAfter, keyAlgorithm, keySize,
+            usage, dnsNames, ipAddresses, ekuList, Path.Combine(_exportRoot, id)));
     }
 
     public async Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken)
     {
         if (request.DnsNames.Count == 0 && request.IpAddresses.Count == 0) throw new ArgumentException("At least one DNS or IP SAN is required.");
         if (request.ValidityDays is < 1 or > 730) throw new ArgumentOutOfRangeException(nameof(request.ValidityDays), "Validity must be between 1 and 730 days.");
+
+        var subject = request.DnsNames.FirstOrDefault() ?? request.IpAddresses.First();
+        logger.LogInformation("Issuing {Usage} certificate for {Subject} ({KeyAlgorithm}, {ValidityDays} days)",
+            request.Usage, subject, request.KeyAlgorithm, request.ValidityDays);
+
         var authorityPaths = await authorities.GetDefaultIssuingAsync(cancellationToken);
 
         using var issuer = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.IssuingPath, null);
         using var ecc = request.KeyAlgorithm == "RSA" ? null : ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var rsa = request.KeyAlgorithm == "RSA" ? RSA.Create(request.RsaKeySize is 2048 or 3072 ? request.RsaKeySize : 2048) : null;
-        var subject = request.DnsNames.FirstOrDefault() ?? request.IpAddresses.First();
         CertificateRequest certificateRequest = ecc is not null
             ? new CertificateRequest($"CN={subject}", ecc, HashAlgorithmName.SHA256)
             : new CertificateRequest(new X500DistinguishedName($"CN={subject}"), rsa!, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -52,23 +131,76 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         }
         certificateRequest.CertificateExtensions.Add(san.Build());
         certificateRequest.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(certificateRequest.PublicKey, false));
+        var publicUrl = options.Value.PublicUrl?.TrimEnd('/');
+        if (!string.IsNullOrEmpty(publicUrl))
+        {
+            certificateRequest.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/latest"));
+        }
         var serial = RandomNumberGenerator.GetBytes(16);
-        using var unsigned = certificateRequest.Create(issuer, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(request.ValidityDays), serial);
+        var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var notAfter = DateTimeOffset.UtcNow.AddDays(request.ValidityDays);
+        // Use X509SignatureGenerator to handle cross-algorithm signing (e.g. RSA cert signed by ECC CA)
+        using var issuerEcc = issuer.GetECDsaPrivateKey();
+        using var issuerRsa = issuerEcc is null ? issuer.GetRSAPrivateKey() : null;
+        var generator = issuerEcc is not null
+            ? X509SignatureGenerator.CreateForECDsa(issuerEcc)
+            : X509SignatureGenerator.CreateForRSA(issuerRsa!, RSASignaturePadding.Pkcs1);
+        using var unsigned = certificateRequest.Create(issuer.SubjectName, generator, notBefore, notAfter, serial);
         using var certificate = ecc is not null ? unsigned.CopyWithPrivateKey(ecc) : unsigned.CopyWithPrivateKey(rsa!);
         var id = Convert.ToHexString(serial).ToLowerInvariant();
         var certificatePath = Path.Combine(_certificateRoot, id);
         var exportPath = Path.Combine(_exportRoot, id);
-        Directory.CreateDirectory(certificatePath);
-        Directory.CreateDirectory(exportPath);
-        File.WriteAllBytes(Path.Combine(certificatePath, "certificate.pfx"), certificate.Export(X509ContentType.Pkcs12));
-        File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certificate.ExportCertificatePem());
-        using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
-        File.WriteAllText(Path.Combine(exportPath, "chain.pem"), issuer.ExportCertificatePem() + root.ExportCertificatePem());
+
+        try
+        {
+            Directory.CreateDirectory(certificatePath);
+            Directory.CreateDirectory(exportPath);
+            File.WriteAllBytes(Path.Combine(certificatePath, "certificate.pfx"), certificate.Export(X509ContentType.Pkcs12));
+            var certPem = certificate.ExportCertificatePem();
+            var keyPem = ecc is not null ? ecc.ExportPkcs8PrivateKeyPem() : rsa!.ExportPkcs8PrivateKeyPem();
+            File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
+            File.WriteAllText(Path.Combine(exportPath, "key.pem"), keyPem);
+            using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
+            var chainPem = issuer.ExportCertificatePem() + root.ExportCertificatePem();
+            File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
+            File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + chainPem);
+            File.WriteAllText(Path.Combine(exportPath, "bundle.pem"), keyPem + certPem + chainPem);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to write certificate files for {CertificateId}", id);
+            throw;
+        }
+
         await deployments.CreateAsync(exportPath, id, request.TargetProfileId, cancellationToken);
+        logger.LogInformation("Issued certificate {CertificateId} for {Subject}, valid until {ExpiresAt:yyyy-MM-dd}", id, subject, notAfter);
         return new IssueResult(id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath);
+    }
+
+    /// <summary>Builds an X.509 CRL Distribution Points extension (OID 2.5.29.31) containing a single HTTP URI.</summary>
+    private static X509Extension BuildCdpExtension(string url)
+    {
+        // ASN.1 structure: SEQUENCE { SEQUENCE { DistributionPoint { distributionPoint [0] { fullName [0] { GeneralName uniformResourceIdentifier [6] url } } } } }
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence()) // CRLDistributionPoints ::= SEQUENCE OF DistributionPoint
+        {
+            using (writer.PushSequence()) // DistributionPoint ::= SEQUENCE
+            {
+                using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0, true))) // distributionPoint [0]
+                {
+                    using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0, true))) // fullName [0]
+                    {
+                        writer.WriteCharacterString(UniversalTagNumber.IA5String, url, new Asn1Tag(TagClass.ContextSpecific, 6)); // uniformResourceIdentifier [6]
+                    }
+                }
+            }
+        }
+        return new X509Extension("2.5.29.31", writer.Encode(), critical: false);
     }
 }
 
 public sealed record IssueCertificateRequest(string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, int ValidityDays = 365, string KeyAlgorithm = "ECC", int RsaKeySize = 2048, string? TargetProfileId = null);
 public sealed record IssueResult(string Id, string Subject, DateTime ExpiresAt, string Usage, string KeyAlgorithm, string ExportPath);
 public sealed record CertificateInventoryItem(string Id, string Subject, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, string ExportPath);
+public sealed record CertificateDetails(string Id, string Subject, string Issuer, string SerialNumber, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, int KeySize, string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, IReadOnlyList<string> EnhancedKeyUsages, string ExportPath);
+public sealed record PfxExportRequest(string Password);

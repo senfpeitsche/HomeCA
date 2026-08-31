@@ -35,10 +35,25 @@ builder.Services.AddSingleton<ConnectorCatalog>();
 builder.Services.AddSingleton<ConnectorRegistry>();
 builder.Services.AddSingleton<InternalAcmeService>();
 builder.Services.AddSingleton<ExternalAcmeIssuerRegistry>();
+builder.Services.AddSingleton<ExternalAcmeService>();
 builder.Services.AddSingleton<CertificateExpiryService>();
 builder.Services.AddSingleton<RevocationRegistry>();
 builder.Services.AddSingleton<CrlService>();
+builder.Services.AddSingleton<BearerTokenFilter>();
+builder.Services.AddSingleton<LoginRateLimiter>();
+builder.Services.AddScoped<UiStrings>();
+builder.Services.AddHostedService<RenewalBackgroundService>();
 builder.Services.AddHealthChecks();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Info.Title = "HomeCA API";
+        document.Info.Version = "v1";
+        document.Info.Description = "Self-hosted homelab PKI — manage CAs, issue TLS/SSH certificates, handle ACME flows, and distribute trust anchors.";
+        return Task.CompletedTask;
+    });
+});
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
@@ -48,183 +63,330 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
+app.MapOpenApi();
+
+// ── Ensure default administrator exists ─────────────────────────────────────
+
+using (var scope = app.Services.CreateScope())
+{
+    var administration = scope.ServiceProvider.GetRequiredService<LocalAdministrationService>();
+    await administration.EnsureDefaultAdministratorAsync(CancellationToken.None);
+}
+
+// ── Public endpoints (no authentication) ────────────────────────────────────
+
 app.MapHealthChecks("/health");
 app.MapGet("/api/v1/instance", (HomeCaStorage storage) => Results.Ok(storage.Describe()));
-app.MapPost("/api/v1/setup", async (SetupRequest request, HttpContext context, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+app.MapGet("/api/v1/trust-anchor", async (CertificateAuthorityService authorities, CancellationToken ct) =>
+{
+    var info = await authorities.GetTrustAnchorInfoAsync(ct);
+    return info is null ? Results.NotFound(new { detail = "No active root CA found. Initialize the PKI first." }) : Results.Ok(info);
+});
+app.MapGet("/api/v1/trust-anchor/pem", async (CertificateAuthorityService authorities, CancellationToken ct) =>
+{
+    var export = await authorities.GetTrustAnchorAsync("pem", ct);
+    return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName);
+});
+app.MapGet("/api/v1/trust-anchor/der", async (CertificateAuthorityService authorities, CancellationToken ct) =>
+{
+    var export = await authorities.GetTrustAnchorAsync("der", ct);
+    return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName);
+});
+app.MapGet("/api/v1/crl/latest", async (CrlService crl, CancellationToken ct) =>
+{
+    var export = await crl.GetLatestAsync(ct);
+    return export is null ? Results.NotFound(new { detail = "No CRL has been generated yet. Generate one first via POST /api/v1/crl." }) : Results.File(export.Content, "application/pkix-crl", export.FileName);
+});
+
+// ── Unauthenticated management endpoints ────────────────────────────────────
+
+app.MapPost("/api/v1/setup", async (SetupRequest request, HttpContext context, LocalAdministrationService administration, CancellationToken ct) =>
 {
     if (context.Connection.RemoteIpAddress is not null && !System.Net.IPAddress.IsLoopback(context.Connection.RemoteIpAddress))
-    {
         return Results.Forbid();
-    }
     if (string.IsNullOrWhiteSpace(request.UserName) || request.Password.Length < 16)
-    {
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["credentials"] = ["Username is required and password must be at least 16 characters."] });
-    }
-    return await administration.SetupAsync(request, cancellationToken) ? Results.NoContent() : Results.Conflict();
+    return await administration.SetupAsync(request, ct) ? Results.NoContent() : Results.Conflict();
 });
-app.MapPost("/api/v1/login", async (LoginRequest request, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+app.MapPost("/api/v1/login", async (LoginRequest request, HttpContext context, LocalAdministrationService administration, LoginRateLimiter rateLimiter, CancellationToken ct) =>
 {
-    var token = await administration.LoginAsync(request, cancellationToken);
-    return token is null ? Results.Unauthorized() : Results.Ok(new { accessToken = token, expiresInSeconds = 43200 });
+    var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (rateLimiter.IsBlocked(ip))
+        return Results.Problem("Too many failed login attempts. Try again later.", statusCode: 429);
+    var loginResponse = await administration.LoginAsync(request, ct);
+    if (loginResponse is null) { rateLimiter.RecordFailure(ip); return Results.Unauthorized(); }
+    rateLimiter.RecordSuccess(ip);
+    return Results.Ok(new { accessToken = loginResponse.AccessToken, expiresInSeconds = loginResponse.ExpiresInSeconds, mustChangePassword = loginResponse.MustChangePassword });
 });
-app.MapPost("/api/v1/authorities/initialize", async (HttpRequest request, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
-    var token = request.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
-    return !await administration.IsSessionValidAsync(token, cancellationToken) ? Results.Unauthorized() : Results.Ok(await authorities.InitializeAsync(cancellationToken));
-});
-app.MapPost("/api/v1/certificates", async (IssueCertificateRequest request, HttpRequest httpRequest, CertificateIssuanceService certificates, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
-    var token = httpRequest.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
-    return !await administration.IsSessionValidAsync(token, cancellationToken) ? Results.Unauthorized() : Results.Ok(await certificates.IssueAsync(request, cancellationToken));
-});
-app.MapPost("/api/v1/ssh-certificates", async (SshIssueRequest request, HttpRequest httpRequest, SshCertificateService certificates, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
-    var token = httpRequest.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
-    return !await administration.IsSessionValidAsync(token, cancellationToken) ? Results.Unauthorized() : Results.Ok(await certificates.IssueAsync(request, cancellationToken));
-});
-app.MapGet("/api/v1/domains", async (HttpRequest request, DomainRegistry domains, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await domains.ListAsync(cancellationToken));
-});
-app.MapPost("/api/v1/domains", async (CreateDomainRequest request, HttpRequest httpRequest, DomainRegistry domains, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await domains.AddAsync(request,cancellationToken));
-});
-app.MapGet("/api/v1/profiles", async (HttpRequest request, TargetProfileRegistry profiles, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await profiles.ListAsync(cancellationToken));
-});
-app.MapPost("/api/v1/profiles", async (CreateTargetProfileRequest request, HttpRequest httpRequest, TargetProfileRegistry profiles, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized();
- try { return Results.Ok(await profiles.AddAsync(request,cancellationToken)); }
- catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string,string[]> { ["profile"] = [exception.Message] }); }
- catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
-});
-app.MapPut("/api/v1/profiles/{id}", async (string id, UpdateTargetProfileRequest request, HttpRequest httpRequest, TargetProfileRegistry profiles, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized();
- try { var profile = await profiles.UpdateAsync(id, request, cancellationToken); return profile is null ? Results.NotFound() : Results.Ok(profile); }
- catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string,string[]> { ["profile"] = [exception.Message] }); }
-});
-app.MapDelete("/api/v1/profiles/{id}", async (string id, HttpRequest httpRequest, TargetProfileRegistry profiles, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized();
- try { return await profiles.DeleteAsync(id, cancellationToken) ? Results.NoContent() : Results.NotFound(); }
- catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
-});
+
+// ── Unauthenticated ACME client endpoints ───────────────────────────────────
+
+app.MapGet("/api/v1/acme/directory", async (InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.GetDirectoryAsync(ct)));
+app.MapPost("/api/v1/acme/accounts", async (RegisterAcmeAccountRequest request, InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.RegisterAccountAsync(request, ct)));
 app.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalog.Types));
-app.MapGet("/api/v1/connector-instances", async (HttpRequest request, ConnectorRegistry connectors, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+
+// ── Authenticated endpoints ─────────────────────────────────────────────────
+
+var api = app.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>();
+
+api.MapPost("/change-password", async (ChangePasswordRequest request, HttpContext context, LocalAdministrationService administration, CancellationToken ct) =>
 {
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized(); return Results.Ok((await connectors.ListAsync(cancellationToken)).Select(connector => new { connector.Id, connector.Name, connector.Type, connector.CreatedAt }));
+    var token = context.Request.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
+    if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 12)
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["Das neue Passwort muss mindestens 12 Zeichen lang sein."] });
+    return await administration.ChangePasswordAsync(token, request, ct) ? Results.NoContent() : Results.Unauthorized();
 });
-app.MapPut("/api/v1/domains/{name}", async (string name, CreateDomainRequest request, HttpRequest httpRequest, DomainRegistry domains, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+
+// Authorities
+api.MapPost("/authorities/initialize", async (CertificateAuthorityService authorities, CancellationToken ct) => Results.Ok(await authorities.InitializeAsync(ct)));
+api.MapGet("/authorities", async (CertificateAuthorityService authorities, CancellationToken ct) => Results.Ok(await authorities.ListAsync(ct)));
+api.MapPost("/authorities", async (CreateAuthorityRequest request, CertificateAuthorityService authorities, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized();
- try { var domain = await domains.UpdateAsync(name, request, cancellationToken); return domain is null ? Results.NotFound() : Results.Ok(domain); }
- catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
+    try { return Results.Ok(await authorities.CreateAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["authority"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
-app.MapGet("/api/v1/certificates", async (HttpRequest httpRequest, CertificateIssuanceService certificates, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapPut("/authorities/{id}", async (string id, UpdateAuthorityRequest request, CertificateAuthorityService authorities, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await certificates.ListAsync(cancellationToken));
+    try { var authority = await authorities.UpdateAsync(id, request, ct); return authority is null ? Results.NotFound() : Results.Ok(authority); }
+    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.Conflict(new { detail = ex.Message }); }
 });
-app.MapGet("/api/v1/authorities", async (HttpRequest httpRequest, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapPost("/authorities/{id}/revoke", async (string id, CertificateAuthorityService authorities, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await authorities.ListAsync(cancellationToken));
+    try { var authority = await authorities.RevokeAsync(id, ct); return authority is null ? Results.NotFound() : Results.Ok(authority); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
-app.MapPost("/api/v1/authorities", async (CreateAuthorityRequest request, HttpRequest httpRequest, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken ct) =>
+api.MapDelete("/authorities/{id}", async (string id, CertificateAuthorityService authorities, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized();
- try { return Results.Ok(await authorities.CreateAsync(request,ct)); } catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string,string[]> { ["authority"]=[exception.Message] }); } catch (InvalidOperationException exception) { return Results.Conflict(new { detail=exception.Message }); }
+    try { return await authorities.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound(); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
-app.MapPut("/api/v1/authorities/{id}", async (string id, UpdateAuthorityRequest request, HttpRequest httpRequest, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken ct) =>
+api.MapGet("/authorities/{id}/certificate", async (string id, string format, CertificateAuthorityService authorities, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized();
- try { var authority=await authorities.UpdateAsync(id,request,ct); return authority is null ? Results.NotFound() : Results.Ok(authority); } catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { return Results.Conflict(new { detail=exception.Message }); }
+    try { var export = await authorities.ExportCertificateAsync(id, format, ct); return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["format"] = [ex.Message] }); }
 });
-app.MapPost("/api/v1/authorities/{id}/revoke", async (string id, HttpRequest httpRequest, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken ct) =>
+
+// Certificates
+api.MapGet("/certificates", async (HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized();
- try { var authority=await authorities.RevokeAsync(id,ct); return authority is null ? Results.NotFound() : Results.Ok(authority); } catch (InvalidOperationException exception) { return Results.Conflict(new { detail=exception.Message }); }
+    var search = httpRequest.Query["search"].FirstOrDefault();
+    var skip = int.TryParse(httpRequest.Query["skip"], out var s) ? s : 0;
+    var take = int.TryParse(httpRequest.Query["take"], out var t) ? t : 100;
+    return Results.Ok(await certificates.ListAsync(ct, search, skip, take));
 });
-app.MapDelete("/api/v1/authorities/{id}", async (string id, HttpRequest httpRequest, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken ct) =>
+api.MapGet("/certificates/{id}", async (string id, CertificateIssuanceService certificates, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized();
- try { return await authorities.DeleteAsync(id,ct) ? Results.NoContent() : Results.NotFound(); } catch (InvalidOperationException exception) { return Results.Conflict(new { detail=exception.Message }); }
+    var details = await certificates.GetDetailsAsync(id, ct);
+    return details is null ? Results.NotFound() : Results.Ok(details);
 });
-app.MapGet("/api/v1/authorities/{id}/certificate", async (string id, string format, HttpRequest httpRequest, CertificateAuthorityService authorities, LocalAdministrationService administration, CancellationToken ct) =>
+api.MapPost("/certificates", async (IssueCertificateRequest request, CertificateIssuanceService certificates, ILogger<Program> logger, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized();
- try { var export=await authorities.ExportCertificateAsync(id,format,ct); return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName); } catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string,string[]> { ["format"]=[exception.Message] }); }
+    try { return Results.Ok(await certificates.IssueAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["certificate"] = [ex.Message] }); }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        logger.LogError(ex, "Certificate issuance failed");
+        throw;
+    }
 });
-app.MapGet("/api/v1/renewal-plans", async (HttpRequest request, RenewalPlanRegistry plans, LocalAdministrationService administration, CancellationToken ct) => { var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,ct)?Results.Unauthorized():Results.Ok(await plans.ListAsync(ct)); });
-app.MapPost("/api/v1/renewal-plans", async (CreateRenewalPlanRequest body, HttpRequest request, RenewalPlanRegistry plans, LocalAdministrationService administration, CancellationToken ct) => { var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,ct)?Results.Unauthorized():Results.Ok(await plans.AddAsync(body,ct)); });
-app.MapPost("/api/v1/connector-instances", async (CreateConnectorRequest request, HttpRequest httpRequest, ConnectorRegistry connectors, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapGet("/certificates/{id}/export/pem", async (string id, HomeCaStorage storage) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase);
- if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized();
- try { return Results.Ok(await connectors.AddAsync(request,cancellationToken)); }
- catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string,string[]> { ["connector"] = [exception.Message] }); }
- catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
+    var path = Path.Combine(storage.RootPath, "exports", id, "certificate.pem");
+    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}.pem");
 });
-app.MapPut("/api/v1/connector-instances/{id}", async (string id, CreateConnectorRequest request, HttpRequest httpRequest, ConnectorRegistry connectors, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapGet("/certificates/{id}/export/chain", async (string id, HomeCaStorage storage) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase);
- if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized();
- try { var connector = await connectors.UpdateAsync(id, request, cancellationToken); return connector is null ? Results.NotFound() : Results.Ok(connector); }
- catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string,string[]> { ["connector"] = [exception.Message] }); }
- catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
+    var path = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
+    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-chain.pem");
 });
-app.MapPost("/api/v1/connector-instances/{id}/check", async (string id, HttpRequest request, ConnectorRegistry registry, ConnectorCatalog catalog, LocalAdministrationService administration, CancellationToken ct) =>
+api.MapGet("/certificates/{id}/export/key", async (string id, HomeCaStorage storage) =>
 {
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized(); var connector=await registry.GetAsync(id,ct); var implementation=connector is null ? null : catalog.Find(connector.Type); if (connector is null || implementation is null) return Results.NotFound();
- try { return Results.Ok(await implementation.CheckAsync(new ConnectorSettings(connector.Name,connector.Type,connector.Secrets),ct)); }
- catch (Exception) { return Results.Ok(new ConnectorCheckResult(false, [], "The connector could not be reached. Check its settings and network access.")); }
+    var path = Path.Combine(storage.RootPath, "exports", id, "key.pem");
+    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-key.pem");
 });
-app.MapPost("/api/v1/connector-instances/{id}/txt-test", async (string id, HttpRequest request, ConnectorRegistry registry, ConnectorCatalog catalog, LocalAdministrationService administration, CancellationToken ct) =>
+api.MapGet("/certificates/{id}/export/fullchain", async (string id, HomeCaStorage storage) =>
 {
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,ct)) return Results.Unauthorized(); var connector=await registry.GetAsync(id,ct); var implementation=connector is null ? null : catalog.Find(connector.Type); if (connector is null || implementation is null) return Results.NotFound(); var name=$"_homeca-test.{request.Query["domain"]}".TrimEnd('.'); if (string.IsNullOrWhiteSpace(request.Query["domain"])) return Results.ValidationProblem(new Dictionary<string,string[]> { ["domain"]=["A domain query parameter is required."] }); var value=Guid.NewGuid().ToString("N"); await implementation.UpsertTxtRecordAsync(new ConnectorSettings(connector.Name,connector.Type,connector.Secrets),name,value,ct); await implementation.DeleteTxtRecordAsync(new ConnectorSettings(connector.Name,connector.Type,connector.Secrets),name,value,ct); return Results.NoContent();
+    var path = Path.Combine(storage.RootPath, "exports", id, "fullchain.pem");
+    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-fullchain.pem");
 });
-app.MapGet("/api/v1/acme/directory", async (InternalAcmeService acme, CancellationToken cancellationToken) => Results.Ok(await acme.GetDirectoryAsync(cancellationToken)));
-app.MapPost("/api/v1/acme/accounts", async (RegisterAcmeAccountRequest request, InternalAcmeService acme, CancellationToken cancellationToken) => Results.Ok(await acme.RegisterAccountAsync(request, cancellationToken)));
-app.MapPost("/api/v1/acme/orders", async (AcmeOrderRequest request, HttpRequest httpRequest, InternalAcmeService acme, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapGet("/certificates/{id}/export/bundle", async (string id, HomeCaStorage storage) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await acme.CreateOrderAsync(request.AccountId,request.Identifiers,cancellationToken));
+    var path = Path.Combine(storage.RootPath, "exports", id, "bundle.pem");
+    return !File.Exists(path) ? Results.NotFound() : Results.File(path, "application/x-pem-file", $"{id}-bundle.pem");
 });
-app.MapGet("/api/v1/acme/orders/{orderId}", async (string orderId, HttpRequest httpRequest, InternalAcmeService acme, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest request, HomeCaStorage storage) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); if (!await administration.IsSessionValidAsync(token,cancellationToken)) return Results.Unauthorized(); var order=await acme.GetOrderAsync(orderId,cancellationToken); return order is null ? Results.NotFound() : Results.Ok(order);
+    var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
+    if (!File.Exists(pfxPath)) return Results.NotFound();
+    using var certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+    var bytes = certificate.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12, request.Password);
+    return Results.File(bytes, "application/x-pkcs12", $"{id}.pfx");
 });
-app.MapPost("/api/v1/acme/orders/{orderId}/finalize", async (string orderId, FinalizeAcmeOrderRequest request, HttpRequest httpRequest, InternalAcmeService acme, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+
+// SSH
+api.MapPost("/ssh-certificates", async (SshIssueRequest request, SshCertificateService certificates, ILogger<Program> logger, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await acme.FinalizeOrderAsync(orderId,request,cancellationToken));
+    try { return Results.Ok(await certificates.IssueAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["ssh"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        logger.LogError(ex, "SSH certificate issuance failed");
+        throw;
+    }
 });
-app.MapGet("/api/v1/acme/external-issuers", async (HttpRequest request, ExternalAcmeIssuerRegistry issuers, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+
+// Domains
+api.MapGet("/domains", async (DomainRegistry domains, CancellationToken ct) => Results.Ok(await domains.ListAsync(ct)));
+api.MapPost("/domains", async (CreateDomainRequest request, DomainRegistry domains, CancellationToken ct) => Results.Ok(await domains.AddAsync(request, ct)));
+api.MapPut("/domains/{name}", async (string name, CreateDomainRequest request, DomainRegistry domains, CancellationToken ct) =>
 {
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await issuers.ListAsync(cancellationToken));
+    try { var domain = await domains.UpdateAsync(name, request, ct); return domain is null ? Results.NotFound() : Results.Ok(domain); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
-app.MapPost("/api/v1/acme/external-issuers", async (CreateExternalAcmeIssuerRequest request, HttpRequest httpRequest, ExternalAcmeIssuerRegistry issuers, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapDelete("/domains/{name}", async (string name, DomainRegistry domains, CancellationToken ct) => await domains.DeleteAsync(name, ct) ? Results.NoContent() : Results.NotFound());
+
+// Profiles
+api.MapGet("/profiles", async (TargetProfileRegistry profiles, CancellationToken ct) => Results.Ok(await profiles.ListAsync(ct)));
+api.MapPost("/profiles", async (CreateTargetProfileRequest request, TargetProfileRegistry profiles, CancellationToken ct) =>
 {
- var token=httpRequest.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await issuers.AddAsync(request,cancellationToken));
+    try { return Results.Ok(await profiles.AddAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["profile"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
-app.MapGet("/api/v1/warnings/expiring", async (HttpRequest request, CertificateExpiryService expiry, LocalAdministrationService administration, CancellationToken cancellationToken) =>
-{ var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(expiry.GetWarnings()); });
-app.MapGet("/api/v1/revocations", async (HttpRequest request, RevocationRegistry registry, LocalAdministrationService administration, CancellationToken ct) => { var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,ct)?Results.Unauthorized():Results.Ok(await registry.ListAsync(ct)); });
-app.MapPost("/api/v1/revocations/{serial}/{reason}", async (string serial, string reason, HttpRequest request, RevocationRegistry registry, LocalAdministrationService administration, CancellationToken ct) => { var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,ct)?Results.Unauthorized():Results.Ok(await registry.RevokeAsync(serial,reason,ct)); });
-app.MapPost("/api/v1/crl", async (HttpRequest request, CrlService crl, LocalAdministrationService administration, CancellationToken ct) => { var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,ct)?Results.Unauthorized():Results.Ok(new { path=await crl.GenerateAsync(ct) }); });
-app.MapPost("/api/v1/backups", async (HttpRequest request, HomeCaStorage storage, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapPut("/profiles/{id}", async (string id, UpdateTargetProfileRequest request, TargetProfileRegistry profiles, CancellationToken ct) =>
 {
-    var token = request.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
-    if (!await administration.IsSessionValidAsync(token, cancellationToken)) return Results.Unauthorized();
-    var backup = await storage.CreateBackupAsync(cancellationToken);
-    return Results.Created($"/api/v1/backups/{backup.FileName}", backup);
+    try { var profile = await profiles.UpdateAsync(id, request, ct); return profile is null ? Results.NotFound() : Results.Ok(profile); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["profile"] = [ex.Message] }); }
 });
-app.MapPost("/api/v1/backups/{fileName}/verify", async (string fileName, HttpRequest request, HomeCaStorage storage, LocalAdministrationService administration, CancellationToken cancellationToken) =>
+api.MapDelete("/profiles/{id}", async (string id, TargetProfileRegistry profiles, CancellationToken ct) =>
 {
- var token=request.Headers.Authorization.ToString().Replace("Bearer ",string.Empty,StringComparison.OrdinalIgnoreCase); return !await administration.IsSessionValidAsync(token,cancellationToken)?Results.Unauthorized():Results.Ok(await storage.VerifyBackupAsync(fileName,cancellationToken));
+    try { return await profiles.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound(); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
+
+// Connectors
+api.MapGet("/connector-instances", async (ConnectorRegistry connectors, CancellationToken ct) => Results.Ok((await connectors.ListAsync(ct)).Select(c => new { c.Id, c.Name, c.Type, c.CreatedAt })));
+api.MapPost("/connector-instances", async (CreateConnectorRequest request, ConnectorRegistry connectors, CancellationToken ct) =>
+{
+    try { return Results.Ok(await connectors.AddAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["connector"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+});
+api.MapPut("/connector-instances/{id}", async (string id, CreateConnectorRequest request, ConnectorRegistry connectors, CancellationToken ct) =>
+{
+    try { var connector = await connectors.UpdateAsync(id, request, ct); return connector is null ? Results.NotFound() : Results.Ok(connector); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["connector"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+});
+api.MapPost("/connector-instances/{id}/check", async (string id, ConnectorRegistry registry, ConnectorCatalog catalog, ILogger<Program> logger, CancellationToken ct) =>
+{
+    var connector = await registry.GetAsync(id, ct);
+    var implementation = connector is null ? null : catalog.Find(connector.Type);
+    if (connector is null || implementation is null) return Results.NotFound();
+    try { return Results.Ok(await implementation.CheckAsync(new ConnectorSettings(connector.Name, connector.Type, connector.Secrets), ct)); }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Connector check failed for {ConnectorId} ({Type})", id, connector.Type);
+        return Results.Ok(new ConnectorCheckResult(false, [], "The connector could not be reached. Check its settings and network access."));
+    }
+});
+api.MapPost("/connector-instances/{id}/txt-test", async (string id, HttpRequest request, ConnectorRegistry registry, ConnectorCatalog catalog, CancellationToken ct) =>
+{
+    var connector = await registry.GetAsync(id, ct);
+    var implementation = connector is null ? null : catalog.Find(connector.Type);
+    if (connector is null || implementation is null) return Results.NotFound();
+    var domain = request.Query["domain"].ToString();
+    if (string.IsNullOrWhiteSpace(domain)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["domain"] = ["A domain query parameter is required."] });
+    var name = $"_homeca-test.{domain}".TrimEnd('.');
+    var value = Guid.NewGuid().ToString("N");
+    var settings = new ConnectorSettings(connector.Name, connector.Type, connector.Secrets);
+    await implementation.UpsertTxtRecordAsync(settings, name, value, ct);
+    await implementation.DeleteTxtRecordAsync(settings, name, value, ct);
+    return Results.NoContent();
+});
+api.MapDelete("/connector-instances/{id}", async (string id, ConnectorRegistry connectors, CancellationToken ct) => await connectors.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
+
+// ACME (authenticated)
+api.MapGet("/acme/accounts", async (InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.ListAccountsAsync(ct)));
+api.MapGet("/acme/orders", async (InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.ListOrdersAsync(ct)));
+api.MapPost("/acme/orders", async (AcmeOrderRequest request, InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.CreateOrderAsync(request.AccountId, request.Identifiers, ct)));
+api.MapGet("/acme/orders/{orderId}", async (string orderId, InternalAcmeService acme, CancellationToken ct) =>
+{
+    var order = await acme.GetOrderAsync(orderId, ct);
+    return order is null ? Results.NotFound() : Results.Ok(order);
+});
+api.MapPost("/acme/orders/{orderId}/finalize", async (string orderId, FinalizeAcmeOrderRequest request, InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.FinalizeOrderAsync(orderId, request, ct)));
+api.MapGet("/acme/external-issuers", async (ExternalAcmeIssuerRegistry issuers, CancellationToken ct) => Results.Ok(await issuers.ListAsync(ct)));
+api.MapPost("/acme/external-issuers", async (CreateExternalAcmeIssuerRequest request, ExternalAcmeIssuerRegistry issuers, CancellationToken ct) => Results.Ok(await issuers.AddAsync(request, ct)));
+api.MapPut("/acme/external-issuers/{id}", async (string id, CreateExternalAcmeIssuerRequest request, ExternalAcmeIssuerRegistry issuers, CancellationToken ct) =>
+{
+    var updated = await issuers.UpdateAsync(id, request, ct);
+    return updated is null ? Results.NotFound() : Results.Ok(updated);
+});
+api.MapDelete("/acme/external-issuers/{id}", async (string id, ExternalAcmeIssuerRegistry issuers, CancellationToken ct) => await issuers.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
+api.MapPost("/acme/external-orders", async (ExternalAcmeOrderRequest request, ExternalAcmeService externalAcme, CancellationToken ct) =>
+{
+    try { return Results.Ok(await externalAcme.RequestCertificateAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["order"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+});
+api.MapGet("/acme/external-certificates", async (ExternalAcmeService externalAcme, CancellationToken ct) => Results.Ok(await externalAcme.ListCertificatesAsync(ct)));
+
+// Renewal plans
+api.MapGet("/renewal-plans", async (RenewalPlanRegistry plans, CancellationToken ct) => Results.Ok(await plans.ListAsync(ct)));
+api.MapPost("/renewal-plans", async (CreateRenewalPlanRequest body, RenewalPlanRegistry plans, CancellationToken ct) => Results.Ok(await plans.AddAsync(body, ct)));
+api.MapPut("/renewal-plans/{id}", async (string id, UpdateRenewalPlanRequest body, RenewalPlanRegistry plans, CancellationToken ct) =>
+{
+    var plan = await plans.UpdateAsync(id, body, ct);
+    return plan is null ? Results.NotFound() : Results.Ok(plan);
+});
+api.MapDelete("/renewal-plans/{id}", async (string id, RenewalPlanRegistry plans, CancellationToken ct) => await plans.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
+
+// Operations
+api.MapGet("/warnings/expiring", (CertificateExpiryService expiry) => Results.Ok(expiry.GetWarnings()));
+api.MapGet("/revocations", async (RevocationRegistry registry, CancellationToken ct) => Results.Ok(await registry.ListAsync(ct)));
+api.MapPost("/revocations/{serial}/{reason}", async (string serial, string reason, RevocationRegistry registry, CancellationToken ct) => Results.Ok(await registry.RevokeAsync(serial, reason, ct)));
+api.MapPost("/crl", async (CrlService crl, ILogger<Program> logger, CancellationToken ct) =>
+{
+    try { return Results.Ok(new { path = await crl.GenerateAsync(ct) }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        logger.LogError(ex, "CRL generation failed");
+        throw;
+    }
+});
+
+// Backups
+api.MapPost("/backups", async (HomeCaStorage storage, ILogger<Program> logger, CancellationToken ct) =>
+{
+    try
+    {
+        var backup = await storage.CreateBackupAsync(ct);
+        return Results.Created($"/api/v1/backups/{backup.FileName}", backup);
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        logger.LogError(ex, "Backup creation failed");
+        throw;
+    }
+});
+api.MapPost("/backups/{fileName}/verify", async (string fileName, HomeCaStorage storage, CancellationToken ct) => Results.Ok(await storage.VerifyBackupAsync(fileName, ct)));
+
+// Audit
+api.MapGet("/audit", async (HttpRequest request, LocalAdministrationService administration, CancellationToken ct) =>
+{
+    var skip = int.TryParse(request.Query["skip"], out var s) ? s : 0;
+    var take = int.TryParse(request.Query["take"], out var t) ? t : 100;
+    var action = request.Query["action"].FirstOrDefault();
+    return Results.Ok(await administration.ReadAuditLogAsync(skip, take, action, ct));
+});
+
+// ── Blazor UI ───────────────────────────────────────────────────────────────
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Run();
+await app.RunAsync();

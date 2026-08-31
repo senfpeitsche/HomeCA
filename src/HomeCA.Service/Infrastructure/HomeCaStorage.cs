@@ -8,7 +8,7 @@ namespace HomeCA.Service.Infrastructure;
 public sealed class HomeCaStorage
 {
     private static readonly byte[] BackupMagic = "HCAB1"u8.ToArray();
-    private static readonly string[] ManagedDirectories = ["authorities", "certificates", "exports", "profiles", "crl", "audit", "state"];
+    private static readonly string[] ManagedDirectories = ["authorities", "certificates", "exports", "external-certificates", "profiles", "crl", "audit", "state"];
     private readonly HomeCaStorageOptions _options;
     private readonly ILogger<HomeCaStorage> _logger;
 
@@ -25,6 +25,7 @@ public sealed class HomeCaStorage
     {
         rootPath = _options.RootPath,
         backupPath = _options.BackupPath,
+        publicUrl = _options.PublicUrl,
         directories = ManagedDirectories,
         stateStore = Path.Combine(_options.RootPath, "state", "homeca-state.json"),
         backupFormat = "HCAB1 (AES-256-GCM encrypted ZIP)"

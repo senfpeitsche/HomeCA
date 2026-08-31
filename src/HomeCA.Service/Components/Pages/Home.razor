@@ -3,6 +3,7 @@
 @inject ISnackbar Snackbar
 @inject IHostEnvironment Host
 @inject IJSRuntime JS
+@inject UiStrings L
 
 <PageTitle>HomeCA</PageTitle>
 
@@ -10,14 +11,47 @@
 {
     <main class="login-shell">
         <MudPaper Class="login-card" Elevation="0">
-            <MudText Typo="Typo.overline" Class="signal-text">LOKALE ZERTIFIKATSSTELLE</MudText>
+            <MudText Typo="Typo.overline" Class="signal-text">@L.LoginSignalText</MudText>
             <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
-            <MudText Class="mud-text-secondary">Melden Sie sich an, um Ihre lokale PKI zu verwalten.</MudText>
+            <MudText Class="mud-text-secondary">@L.LoginSubtitle</MudText>
             <MudForm @ref="_loginForm" Class="form-stack" @bind-IsValid="_loginValid">
-                <MudTextField @bind-Value="_loginUser" Label="Benutzername" Required="true" Immediate="true" />
-                <MudTextField @bind-Value="_loginPassword" Label="Passwort" InputType="InputType.Password" Required="true" Immediate="true" />
+                <MudTextField @bind-Value="_loginUser" Label="@L.LoginUsername" Required="true" Immediate="true" />
+                <MudTextField @bind-Value="_loginPassword" Label="@L.LoginPassword" InputType="InputType.Password" Required="true" Immediate="true" />
                 @if (!string.IsNullOrEmpty(_loginError)) { <MudAlert Severity="Severity.Error" Dense="true">@_loginError</MudAlert> }
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Button" Disabled="_busy" OnClick="LoginAsync" FullWidth="true">@(_busy ? "Anmeldung läuft …" : "Anmelden")</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Button" Disabled="_busy" OnClick="LoginAsync" FullWidth="true">@(_busy ? L.LoginBusy : L.LoginButton)</MudButton>
+            </MudForm>
+        </MudPaper>
+        <MudPaper Class="login-card mt-4" Elevation="0">
+            <MudExpansionPanels MultiExpansion="true" Elevation="0">
+                <MudExpansionPanel Text="@L.TrustInstallTitle">
+                    <MudText Class="mud-text-secondary mb-3">@L.TrustInstallDescription</MudText>
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Windows (PowerShell als Administrator)</MudText>
+                    <MudTextField Value="@TrustScriptWindows" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptWindows))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Linux (Debian/Ubuntu)</MudText>
+                    <MudTextField Value="@TrustScriptLinux" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptLinux))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">macOS</MudText>
+                    <MudTextField Value="@TrustScriptMacOs" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptMacOs))" />
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Firefox (Enterprise-Richtlinie)</MudText>
+                    <MudTextField Value="@TrustScriptFirefox" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="@(() => CopyToClipboard(TrustScriptFirefox))" />
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudPaper>
+    </main>
+}
+else if (_mustChangePassword)
+{
+    <main class="login-shell">
+        <MudPaper Class="login-card" Elevation="0">
+            <MudText Typo="Typo.overline" Class="signal-text">@L.LoginSignalText</MudText>
+            <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
+            <MudText Class="mud-text-secondary">@L.ChangePasswordDescription</MudText>
+            <MudForm @ref="_changePasswordForm" Class="form-stack" @bind-IsValid="_changePasswordValid">
+                <MudTextField @bind-Value="_currentPassword" Label="@L.CurrentPassword" InputType="InputType.Password" Required="true" Immediate="true" />
+                <MudTextField @bind-Value="_newPassword" Label="@L.NewPassword" InputType="InputType.Password" Required="true" Immediate="true" Validation="@(new Func<string, string?>(ValidateNewPassword))" />
+                <MudTextField @bind-Value="_confirmPassword" Label="@L.ConfirmNewPassword" InputType="InputType.Password" Required="true" Immediate="true" Validation="@(new Func<string, string?>(ValidateConfirmPassword))" />
+                @if (!string.IsNullOrEmpty(_changePasswordError)) { <MudAlert Severity="Severity.Error" Dense="true">@_changePasswordError</MudAlert> }
+                @if (!string.IsNullOrEmpty(_changePasswordSuccess)) { <MudAlert Severity="Severity.Success" Dense="true">@_changePasswordSuccess</MudAlert> }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Button" Disabled="_busy" OnClick="ChangePasswordAsync" FullWidth="true">@(_busy ? L.ChangePasswordBusy : L.ChangePasswordButton)</MudButton>
             </MudForm>
         </MudPaper>
     </main>
@@ -28,8 +62,8 @@ else
         <MudAppBar Elevation="0" Class="app-bar">
             <MudText Typo="Typo.h5" Class="app-name">HomeCA <span>LOCAL PKI</span></MudText>
             <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Daten aktualisieren" OnClick="LoadAllAsync" Disabled="_busy" />
-            <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="Logout">Abmelden</MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="@L.RefreshAriaLabel" OnClick="LoadAllAsync" Disabled="_busy" />
+            <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="Logout">@L.LogoutButton</MudButton>
         </MudAppBar>
         <MudDrawer Open="true" Variant="DrawerVariant.Responsive" Elevation="0" Class="nav-rail">
             <MudNavMenu>
@@ -56,13 +90,16 @@ else
 }
 
 @code {
-    private readonly (string Key, string Value)[] Nav = [("overview", "Übersicht"), ("certificates", "Zertifikate"), ("authorities", "Zertifizierungsstellen"), ("automation", "Automatik"), ("settings", "Einstellungen"), ("operations", "Betrieb")];
+    private (string Key, string Value)[] Nav => [("overview", L.NavOverview), ("certificates", L.NavCertificates), ("authorities", L.NavAuthorities), ("automation", L.NavAutomation), ("settings", L.NavSettings), ("operations", L.NavOperations)];
     private const string Tls = "TLS", ClientUsage = "mTLS", Ecc = "ECC", Rsa = "RSA", RootAuthority = "root", IntermediateAuthority = "intermediate", HostKind = "host", UserKind = "user", Hetzner = "hetzner", Technitium = "technitium", Unspecified = "unspecified", KeyCompromise = "keyCompromise", CessationOfOperation = "cessationOfOperation";
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private string? _token, _loginUser, _loginPassword, _loginError, _pageError, _connectorCheckMessage, _editingConnectorId, _editingDomainName, _editingAuthorityId, _editingProfileId, _deleteAuthorityId, _deleteProfileId;
     private string _section = "overview";
-    private bool _busy, _loading, _loginValid;
-    private MudForm? _loginForm;
+    private bool _busy, _loading, _loginValid, _mustChangePassword;
+    private MudForm? _loginForm, _changePasswordForm;
+    private string _currentPassword = "", _newPassword = "", _confirmPassword = "";
+    private string? _changePasswordError, _changePasswordSuccess;
+    private bool _changePasswordValid;
     private List<Certificate> _certificates = [];
     private List<Authority> _authorities = [];
     private List<Domain> _domains = [];
@@ -72,18 +109,28 @@ else
     private List<ExternalIssuer> _issuers = [];
     private List<ExpiryWarning> _warnings = [];
     private List<Revocation> _revocations = [];
+    private List<AcmeAccountFull> _acmeAccounts = [];
+    private List<AcmeOrderFull> _acmeOrders = [];
+    private string? _editingIssuerId, _deleteIssuerId;
+    private AcmeOrderFull? _checkedOrder;
+    private string _pfxPassword = "", _pfxCertificateId = "";
+    private bool _pfxDialogVisible;
+    private string? _deleteConnectorId, _deleteDomainName, _editingPlanId, _deletePlanId;
+    private string _lastBackupFileName = "";
 
     private RenderFragment OverviewContent => @<text>
-        <MudText Typo="Typo.overline" Class="section-kicker">Zustand der Vertrauensbasis</MudText><MudText Typo="Typo.h3" Class="page-title">Übersicht</MudText>
-        <div class="metric-grid"><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">Zertifikate</MudText><MudText Typo="Typo.h3">@_certificates.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">CAs</MudText><MudText Typo="Typo.h3">@_authorities.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">Erneuerungen</MudText><MudText Typo="Typo.h3">@_plans.Count(p => p.Enabled)</MudText></MudPaper></div>
-        @if (_warnings.Count > 0) { <MudAlert Severity="Severity.Warning" Class="mb-4"><b>@_warnings.Count Zertifikat(e) laufen bald ab.</b><br />@string.Join(" · ", _warnings.Select(w => $"{w.Subject} ({w.DaysRemaining} Tage)"))</MudAlert> }
-        <MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Neueste Zertifikate</MudText>@CertificateTable(_certificates.Take(5))</MudPaper>
+        <MudText Typo="Typo.overline" Class="section-kicker">@L.OverviewKicker</MudText><MudText Typo="Typo.h3" Class="page-title">@L.OverviewTitle</MudText>
+        <div class="metric-grid"><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">@L.MetricCertificates</MudText><MudText Typo="Typo.h3">@_certificates.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">@L.MetricCAs</MudText><MudText Typo="Typo.h3">@_authorities.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">@L.MetricRenewals</MudText><MudText Typo="Typo.h3">@_plans.Count(p => p.Enabled)</MudText></MudPaper></div>
+        @if (_warnings.Count > 0) { <MudAlert Severity="Severity.Warning" Class="mb-4"><b>@L.ExpiryWarning(_warnings.Count)</b><br />@string.Join(" · ", _warnings.Select(w => $"{w.Subject} ({L.ExpiryDays(w.DaysRemaining)})"))</MudAlert> }
+        <MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">@L.TrustAnchorTitle</MudText><MudText Class="mud-text-secondary mb-3">@L.TrustAnchorDescription</MudText><div class="d-flex gap-2 flex-wrap"><MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => DownloadTrustAnchor("pem"))">@L.TrustAnchorPem</MudButton><MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => DownloadTrustAnchor("der"))">@L.TrustAnchorDer</MudButton></div></MudPaper>
+        <MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">@L.LatestCertificates</MudText>@CertificateTable(_certificates.Take(5))</MudPaper>
     </text>;
 
     private RenderFragment CertificatesContent => @<text>
         <MudText Typo="Typo.overline" Class="section-kicker">X.509 und SSH</MudText><MudText Typo="Typo.h3" Class="page-title">Zertifikate ausstellen</MudText>
         <MudGrid><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudTabs Rounded="false" PanelClass="pt-4"><MudTabPanel Text="TLS- und mTLS-Zertifikat">@CertificateIssueForm</MudTabPanel><MudTabPanel Text="SSH-Zertifikat">@SshIssueForm</MudTabPanel><MudTabPanel Text="Interne ACME">@AcmeForm</MudTabPanel></MudTabs></MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel issue-note" Elevation="0">@CertificateProfileSummary</MudPaper></MudItem></MudGrid>
         <MudPaper Class="panel"><MudText Typo="Typo.h5">Zertifikatsinventar</MudText>@CertificateTable(_certificates)</MudPaper>
+        <MudDialog @bind-Visible="_pfxDialogVisible"><TitleContent><MudText Typo="Typo.h6">PFX-Kennwort festlegen</MudText></TitleContent><DialogContent><MudText Class="mb-3">Das PFX-Archiv wird mit diesem Kennwort verschlüsselt. Verwenden Sie ein starkes Kennwort und geben Sie es nur an das Zielsystem weiter.</MudText><MudTextField @bind-Value="_pfxPassword" Label="Kennwort" InputType="InputType.Password" Required="true" Immediate="true" /><MudTextField Value="_pfxPassword" Label="Kennwort bestätigen" InputType="InputType.Password" ReadOnly="true" Disabled="true" Class="mt-2" /></DialogContent><DialogActions><MudButton OnClick="CancelPfxDialog">Abbrechen</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(string.IsNullOrWhiteSpace(_pfxPassword) || _busy)" OnClick="DownloadPfx">Herunterladen</MudButton></DialogActions></MudDialog>
     </text>;
 
     private RenderFragment AuthoritiesContent => @<text>
@@ -92,33 +139,33 @@ else
     </text>;
 
     private RenderFragment AutomationContent => @<text>
-        <MudText Typo="Typo.overline" Class="section-kicker">Abläufe vorbereiten</MudText><MudText Typo="Typo.h3" Class="page-title">Erneuerungsautomatik</MudText><MudGrid><MudItem xs="12" md="5"><MudPaper Class="panel" Elevation="0">@RenewalForm</MudPaper></MudItem><MudItem xs="12" md="7"><MudPaper Class="panel" Elevation="0"><MudTable Items="_plans" Dense="true"><HeaderContent><MudTh>Zertifikat</MudTh><MudTh>Tage vorher</MudTh><MudTh>Status</MudTh></HeaderContent><RowTemplate><MudTd>@CertificateName(context.CertificateId)</MudTd><MudTd>@context.RenewBeforeDays</MudTd><MudTd><MudChip T="string" Size="Size.Small" Color="@(context.Enabled ? Color.Success : Color.Default)">@(context.Enabled ? "Aktiv" : "Inaktiv")</MudChip></MudTd></RowTemplate></MudTable></MudPaper></MudItem></MudGrid>
+        <MudText Typo="Typo.overline" Class="section-kicker">Abläufe vorbereiten</MudText><MudText Typo="Typo.h3" Class="page-title">Erneuerungsautomatik</MudText><MudGrid><MudItem xs="12" md="5"><MudPaper Class="panel" Elevation="0">@RenewalForm</MudPaper></MudItem><MudItem xs="12" md="7"><MudPaper Class="panel" Elevation="0"><MudTable Items="_plans" Dense="true"><HeaderContent><MudTh>Zertifikat</MudTh><MudTh>Tage vorher</MudTh><MudTh>Status</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@CertificateName(context.CertificateId)</MudTd><MudTd>@context.RenewBeforeDays</MudTd><MudTd><MudChip T="string" Size="Size.Small" Color="@(context.Enabled ? Color.Success : Color.Default)">@(context.Enabled ? "Aktiv" : "Inaktiv")</MudChip></MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginPlanEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeletePlan(context.Id))">@(_deletePlanId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper></MudItem></MudGrid>
     </text>;
 
     private RenderFragment SettingsContent => @<text>
         @if (!string.IsNullOrEmpty(_connectorCheckMessage)) { <MudAlert Severity="@(_connectorCheckMessage.StartsWith("Verbindung hergestellt", StringComparison.Ordinal) ? Severity.Success : Severity.Error)" Class="mb-4">@_connectorCheckMessage</MudAlert> }
-        <MudText Typo="Typo.overline" Class="section-kicker">Externe Dienste und Zonen</MudText><MudText Typo="Typo.h3" Class="page-title">Einstellungen</MudText><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ConnectorForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@DomainForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@IssuerForm</MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte DNS-Connectoren</MudText><MudTable Items="_connectors" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Typ</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@context.Type</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginConnectorEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => CheckConnector(context.Id))">@(context.Type == Hetzner ? "Hetzner prüfen" : "Technitium prüfen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte Domains</MudText><MudTable Items="_domains" Dense="true"><HeaderContent><MudTh>Domain</MudTh><MudTh>Ausstellungszone</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@(context.InternalIssuanceEnabled ? "Intern" : "Extern")</MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginDomainEdit(context))">Bearbeiten</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ProfileForm</MudPaper></MudItem><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Zielprofile</MudText><MudTable Items="_profiles" Dense="true" Hover="true"><HeaderContent><MudTh>Name</MudTh><MudTh>ID</MudTh><MudTh>Version</MudTh><MudTh>Algorithmus</MudTh><MudTh>Exporte</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@ProfileDisplayName(context)</MudTd><MudTd>@context.Id</MudTd><MudTd>@context.Version</MudTd><MudTd>@ProfileKeyAlgorithm(context)</MudTd><MudTd>@string.Join(", ", ProfileExportFormats(context))</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginProfileEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteProfile(context.Id))">@(_deleteProfileId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Es sind noch keine Zielprofile angelegt.</MudText></NoRecordsContent></MudTable></MudPaper></MudItem></MudGrid>
+        <MudText Typo="Typo.overline" Class="section-kicker">Externe Dienste und Zonen</MudText><MudText Typo="Typo.h3" Class="page-title">Einstellungen</MudText><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ConnectorForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@DomainForm</MudPaper></MudItem><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@IssuerForm</MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte DNS-Connectoren</MudText><MudTable Items="_connectors" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Typ</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@context.Type</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginConnectorEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => CheckConnector(context.Id))">@(context.Type == Hetzner ? "Hetzner prüfen" : "Technitium prüfen")</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => TxtTestConnector(context.Id))">TXT-Test</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteConnector(context.Id))">@(_deleteConnectorId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Gespeicherte Domains</MudText><MudTable Items="_domains" Dense="true"><HeaderContent><MudTh>Domain</MudTh><MudTh>Ausstellungszone</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd>@(context.InternalIssuanceEnabled ? "Intern" : "Extern")</MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginDomainEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteDomain(context.Name))">@(_deleteDomainName == context.Name ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate></MudTable></MudPaper><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Externe ACME-Issuer</MudText><MudTable Items="_issuers" Dense="true"><HeaderContent><MudTh>Name</MudTh><MudTh>Directory-URL</MudTh><MudTh>DNS-Connector</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Name</MudTd><MudTd><MudText Typo="Typo.caption">@context.DirectoryUrl</MudText></MudTd><MudTd>@ConnectorName(context.ConnectorId)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginIssuerEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteIssuer(context.Id))">@(_deleteIssuerId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine externen ACME-Issuer registriert.</MudText></NoRecordsContent></MudTable></MudPaper><MudGrid><MudItem xs="12" lg="4"><MudPaper Class="panel" Elevation="0">@ProfileForm</MudPaper></MudItem><MudItem xs="12" lg="8"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Zielprofile</MudText><MudTable Items="_profiles" Dense="true" Hover="true"><HeaderContent><MudTh>Name</MudTh><MudTh>ID</MudTh><MudTh>Version</MudTh><MudTh>Algorithmus</MudTh><MudTh>Exporte</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@ProfileDisplayName(context)</MudTd><MudTd>@context.Id</MudTd><MudTd>@context.Version</MudTd><MudTd>@ProfileKeyAlgorithm(context)</MudTd><MudTd>@string.Join(", ", ProfileExportFormats(context))</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginProfileEdit(context))">Bearbeiten</MudButton><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteProfile(context.Id))">@(_deleteProfileId == context.Id ? "Löschen bestätigen" : "Löschen")</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Es sind noch keine Zielprofile angelegt.</MudText></NoRecordsContent></MudTable></MudPaper></MudItem></MudGrid>
     </text>;
 
     private RenderFragment OperationsContent => @<text>
-        <MudText Typo="Typo.overline" Class="section-kicker">Sperrung und Wiederherstellbarkeit</MudText><MudText Typo="Typo.h3" Class="page-title">Betrieb</MudText><MudGrid><MudItem xs="12" lg="5"><MudPaper Class="panel" Elevation="0">@RevocationForm<MudDivider Class="my-4" /><MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="GenerateCrl">Sperrliste erzeugen</MudButton></MudPaper></MudItem><MudItem xs="12" lg="7"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Sperrungen</MudText><MudTable Items="_revocations" Dense="true"><HeaderContent><MudTh>Seriennummer</MudTh><MudTh>Grund</MudTh><MudTh>Datum</MudTh></HeaderContent><RowTemplate><MudTd>@context.SerialNumber</MudTd><MudTd>@context.Reason</MudTd><MudTd>@Date(context.RevokedAt)</MudTd></RowTemplate></MudTable></MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Verschlüsseltes Backup</MudText><MudText Class="mb-3">Erstellt ein verschlüsseltes Archiv der HomeCA-Daten.</MudText><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateBackup">Backup erstellen</MudButton></MudPaper>
+        <MudText Typo="Typo.overline" Class="section-kicker">Sperrung und Wiederherstellbarkeit</MudText><MudText Typo="Typo.h3" Class="page-title">Betrieb</MudText><MudGrid><MudItem xs="12" lg="5"><MudPaper Class="panel" Elevation="0">@RevocationForm<MudDivider Class="my-4" /><MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="GenerateCrl">Sperrliste erzeugen</MudButton></MudPaper></MudItem><MudItem xs="12" lg="7"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Sperrungen</MudText><MudTable Items="_revocations" Dense="true"><HeaderContent><MudTh>Seriennummer</MudTh><MudTh>Grund</MudTh><MudTh>Datum</MudTh></HeaderContent><RowTemplate><MudTd>@context.SerialNumber</MudTd><MudTd>@context.Reason</MudTd><MudTd>@Date(context.RevokedAt)</MudTd></RowTemplate></MudTable></MudPaper></MudItem></MudGrid><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h6">Verschlüsseltes Backup</MudText><MudText Class="mb-3">Erstellt ein verschlüsseltes Archiv der HomeCA-Daten.</MudText><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateBackup">Backup erstellen</MudButton>@if (!string.IsNullOrEmpty(_lastBackupFileName)) { <MudButton Color="Color.Default" Variant="Variant.Outlined" Disabled="_busy" OnClick="VerifyBackup" Class="ml-2">@_lastBackupFileName verifizieren</MudButton> }</MudPaper>
     </text>;
 
     private string _dnsNames = "", _ipAddresses = "", _keyAlgorithm = "ECC", _certificateUsage = "TLS", _selectedProfileId = "", _sshKind = "host", _sshIdentity = "", _sshPrincipals = "", _sshPublicKey = "", _renewalCertificate = "", _connectorName = "", _connectorType = "hetzner", _connectorSecret = "", _connectorEndpoint = "", _domainName = "", _domainConnector = "", _issuerName = "", _issuerUrl = "", _issuerConnector = "", _serialNumber = "", _revocationReason = "unspecified", _acmeContact = "", _acmeAccountId = "", _acmeIdentifiers = "", _acmeOrderId = "", _authorityName = "", _authoritySubject = "CN=HomeCA Root CA", _authorityType = "root", _authorityParent = "", _authorityKeyAlgorithm = "ECC", _profileId = "", _profileVersion = "1.0", _profileDisplayName = "", _profilePurpose = "", _profileKeyAlgorithm = "ECC", _profileExportFormats = "PEM", _profileDocumentation = "", _profileRenewalScript = "";
     private int _validityDays = 365, _rsaKeySize = 2048, _renewBeforeDays = 30, _authorityValidityDays = 3650, _authorityCrlValidityDays = 7, _profileMaximumValidityDays = 730;
-    private bool _internalIssuance = true, _authorityActive = true, _profileRequiresDnsName = true, _profileAllowsIpAddress = true;
+    private bool _internalIssuance = true, _authorityActive = true, _profileRequiresDnsName = true, _profileAllowsIpAddress = true, _renewalEnabled = true;
 
-    private RenderFragment CertificateTable(IEnumerable<Certificate> items) => @<MudTable Items="items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"><HeaderContent><MudTh>Subject</MudTh><MudTh>Algorithmus</MudTh><MudTh>Läuft ab</MudTh><MudTh>Export</MudTh></HeaderContent><RowTemplate><MudTd DataLabel="Subject">@context.Subject</MudTd><MudTd DataLabel="Algorithmus">@context.KeyAlgorithm</MudTd><MudTd DataLabel="Läuft ab">@Date(context.ExpiresAt)</MudTd><MudTd DataLabel="Export"><MudText Typo="Typo.caption">@context.ExportPath</MudText></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine Zertifikate ausgestellt.</MudText></NoRecordsContent></MudTable>;
+    private RenderFragment CertificateTable(IEnumerable<Certificate> items) => @<MudTable Items="items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"><HeaderContent><MudTh>Subject</MudTh><MudTh>Algorithmus</MudTh><MudTh>Läuft ab</MudTh><MudTh>Download</MudTh></HeaderContent><RowTemplate><MudTd DataLabel="Subject">@context.Subject</MudTd><MudTd DataLabel="Algorithmus">@context.KeyAlgorithm</MudTd><MudTd DataLabel="Läuft ab">@Date(context.ExpiresAt)</MudTd><MudTd DataLabel="Download"><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "pem"))">PEM</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "key"))">Key</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "chain"))">Chain</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "fullchain"))">Fullchain</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DownloadCertificateExport(context.Id, "bundle"))">Bundle</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => OpenPfxDialog(context.Id))">PFX</MudButton></MudTd></RowTemplate><NoRecordsContent><MudText Class="pa-4">Noch keine Zertifikate ausgestellt.</MudText></NoRecordsContent></MudTable>;
     private RenderFragment AuthorityForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingAuthorityId is null ? "CA anlegen" : "CA verwalten")</MudText><MudTextField @bind-Value="_authorityName" Label="Name" Required="true" /><MudTextField @bind-Value="_authoritySubject" Label="Subject (DN)" Required="true" Disabled="@(_editingAuthorityId is not null)" /><MudSelect T="string" Label="Typ" @bind-Value="_authorityType" Disabled="@(_editingAuthorityId is not null)"><MudSelectItem Value="@RootAuthority">Root-CA</MudSelectItem><MudSelectItem Value="@IntermediateAuthority">Intermediate-CA</MudSelectItem></MudSelect>@if (_authorityType == IntermediateAuthority) { <MudSelect T="string" Label="Übergeordnete Root-CA" @bind-Value="_authorityParent" Required="true" Disabled="@(_editingAuthorityId is not null)">@foreach(var authority in _authorities.Where(a => a.Type == RootAuthority && a.IsActive && !a.IsRevoked)) { <MudSelectItem Value="@authority.Id">@authority.Name</MudSelectItem> }</MudSelect> }<MudNumericField T="int" @bind-Value="_authorityValidityDays" Label="Laufzeit (Tage)" Min="1" Max="7300" Disabled="@(_editingAuthorityId is not null)" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_authorityKeyAlgorithm" Disabled="@(_editingAuthorityId is not null)"><MudSelectItem Value="@Ecc">ECC P-256</MudSelectItem><MudSelectItem Value="@Rsa">RSA 3072</MudSelectItem></MudSelect><MudNumericField T="int" @bind-Value="_authorityCrlValidityDays" Label="CRL-Gültigkeit (Tage)" Min="1" Max="365" />@if (_editingAuthorityId is not null) { <MudCheckBox @bind-Value="_authorityActive" Label="Für neue Ausstellungen aktiv" /> }<MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAuthority">@(_editingAuthorityId is null ? "CA erstellen" : "Änderungen speichern")</MudButton>@if (_editingAuthorityId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelAuthorityEdit">Bearbeiten abbrechen</MudButton> }</div>;
     private RenderFragment CertificateIssueForm => @<div class="form-stack"><div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 1</MudText><MudText Typo="Typo.h6">Zielsystem wählen</MudText><MudText Class="mud-text-secondary">Das Zielprofil setzt Standardwerte für Algorithmus, Laufzeit, Exporte und Einspielhinweise.</MudText></div><MudSelect T="string" Label="Zielprofil" Value="_selectedProfileId" ValueChanged="SelectProfile" Required="true">@foreach (var profile in _profiles) { <MudSelectItem Value="@profile.Id">@ProfileDisplayName(profile)</MudSelectItem> }</MudSelect><div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 2</MudText><MudText Typo="Typo.h6">Zertifikat definieren</MudText></div><MudSelect T="string" Label="Verwendung" @bind-Value="_certificateUsage"><MudSelectItem T="string" Value="@Tls">TLS-Server</MudSelectItem><MudSelectItem T="string" Value="@ClientUsage">mTLS / Client</MudSelectItem></MudSelect><MudTextField @bind-Value="_dnsNames" Label="DNS-Namen" HelperText="@DnsHelperText" Required="@ProfileRequiresDnsName(SelectedProfile)" /><MudTextField @bind-Value="_ipAddresses" Label="IP-Adressen" HelperText="@IpHelperText" Disabled="@(!AllowsIpAddresses)" /><MudNumericField T="int" @bind-Value="_validityDays" Label="Gültigkeit in Tagen" Min="1" Max="@EffectiveValidityLimit" HelperText="@ValidityHelperText" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_keyAlgorithm" Disabled="@ProfileForcesRsa"><MudSelectItem T="string" Value="@Ecc">ECC</MudSelectItem><MudSelectItem T="string" Value="@Rsa">RSA</MudSelectItem></MudSelect>@if (ProfileForcesRsa) { <MudAlert Severity="Severity.Info" Dense="true">Dieses Zielprofil erzwingt RSA. Die Abweichung zur Standardwahl ECC ist hier bewusst sichtbar.</MudAlert> }@if (_keyAlgorithm == Rsa) { <MudNumericField T="int" @bind-Value="_rsaKeySize" Label="RSA-Schlüssellänge" Min="2048" Max="3072" HelperText="Legacy-Profile verwenden RSA 2048 oder 3072 Bit." /> }<div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">Schritt 3</MudText><MudText Typo="Typo.h6">Deployment-Paket erzeugen</MudText><MudText Class="mud-text-secondary">HomeCA speichert beim Ausstellen einen versionsierten Snapshot mit Exporten, Anleitung, Prüfsummen und Erneuerungsskript.</MudText></div><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="IssueCertificate">@CertificateActionLabel</MudButton></div>;
     private RenderFragment CertificateProfileSummary => @<div class="profile-summary"><MudText Typo="Typo.h6">Ausstellungsweg</MudText><MudText>Die privaten Schlüssel und Exportpfade verbleiben auf dem HomeCA-Host. Der Ablauf startet mit dem Zielsystem und leitet daraus die Zertifikatsparameter ab.</MudText>@if (SelectedProfile is { } profile) { <MudDivider Class="my-4" /><MudText Typo="Typo.overline" Class="section-kicker">Aktives Zielprofil</MudText><MudText Typo="Typo.h5" Class="page-title compact-title">@ProfileDisplayName(profile)</MudText><MudText>@ProfilePurpose(profile)</MudText><MudText Typo="Typo.caption">Version @ProfileVersion(profile)</MudText><div class="chip-row">@foreach (var format in ProfileExportFormats(profile)) { <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">@format</MudChip> }</div><div class="profile-facts"><div class="profile-fact"><strong>Standardalgorithmus:</strong> @ProfileKeyAlgorithm(profile)</div><div class="profile-fact"><strong>Maximale Laufzeit:</strong> @ProfileMaximumValidityDays(profile) Tage</div><div class="profile-fact"><strong>DNS-SAN:</strong> @(ProfileRequiresDnsName(profile) ? "erforderlich" : "optional")</div><div class="profile-fact"><strong>IP-SAN:</strong> @(ProfileAllowsIpAddress(profile) ? "erlaubt" : "nicht vorgesehen")</div></div><MudAlert Severity="Severity.Info" Dense="true">Deployment-Paket: @string.Join(", ", ProfileExportFormats(profile)) sowie profilgebundene Anleitung und Skript-Snapshot.</MudAlert><MudText Typo="Typo.body2" Class="mt-3">@ProfileDocumentation(profile)</MudText><MudText Typo="Typo.caption" Class="mt-2">Skript-Vorschau</MudText><MudTextField Value="@ProfileRenewalScript(profile)" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" /> } else { <MudAlert Severity="Severity.Warning" Dense="true">Es ist kein Zielprofil geladen. Ohne Profil fehlen Exporte und profilbezogene Vorgaben.</MudAlert> }</div>;
     private RenderFragment ProfileForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingProfileId is null ? "Zielprofil anlegen" : "Zielprofil bearbeiten")</MudText><MudTextField @bind-Value="_profileId" Label="Profil-ID" Required="true" HelperText="Kleinbuchstaben, Zahlen und Bindestriche." Disabled="@(_editingProfileId is not null)" /><MudTextField @bind-Value="_profileDisplayName" Label="Anzeigename" Required="true" /><MudTextField @bind-Value="_profileVersion" Label="Version" Required="true" /><MudTextField @bind-Value="_profilePurpose" Label="Einsatzzweck" Required="true" /><MudSelect T="string" Label="Schlüsselalgorithmus" @bind-Value="_profileKeyAlgorithm"><MudSelectItem Value="@Ecc">ECC</MudSelectItem><MudSelectItem Value="@Rsa">RSA</MudSelectItem></MudSelect><MudTextField @bind-Value="_profileExportFormats" Label="Exportformate" HelperText="Durch Kommas trennen, z. B. PEM, PFX, DER." Required="true" /><MudNumericField T="int" @bind-Value="_profileMaximumValidityDays" Label="Maximale Laufzeit (Tage)" Min="1" Max="730" /><MudCheckBox @bind-Value="_profileRequiresDnsName" Label="DNS-Name erforderlich" /><MudCheckBox @bind-Value="_profileAllowsIpAddress" Label="IP-SAN erlauben" /><MudTextField @bind-Value="_profileDocumentation" Label="Installationshinweise" Lines="5" Required="true" /><MudTextField @bind-Value="_profileRenewalScript" Label="Erneuerungsskript" Lines="5" Required="true" /><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveProfile">@(_editingProfileId is null ? "Profil speichern" : "Änderungen speichern")</MudButton>@if (_editingProfileId is not null) { <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="CancelProfileEdit">Bearbeiten abbrechen</MudButton> }</div>;
     private RenderFragment SshIssueForm => @<div class="form-stack"><MudSelect T="string" Label="Art" @bind-Value="_sshKind"><MudSelectItem T="string" Value="@HostKind">Host</MudSelectItem><MudSelectItem T="string" Value="@UserKind">Benutzer</MudSelectItem></MudSelect><MudTextField @bind-Value="_sshIdentity" Label="Identität" Required="true" /><MudTextField @bind-Value="_sshPrincipals" Label="Principals" Required="true" HelperText="Durch Kommas trennen" /><MudTextField @bind-Value="_sshPublicKey" Label="Öffentlicher SSH-Schlüssel" Required="true" Lines="3" /><MudNumericField T="int" @bind-Value="_validityDays" Label="Gültigkeit in Tagen" Min="1" Max="3650" /><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="IssueSsh">SSH-Zertifikat ausstellen</MudButton></div>;
-    private RenderFragment AcmeForm => @<div class="form-stack"><MudText Typo="Typo.body2">Registrieren Sie ein Konto oder geben Sie die Kennung eines bestehenden Kontos ein.</MudText><MudTextField @bind-Value="_acmeContact" Label="Kontakt (mailto:)" /><MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="RegisterAcme">ACME-Konto registrieren</MudButton><MudTextField @bind-Value="_acmeAccountId" Label="Konto-ID" Required="true" /><MudTextField @bind-Value="_acmeIdentifiers" Label="DNS-Identitäten" Required="true" HelperText="Durch Kommas trennen" /><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="CreateAcmeOrder">Auftrag anlegen</MudButton><MudTextField @bind-Value="_acmeOrderId" Label="Auftrag-ID zum Finalisieren" /><MudButton Variant="Variant.Text" Disabled="_busy" OnClick="FinalizeAcmeOrder">Auftrag finalisieren</MudButton></div>;
-    private RenderFragment RenewalForm => @<div class="form-stack"><MudText Typo="Typo.h6">Erneuerungsplan</MudText><MudSelect T="string" Label="Zertifikat" @bind-Value="_renewalCertificate" Required="true">@foreach (var certificate in _certificates) { <MudSelectItem Value="@certificate.Id">@certificate.Subject</MudSelectItem> }</MudSelect><MudNumericField T="int" @bind-Value="_renewBeforeDays" Label="Tage vor Ablauf" Min="1" Max="365" /><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="AddRenewalPlan">Erneuerungsplan speichern</MudButton></div>;
+    private RenderFragment AcmeForm => @<div class="form-stack"><MudText Typo="Typo.body2">Registrieren Sie ein Konto oder geben Sie die Kennung eines bestehenden Kontos ein.</MudText><MudTextField @bind-Value="_acmeContact" Label="Kontakt (mailto:)" /><MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="RegisterAcme">ACME-Konto registrieren</MudButton>@if (_acmeAccounts.Count > 0) { <MudText Typo="Typo.h6" Class="mt-4">Registrierte Konten</MudText><MudTable Items="_acmeAccounts" Dense="true"><HeaderContent><MudTh>ID</MudTh><MudTh>Kontakt</MudTh><MudTh>Erstellt</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Id[..8]…</MudTd><MudTd>@context.Contact</MudTd><MudTd>@Date(context.CreatedAt)</MudTd><MudTd><MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _acmeAccountId = context.Id)">Verwenden</MudButton></MudTd></RowTemplate></MudTable> }<MudTextField @bind-Value="_acmeAccountId" Label="Konto-ID" Required="true" /><MudTextField @bind-Value="_acmeIdentifiers" Label="DNS-Identitäten" Required="true" HelperText="Durch Kommas trennen" /><MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy" OnClick="CreateAcmeOrder">Auftrag anlegen</MudButton><MudDivider Class="my-4" /><MudText Typo="Typo.h6">Auftragsstatus prüfen</MudText><MudTextField @bind-Value="_acmeOrderId" Label="Auftrag-ID" /><MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="CheckAcmeOrderStatus">Status abfragen</MudButton>@if (_checkedOrder is not null) { <MudAlert Severity="@(_checkedOrder.Status == "valid" ? Severity.Success : Severity.Info)" Dense="true" Class="mt-2">Auftrag @_checkedOrder.Id[..8]… — Status: <b>@_checkedOrder.Status</b>@if (_checkedOrder.CertificateId is not null) { <span> — Zertifikat: @_checkedOrder.CertificateId[..8]…</span> }</MudAlert> }<MudButton Variant="Variant.Text" Disabled="_busy" OnClick="FinalizeAcmeOrder">Auftrag finalisieren</MudButton>@if (_acmeOrders.Count > 0) { <MudText Typo="Typo.h6" Class="mt-4">Aufträge</MudText><MudTable Items="_acmeOrders" Dense="true"><HeaderContent><MudTh>ID</MudTh><MudTh>Identitäten</MudTh><MudTh>Status</MudTh><MudTh>Erstellt</MudTh><MudTh>Zertifikat</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Id[..8]…</MudTd><MudTd>@string.Join(", ", context.Identifiers)</MudTd><MudTd><MudChip T="string" Size="Size.Small" Color="@(context.Status == "valid" ? Color.Success : Color.Default)">@context.Status</MudChip></MudTd><MudTd>@Date(context.CreatedAt)</MudTd><MudTd>@(context.CertificateId is not null ? context.CertificateId[..8] + "…" : "—")</MudTd><MudTd>@if (context.Status == "ready") { <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => { _acmeOrderId = context.Id; })">Finalisieren</MudButton> }</MudTd></RowTemplate></MudTable> }</div>;
+    private RenderFragment RenewalForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingPlanId is null ? "Erneuerungsplan" : "Plan bearbeiten")</MudText>@if (_editingPlanId is null) { <MudSelect T="string" Label="Zertifikat" @bind-Value="_renewalCertificate" Required="true">@foreach (var certificate in _certificates) { <MudSelectItem Value="@certificate.Id">@certificate.Subject</MudSelectItem> }</MudSelect> } else { <MudText Typo="Typo.body2">@CertificateName(_renewalCertificate)</MudText> }<MudNumericField T="int" @bind-Value="_renewBeforeDays" Label="Tage vor Ablauf" Min="1" Max="365" /><MudCheckBox @bind-Value="_renewalEnabled" Label="Aktiv" /><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveRenewalPlan">@(_editingPlanId is null ? "Erneuerungsplan speichern" : "Änderungen speichern")</MudButton>@if (_editingPlanId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelPlanEdit">Bearbeiten abbrechen</MudButton> }</div>;
     private RenderFragment ConnectorForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingConnectorId is null ? "DNS-Connector anlegen" : "DNS-Connector bearbeiten")</MudText><MudTextField @bind-Value="_connectorName" Label="Name" Required="true" /><MudSelect T="string" Label="Typ" @bind-Value="_connectorType"><MudSelectItem T="string" Value="@Hetzner">Hetzner DNS</MudSelectItem><MudSelectItem T="string" Value="@Technitium">Technitium</MudSelectItem></MudSelect>@if (_connectorType == "technitium") { <MudTextField @bind-Value="_connectorEndpoint" Label="Technitium-Endpunkt" Required="true" /> }<MudTextField @bind-Value="_connectorSecret" Label="API-Token" InputType="InputType.Password" Required="true" HelperText="Beim Bearbeiten wird der gespeicherte Zugangsschlüssel ersetzt." /><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="AddConnector">@(_editingConnectorId is null ? "Connector speichern" : "Connector aktualisieren")</MudButton>@if (_editingConnectorId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelConnectorEdit">Bearbeiten abbrechen</MudButton> }</div>;
     private RenderFragment DomainForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingDomainName is null ? "Domain anlegen" : "Domain bearbeiten")</MudText><MudTextField @bind-Value="_domainName" Label="Domainname" Required="true" /><MudSelect T="string" Label="DNS-Connector" @bind-Value="_domainConnector" Clearable="true">@foreach (var connector in _connectors) { <MudSelectItem Value="@connector.Id">@connector.Name</MudSelectItem> }</MudSelect><MudCheckBox @bind-Value="_internalIssuance" Label="Interne Ausstellungszone" /><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="AddDomain">@(_editingDomainName is null ? "Domain speichern" : "Domain aktualisieren")</MudButton>@if (_editingDomainName is not null) { <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="CancelDomainEdit">Bearbeiten abbrechen</MudButton> }</div>;
-    private RenderFragment IssuerForm => @<div class="form-stack"><MudText Typo="Typo.h6">Externer ACME-Issuer</MudText><MudTextField @bind-Value="_issuerName" Label="Name" Required="true" /><MudTextField @bind-Value="_issuerUrl" Label="Directory-URL" Required="true" /><MudSelect T="string" Label="DNS-Connector" @bind-Value="_issuerConnector" Required="true">@foreach (var connector in _connectors) { <MudSelectItem Value="@connector.Id">@connector.Name</MudSelectItem> }</MudSelect><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="AddIssuer">Issuer speichern</MudButton></div>;
+    private RenderFragment IssuerForm => @<div class="form-stack"><MudText Typo="Typo.h6">@(_editingIssuerId is null ? "Externer ACME-Issuer" : "Issuer bearbeiten")</MudText><MudTextField @bind-Value="_issuerName" Label="Name" Required="true" /><MudTextField @bind-Value="_issuerUrl" Label="Directory-URL" Required="true" /><MudSelect T="string" Label="DNS-Connector" @bind-Value="_issuerConnector" Required="true">@foreach (var connector in _connectors) { <MudSelectItem Value="@connector.Id">@connector.Name</MudSelectItem> }</MudSelect><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveIssuer">@(_editingIssuerId is null ? "Issuer speichern" : "Änderungen speichern")</MudButton>@if (_editingIssuerId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelIssuerEdit">Bearbeiten abbrechen</MudButton> }</div>;
     private RenderFragment RevocationForm => @<div class="form-stack"><MudText Typo="Typo.h6">Zertifikat sperren</MudText><MudTextField @bind-Value="_serialNumber" Label="Seriennummer (hexadezimal)" Required="true" /><MudSelect T="string" Label="Sperrgrund" @bind-Value="_revocationReason"><MudSelectItem T="string" Value="@Unspecified">Nicht angegeben</MudSelectItem><MudSelectItem T="string" Value="@KeyCompromise">Schlüssel kompromittiert</MudSelectItem><MudSelectItem T="string" Value="@CessationOfOperation">Außer Betrieb</MudSelectItem></MudSelect><MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="_busy" OnClick="Revoke">Zertifikat sperren</MudButton></div>;
 
     protected override async Task OnInitializedAsync() => await LoadInstanceAsync();
@@ -134,16 +181,35 @@ else
     {
         await _loginForm!.Validate(); if (!_loginValid) return;
         _busy = true; _loginError = null;
-        try { using var client = Client(); var response = await client.PostAsJsonAsync("api/v1/login", new { userName = _loginUser, password = _loginPassword }); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(); var result = await response.Content.ReadFromJsonAsync<LoginResult>(_json); _token = result?.AccessToken ?? throw new InvalidOperationException(); await LoadAllAsync(); }
+        try { using var client = Client(); var response = await client.PostAsJsonAsync("api/v1/login", new { userName = _loginUser, password = _loginPassword }); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(); var result = await response.Content.ReadFromJsonAsync<LoginResult>(_json); _token = result?.AccessToken ?? throw new InvalidOperationException(); _mustChangePassword = result.MustChangePassword; if (!_mustChangePassword) { await LoadAllAsync(); } }
         catch { _loginError = "Benutzername oder Passwort sind nicht korrekt."; }
         finally { _busy = false; }
     }
-    private void Logout() { _token = null; _loginPassword = null; _section = "overview"; ClearData(); Snackbar.Add("Sie wurden abgemeldet.", Severity.Info); }
-    private void ClearData() { _certificates=[]; _authorities=[]; _domains=[]; _connectors=[]; _profiles=[]; _plans=[]; _issuers=[]; _warnings=[]; _revocations=[]; _selectedProfileId = ""; }
+    private void Logout() { _token = null; _loginPassword = null; _section = "overview"; _mustChangePassword = false; _currentPassword = ""; _newPassword = ""; _confirmPassword = ""; _changePasswordError = null; _changePasswordSuccess = null; ClearData(); Snackbar.Add("Sie wurden abgemeldet.", Severity.Info); }
+    private void ClearData() { _certificates=[]; _authorities=[]; _domains=[]; _connectors=[]; _profiles=[]; _plans=[]; _issuers=[]; _warnings=[]; _revocations=[]; _acmeAccounts=[]; _acmeOrders=[]; _checkedOrder=null; _selectedProfileId = ""; }
+    private async Task ChangePasswordAsync()
+    {
+        await _changePasswordForm!.Validate(); if (!_changePasswordValid) return;
+        if (_newPassword != _confirmPassword) { _changePasswordError = L.ChangePasswordMismatch; return; }
+        if (_newPassword.Length < 12) { _changePasswordError = L.ChangePasswordTooShort; return; }
+        _busy = true; _changePasswordError = null; _changePasswordSuccess = null;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/change-password", new { currentPassword = _currentPassword, newPassword = _newPassword });
+            if (!response.IsSuccessStatusCode) { _changePasswordError = L.ChangePasswordError; return; }
+            _changePasswordSuccess = L.ChangePasswordSuccess;
+            _mustChangePassword = false; _token = null; _loginPassword = null; _currentPassword = ""; _newPassword = ""; _confirmPassword = "";
+        }
+        catch { _changePasswordError = L.ChangePasswordError; }
+        finally { _busy = false; }
+    }
+    private string? ValidateNewPassword(string value) => !string.IsNullOrEmpty(value) && value.Length < 12 ? L.ChangePasswordTooShort : null;
+    private string? ValidateConfirmPassword(string value) => !string.IsNullOrEmpty(value) && value != _newPassword ? L.ChangePasswordMismatch : null;
     private async Task LoadAllAsync()
     {
         if (string.IsNullOrEmpty(_token)) return; _loading = true; _pageError = null;
-        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; SyncProfileSelection(); }
+        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; SyncProfileSelection(); }
         catch { _pageError = "Die Verwaltungsdaten konnten nicht geladen werden. Prüfen Sie die Verbindung oder melden Sie sich erneut an."; }
         finally { _loading = false; }
     }
@@ -194,6 +260,56 @@ else
         catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
         finally { _busy = false; }
     }
+    private async Task DownloadCertificateExport(string id, string format)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.GetAsync($"api/v1/certificates/{Uri.EscapeDataString(id)}/export/{Uri.EscapeDataString(format)}");
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var name = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? $"{id}.{format}";
+            await JS.InvokeVoidAsync("homeca.download", name, response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream", Convert.ToBase64String(bytes));
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task DownloadTrustAnchor(string format)
+    {
+        _busy = true;
+        try
+        {
+            using var client = new HttpClient { BaseAddress = new Uri($"{Navigation.BaseUri}") };
+            var response = await client.GetAsync($"api/v1/trust-anchor/{Uri.EscapeDataString(format)}");
+            if (!response.IsSuccessStatusCode) { Snackbar.Add("Keine aktive Root-CA gefunden. Bitte zuerst die PKI initialisieren.", Severity.Warning); return; }
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var name = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? $"homeca-root-ca.{(format == "der" ? "cer" : "pem")}";
+            await JS.InvokeVoidAsync("homeca.download", name, response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream", Convert.ToBase64String(bytes));
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private void OpenPfxDialog(string id) { _pfxCertificateId = id; _pfxPassword = ""; _pfxDialogVisible = true; }
+    private void CancelPfxDialog() { _pfxDialogVisible = false; _pfxPassword = ""; _pfxCertificateId = ""; }
+    private async Task DownloadPfx()
+    {
+        if (string.IsNullOrWhiteSpace(_pfxPassword)) { Snackbar.Add("Ein Kennwort ist erforderlich.", Severity.Warning); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync($"api/v1/certificates/{Uri.EscapeDataString(_pfxCertificateId)}/export/pfx", new { password = _pfxPassword });
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var name = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? $"{_pfxCertificateId}.pfx";
+            await JS.InvokeVoidAsync("homeca.download", name, "application/x-pkcs12", Convert.ToBase64String(bytes));
+            _pfxDialogVisible = false; _pfxPassword = ""; _pfxCertificateId = "";
+            Snackbar.Add("PFX-Datei wurde heruntergeladen.", Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
     private async Task IssueCertificate()
     {
         var profile = SelectedProfile;
@@ -215,7 +331,32 @@ else
         _busy = true; try { using var client = Client(); var response = await client.PostAsJsonAsync("api/v1/acme/orders", new { accountId = _acmeAccountId, identifiers = Split(_acmeIdentifiers) }); response.EnsureSuccessStatusCode(); var order = await response.Content.ReadFromJsonAsync<AcmeOrder>(_json); _acmeOrderId = order?.Id ?? ""; Snackbar.Add("ACME-Auftrag angelegt. Die Auftrag-ID wurde übernommen.", Severity.Success); } catch { Snackbar.Add("ACME-Auftrag konnte nicht angelegt werden.", Severity.Error); } finally { _busy = false; }
     }
     private async Task FinalizeAcmeOrder() { if (string.IsNullOrWhiteSpace(_acmeOrderId)) { Snackbar.Add("Eine Auftrag-ID ist erforderlich.", Severity.Warning); return; } await Post($"api/v1/acme/orders/{Uri.EscapeDataString(_acmeOrderId)}/finalize", new { validityDays = _validityDays, keyAlgorithm = _keyAlgorithm, rsaKeySize = _rsaKeySize }); }
-    private async Task AddRenewalPlan() { if (string.IsNullOrWhiteSpace(_renewalCertificate)) { Snackbar.Add("Wählen Sie ein Zertifikat aus.", Severity.Warning); return; } await Post("api/v1/renewal-plans", new { certificateId = _renewalCertificate, renewBeforeDays = _renewBeforeDays, enabled = true }); }
+    private async Task CheckAcmeOrderStatus()
+    {
+        if (string.IsNullOrWhiteSpace(_acmeOrderId)) { Snackbar.Add("Eine Auftrag-ID ist erforderlich.", Severity.Warning); return; }
+        _busy = true; _checkedOrder = null;
+        try { using var client = Client(); var response = await client.GetAsync($"api/v1/acme/orders/{Uri.EscapeDataString(_acmeOrderId)}"); if (!response.IsSuccessStatusCode) { Snackbar.Add("Auftrag wurde nicht gefunden.", Severity.Error); return; } _checkedOrder = await response.Content.ReadFromJsonAsync<AcmeOrderFull>(_json); }
+        catch { Snackbar.Add("Auftragsstatus konnte nicht abgefragt werden.", Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task SaveRenewalPlan()
+    {
+        if (_editingPlanId is null) { if (string.IsNullOrWhiteSpace(_renewalCertificate)) { Snackbar.Add("Wählen Sie ein Zertifikat aus.", Severity.Warning); return; } await Post("api/v1/renewal-plans", new { certificateId = _renewalCertificate, renewBeforeDays = _renewBeforeDays, enabled = _renewalEnabled }); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.PutAsJsonAsync($"api/v1/renewal-plans/{Uri.EscapeDataString(_editingPlanId)}", new { renewBeforeDays = _renewBeforeDays, enabled = _renewalEnabled }); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); CancelPlanEdit(); Snackbar.Add("Erneuerungsplan aktualisiert.", Severity.Success); await LoadAllAsync(); }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private void BeginPlanEdit(RenewalPlan plan) { _editingPlanId = plan.Id; _renewalCertificate = plan.CertificateId; _renewBeforeDays = plan.RenewBeforeDays; _renewalEnabled = plan.Enabled; }
+    private void CancelPlanEdit() { _editingPlanId = null; _deletePlanId = null; _renewalCertificate = ""; _renewBeforeDays = 30; _renewalEnabled = true; }
+    private async Task DeletePlan(string id)
+    {
+        if (_deletePlanId != id) { _deletePlanId = id; Snackbar.Add("Klicken Sie erneut auf Löschen, um den Erneuerungsplan zu entfernen.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.DeleteAsync($"api/v1/renewal-plans/{Uri.EscapeDataString(id)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); _deletePlanId = null; Snackbar.Add("Erneuerungsplan gelöscht.", Severity.Success); await LoadAllAsync(); }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
     private async Task AddConnector()
     {
         if (string.IsNullOrWhiteSpace(_connectorName) || string.IsNullOrWhiteSpace(_connectorSecret)) { Snackbar.Add("Name und API-Token sind erforderlich.", Severity.Warning); return; }
@@ -347,7 +488,42 @@ else
         finally { _busy = false; }
     }
     private string ConnectorName(string? id) => string.IsNullOrWhiteSpace(id) ? "Keiner" : _connectors.FirstOrDefault(connector => connector.Id == id)?.Name ?? "Unbekannter Connector";
-    private async Task AddIssuer() { if (string.IsNullOrWhiteSpace(_issuerName) || string.IsNullOrWhiteSpace(_issuerUrl) || string.IsNullOrWhiteSpace(_issuerConnector)) { Snackbar.Add("Name, Directory-URL und DNS-Connector sind erforderlich.", Severity.Warning); return; } await Post("api/v1/acme/external-issuers", new { name = _issuerName, directoryUrl = _issuerUrl, connectorId = _issuerConnector }); }
+    private async Task SaveIssuer()
+    {
+        if (string.IsNullOrWhiteSpace(_issuerName) || string.IsNullOrWhiteSpace(_issuerUrl) || string.IsNullOrWhiteSpace(_issuerConnector)) { Snackbar.Add("Name, Directory-URL und DNS-Connector sind erforderlich.", Severity.Warning); return; }
+        var payload = new { name = _issuerName, directoryUrl = _issuerUrl, connectorId = _issuerConnector };
+        if (_editingIssuerId is null) { await Post("api/v1/acme/external-issuers", payload); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PutAsJsonAsync($"api/v1/acme/external-issuers/{Uri.EscapeDataString(_editingIssuerId)}", payload);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            CancelIssuerEdit();
+            Snackbar.Add("Issuer aktualisiert.", Severity.Success);
+            await LoadAllAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private void BeginIssuerEdit(ExternalIssuer issuer) { _editingIssuerId = issuer.Id; _issuerName = issuer.Name; _issuerUrl = issuer.DirectoryUrl; _issuerConnector = issuer.ConnectorId; }
+    private void CancelIssuerEdit() { _editingIssuerId = null; _deleteIssuerId = null; _issuerName = ""; _issuerUrl = ""; _issuerConnector = ""; }
+    private async Task DeleteIssuer(string id)
+    {
+        if (_deleteIssuerId != id) { _deleteIssuerId = id; Snackbar.Add("Klicken Sie erneut auf Löschen, um den Issuer zu entfernen.", Severity.Warning); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.DeleteAsync($"api/v1/acme/external-issuers/{Uri.EscapeDataString(id)}");
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            _deleteIssuerId = null;
+            Snackbar.Add("Issuer gelöscht.", Severity.Success);
+            await LoadAllAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
     private async Task CheckConnector(string id)
     {
         _busy = true;
@@ -375,9 +551,42 @@ else
     }
     private async Task Revoke() { if (string.IsNullOrWhiteSpace(_serialNumber)) { Snackbar.Add("Eine Seriennummer ist erforderlich.", Severity.Warning); return; } await Post($"api/v1/revocations/{Uri.EscapeDataString(_serialNumber)}/{Uri.EscapeDataString(_revocationReason)}"); }
     private async Task GenerateCrl() => await Post("api/v1/crl");
+    private async Task DeleteConnector(string id)
+    {
+        if (_deleteConnectorId != id) { _deleteConnectorId = id; Snackbar.Add("Klicken Sie erneut auf Löschen, um den Connector zu entfernen.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.DeleteAsync($"api/v1/connector-instances/{Uri.EscapeDataString(id)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); _deleteConnectorId = null; Snackbar.Add("Connector gelöscht.", Severity.Success); await LoadAllAsync(); }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task DeleteDomain(string name)
+    {
+        if (_deleteDomainName != name) { _deleteDomainName = name; Snackbar.Add("Klicken Sie erneut auf Löschen, um die Domain zu entfernen.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.DeleteAsync($"api/v1/domains/{Uri.EscapeDataString(name)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); _deleteDomainName = null; Snackbar.Add("Domain gelöscht.", Severity.Success); await LoadAllAsync(); }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task TxtTestConnector(string id)
+    {
+        var domain = _domains.FirstOrDefault()?.Name;
+        if (string.IsNullOrWhiteSpace(domain)) { Snackbar.Add("Legen Sie zuerst eine Domain an, damit der TXT-Test eine Zielzone hat.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.PostAsync($"api/v1/connector-instances/{Uri.EscapeDataString(id)}/txt-test?domain={Uri.EscapeDataString(domain)}", null); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); Snackbar.Add($"TXT-Roundtrip für {domain} war erfolgreich.", Severity.Success); }
+        catch (Exception exception) { Snackbar.Add($"TXT-Test fehlgeschlagen: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
+    }
     private async Task CreateBackup()
     {
-        _busy = true; try { using var client = Client(); var response = await client.PostAsync("api/v1/backups", null); response.EnsureSuccessStatusCode(); var backup = await response.Content.ReadFromJsonAsync<Backup>(_json); Snackbar.Add($"Backup {backup?.FileName} erstellt.", Severity.Success); } catch { Snackbar.Add("Backup konnte nicht erstellt werden.", Severity.Error); } finally { _busy = false; }
+        _busy = true; try { using var client = Client(); var response = await client.PostAsync("api/v1/backups", null); response.EnsureSuccessStatusCode(); var backup = await response.Content.ReadFromJsonAsync<Backup>(_json); _lastBackupFileName = backup?.FileName ?? ""; Snackbar.Add($"Backup {backup?.FileName} erstellt.", Severity.Success); } catch { Snackbar.Add("Backup konnte nicht erstellt werden.", Severity.Error); } finally { _busy = false; }
+    }
+    private async Task VerifyBackup()
+    {
+        if (string.IsNullOrWhiteSpace(_lastBackupFileName)) { Snackbar.Add("Es wurde noch kein Backup erstellt.", Severity.Warning); return; }
+        _busy = true;
+        try { using var client = Client(); var response = await client.PostAsync($"api/v1/backups/{Uri.EscapeDataString(_lastBackupFileName)}/verify", null); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); Snackbar.Add($"Backup {_lastBackupFileName} wurde erfolgreich verifiziert.", Severity.Success); }
+        catch (Exception exception) { Snackbar.Add($"Backup-Verifizierung fehlgeschlagen: {exception.Message}", Severity.Error); }
+        finally { _busy = false; }
     }
     private static string[] Split(string value) => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     private async Task<string> ReadApiError(HttpResponseMessage response)
@@ -393,6 +602,15 @@ else
     }
     private string CertificateName(string id) => _certificates.FirstOrDefault(c => c.Id == id)?.Subject ?? id;
     private string NavClass(string key) => _section == key ? "active-nav" : string.Empty;
+
+    // ── Trust installation scripts ──────────────────────────────────────────
+    private string BaseUrl => Navigation.BaseUri.TrimEnd('/');
+    private string TrustScriptWindows => $"Invoke-WebRequest -Uri '{BaseUrl}/api/v1/trust-anchor/der' -OutFile \"$env:TEMP\\homeca-root-ca.cer\"\ncertutil -addstore -f \"Root\" \"$env:TEMP\\homeca-root-ca.cer\"\nRemove-Item \"$env:TEMP\\homeca-root-ca.cer\"";
+    private string TrustScriptLinux => $"curl -o /tmp/homeca-root-ca.crt {BaseUrl}/api/v1/trust-anchor/pem\nsudo cp /tmp/homeca-root-ca.crt /usr/local/share/ca-certificates/homeca-root-ca.crt\nsudo update-ca-certificates";
+    private string TrustScriptMacOs => $"curl -o /tmp/homeca-root-ca.pem {BaseUrl}/api/v1/trust-anchor/pem\nsudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/homeca-root-ca.pem";
+    private string TrustScriptFirefox => "{\n  \"policies\": { \"Certificates\": { \"ImportEnterpriseRoots\": true,\n    \"Install\": [\"" + BaseUrl + "/api/v1/trust-anchor/pem\"] } }\n}";
+    private async Task CopyToClipboard(string text) { await JS.InvokeVoidAsync("navigator.clipboard.writeText", text); Snackbar.Add(L.TrustInstallCopied, Severity.Success); }
+
     private TargetProfileDto? SelectedProfile => _profiles.FirstOrDefault(profile => profile.Id == _selectedProfileId);
     private bool AllowsIpAddresses => ProfileAllowsIpAddress(SelectedProfile);
     private bool ProfileForcesRsa => string.Equals(ProfileKeyAlgorithm(SelectedProfile), Rsa, StringComparison.OrdinalIgnoreCase);
@@ -452,5 +670,5 @@ else
     private static string ProfileRenewalScript(TargetProfileDto? profile) => string.IsNullOrWhiteSpace(profile?.RenewalScriptTemplate) ? "# Kein profilspezifisches Skript hinterlegt." : profile.RenewalScriptTemplate;
     private static string Date(DateTime value) => value.ToLocalTime().ToString("d", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
     private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.GetCultureInfo("de-DE"));
-    private record LoginResult(string AccessToken); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors);
+    private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Backup(string FileName); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors);
 }
