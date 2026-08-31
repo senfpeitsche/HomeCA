@@ -85,12 +85,13 @@ else
             else if (_section == "automation") { @AutomationContent }
             else if (_section == "settings") { @SettingsContent }
             else if (_section == "operations") { @OperationsContent }
+            else if (_section == "help") { <HelpContent /> }
         </MudMainContent>
     </MudLayout>
 }
 
 @code {
-    private (string Key, string Value)[] Nav => [("overview", L.NavOverview), ("certificates", L.NavCertificates), ("authorities", L.NavAuthorities), ("automation", L.NavAutomation), ("settings", L.NavSettings), ("operations", L.NavOperations)];
+    private (string Key, string Value)[] Nav => [("overview", L.NavOverview), ("certificates", L.NavCertificates), ("authorities", L.NavAuthorities), ("automation", L.NavAutomation), ("settings", L.NavSettings), ("operations", L.NavOperations), ("help", L.NavHelp)];
     private const string Tls = "TLS", ClientUsage = "mTLS", Ecc = "ECC", Rsa = "RSA", RootAuthority = "root", IntermediateAuthority = "intermediate", HostKind = "host", UserKind = "user", Hetzner = "hetzner", Technitium = "technitium", Unspecified = "unspecified", KeyCompromise = "keyCompromise", CessationOfOperation = "cessationOfOperation";
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private string? _token, _loginUser, _loginPassword, _loginError, _pageError, _connectorCheckMessage, _editingConnectorId, _editingDomainName, _editingAuthorityId, _editingProfileId, _deleteAuthorityId, _deleteProfileId, _deleteCertificateId;

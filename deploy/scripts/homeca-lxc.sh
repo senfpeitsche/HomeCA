@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # HomeCA LXC — Proxmox one-liner entry script
+#
 # Usage (paste into Proxmox shell):
-#   GITHUB_TOKEN=ghp_… bash -c "$(curl -fsSL -H 'Authorization: token ghp_…' https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+#   GITHUB_TOKEN=ghp_… bash -c "$(curl -fsSL \
+#     -H 'Authorization: token ghp_…' -H 'Accept: application/vnd.github.raw' \
+#     'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-lxc.sh?ref=main')"
+#
+# Once the repo is public, simplify to:
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
 #
 # What it does:
 #   1. Downloads the latest Debian 12 template (if missing)
@@ -19,12 +25,10 @@
 #   HOMECA_BRIDGE      — network bridge        (default: vmbr0)
 #   HOMECA_NET         — IP config             (default: dhcp)
 #   HOMECA_VERSION     — release tag to install (default: latest)
-#   HOMECA_REPO_URL    — raw base URL for scripts
 
 set -euo pipefail
 
 # ── Defaults ────────────────────────────────────────────────────────
-REPO_URL="${HOMECA_REPO_URL:-https://raw.githubusercontent.com/senfpeitsche/HomeCA/main}"
 HOSTNAME="${HOMECA_HOSTNAME:-homeca}"
 DISK="${HOMECA_DISK:-8}"
 RAM="${HOMECA_RAM:-1024}"
@@ -33,12 +37,27 @@ STORAGE="${HOMECA_STORAGE:-local-lvm}"
 BRIDGE="${HOMECA_BRIDGE:-vmbr0}"
 NET="${HOMECA_NET:-dhcp}"
 VERSION="${HOMECA_VERSION:-latest}"
+GH_REPO="senfpeitsche/HomeCA"
 
-# ── Auth header for private repo ────────────────────────────────────
-GH_AUTH=()
+# ── Auth + download helpers for private repo ────────────────────────
+GH_AUTH_HEADER=()
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  GH_AUTH=(-H "Authorization: token ${GITHUB_TOKEN}")
+  GH_AUTH_HEADER=(-H "Authorization: token ${GITHUB_TOKEN}")
 fi
+
+# Download a raw file from the repo (works for both private and public)
+gh_raw() {
+  local path="$1" dest="${2:--}"
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    curl -fsSL "${GH_AUTH_HEADER[@]}" \
+      -H "Accept: application/vnd.github.raw" \
+      -o "$dest" \
+      "https://api.github.com/repos/${GH_REPO}/contents/${path}?ref=main"
+  else
+    curl -fsSL -o "$dest" \
+      "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
+  fi
+}
 
 # ── Colors / helpers ────────────────────────────────────────────────
 BL='\033[36m' GN='\033[32m' RD='\033[31m' YW='\033[33m' CL='\033[0m'
@@ -88,7 +107,6 @@ fi
 if [[ "$NET" == "dhcp" ]]; then
   NET_PARAM="name=eth0,bridge=${BRIDGE},ip=dhcp"
 else
-  # Expect CIDR notation, e.g. 10.0.0.50/24,gw=10.0.0.1
   NET_PARAM="name=eth0,bridge=${BRIDGE},ip=${NET}"
 fi
 
@@ -102,7 +120,7 @@ pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
   --rootfs "${STORAGE}:${DISK}" \
   --net0 "$NET_PARAM" \
   --unprivileged 1 \
-  --features nesting=0 \
+  --features nesting=1 \
   --onboot 1 \
   --start 0 \
   --ostype debian \
@@ -113,7 +131,6 @@ msg_ok "LXC ${CTID} created"
 msg_info "Starting container …"
 pct start "$CTID"
 
-# Wait until the container has an IP (max 30 s)
 for i in $(seq 1 30); do
   if pct exec "$CTID" -- ping -c1 -W1 deb.debian.org &>/dev/null; then
     break
@@ -122,14 +139,27 @@ for i in $(seq 1 30); do
 done
 msg_ok "Container running"
 
-# ── Run the in-container install script ──────────────────────────────
+# ── Bootstrap curl inside the container ──────────────────────────────
+msg_info "Installing curl inside container …"
+pct exec "$CTID" -- bash -c "apt-get update -qq && apt-get install -y -qq curl" >/dev/null 2>&1
+msg_ok "curl available"
+
+# ── Fetch install script and push into container ─────────────────────
 msg_info "Running HomeCA installer inside CT ${CTID} …"
-pct exec "$CTID" -- bash -c "
+INSTALL_SCRIPT=$(mktemp /tmp/homeca-install.XXXXXX.sh)
+gh_raw "deploy/scripts/homeca-install.sh" "$INSTALL_SCRIPT"
+pct push "$CTID" "$INSTALL_SCRIPT" /tmp/homeca-install.sh
+rm -f "$INSTALL_SCRIPT"
+
+if ! pct exec "$CTID" -- bash -c "
   export HOMECA_VERSION='${VERSION}'
-  export HOMECA_REPO_URL='${REPO_URL}'
   export GITHUB_TOKEN='${GITHUB_TOKEN:-}'
-  bash <(curl -fsSL ${GH_AUTH[*]+"${GH_AUTH[*]}"} '${REPO_URL}/deploy/scripts/homeca-install.sh')
-"
+  bash /tmp/homeca-install.sh
+  rm -f /tmp/homeca-install.sh
+"; then
+  msg_error "Installation failed inside CT ${CTID}. Check logs: pct exec ${CTID} -- journalctl -u homeca -n 50"
+  exit 1
+fi
 msg_ok "HomeCA installed"
 
 # ── Summary ──────────────────────────────────────────────────────────

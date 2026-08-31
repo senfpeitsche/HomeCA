@@ -4,32 +4,46 @@ Diese Anleitung richtet eine einzelne HomeCA-Instanz in einem Debian-12-LXC ein.
 
 ## Voraussetzung: GitHub-Token (privates Repository)
 
-Solange das Repository privat ist, benötigen alle Scripts ein GitHub Personal Access Token (PAT) mit `repo`-Berechtigung. Erstelle eines unter **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens** mit Lesezugriff auf Contents und Releases.
+Solange das Repository privat ist, benötigen alle Scripts ein GitHub Personal Access Token (PAT). Erstelle ein **Fine-grained PAT** unter:
 
-Das Token wird als Umgebungsvariable `GITHUB_TOKEN` übergeben und muss auch beim initialen curl zum Herunterladen des Scripts als Header mitgegeben werden.
+**GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
 
-Sobald das Repository öffentlich ist, kann `GITHUB_TOKEN` weggelassen werden — die Scripts erkennen das automatisch.
+Benötigte Berechtigungen:
+- **Repository access**: Nur `senfpeitsche/HomeCA`
+- **Contents**: Read-only
+- **Actions**: Read-only (optional)
+
+Das Token wird als `GITHUB_TOKEN`-Umgebungsvariable übergeben und zusätzlich als Header beim ersten curl (zum Herunterladen des Scripts selbst). Sobald das Repository öffentlich ist, kann alles mit `GITHUB_TOKEN` weggelassen werden.
 
 ## Schnellstart — One-Liner-Installation
 
 Öffne die **Proxmox-Shell** (Knoten → Shell im Webinterface) und füge ein:
 
 ```bash
-GITHUB_TOKEN=ghp_DEIN_TOKEN \
-  bash -c "$(curl -fsSL -H 'Authorization: token ghp_DEIN_TOKEN' \
-  https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+export GH_TOKEN="ghp_DEIN_TOKEN"
+GITHUB_TOKEN=$GH_TOKEN bash -c "$(curl -fsSL \
+  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
+  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-lxc.sh?ref=main')"
 ```
 
 Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installiert .NET 10, HomeCA und den systemd-Dienst. Danach ist HomeCA unter `http://127.0.0.1:5080` im Container erreichbar.
+
+Wenn das Repo öffentlich ist, reicht:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+```
 
 ### Standardwerte anpassen
 
 Alle Einstellungen lassen sich über Umgebungsvariablen überschreiben:
 
 ```bash
-GITHUB_TOKEN=ghp_DEIN_TOKEN HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
-  bash -c "$(curl -fsSL -H 'Authorization: token ghp_DEIN_TOKEN' \
-  https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+export GH_TOKEN="ghp_DEIN_TOKEN"
+GITHUB_TOKEN=$GH_TOKEN HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
+  bash -c "$(curl -fsSL \
+  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
+  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-lxc.sh?ref=main')"
 ```
 
 | Variable | Standard | Beschreibung |
@@ -50,38 +64,45 @@ GITHUB_TOKEN=ghp_DEIN_TOKEN HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 
 Falls der LXC bereits existiert, kann das Install-Script direkt im Container ausgeführt werden:
 
 ```bash
-GITHUB_TOKEN=ghp_DEIN_TOKEN \
-  bash <(curl -fsSL -H 'Authorization: token ghp_DEIN_TOKEN' \
-  https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-install.sh)
+export GH_TOKEN="ghp_DEIN_TOKEN"
+GITHUB_TOKEN=$GH_TOKEN bash <(curl -fsSL \
+  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
+  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-install.sh?ref=main')
 ```
 
-## Update — One-Liner
-
-### Aus der Proxmox-Shell (Container-ID anpassen):
-
-```bash
-pct exec 100 -- bash -c "export GITHUB_TOKEN='ghp_DEIN_TOKEN'; \
-  bash <(curl -fsSL -H 'Authorization: token ghp_DEIN_TOKEN' \
-  https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)"
-```
+## Update
 
 ### Direkt im Container:
 
 ```bash
-GITHUB_TOKEN=ghp_DEIN_TOKEN \
-  bash <(curl -fsSL -H 'Authorization: token ghp_DEIN_TOKEN' \
-  https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
+export GH_TOKEN="ghp_DEIN_TOKEN"
+GITHUB_TOKEN=$GH_TOKEN bash <(curl -fsSL \
+  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
+  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main')
+```
+
+### Vom Proxmox-Host aus (Container-ID anpassen):
+
+```bash
+export GH_TOKEN="ghp_DEIN_TOKEN"
+curl -fsSL \
+  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
+  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main' \
+  -o /tmp/homeca-update.sh
+pct push 100 /tmp/homeca-update.sh /tmp/homeca-update.sh
+pct exec 100 -- bash -c "export GITHUB_TOKEN='$GH_TOKEN'; bash /tmp/homeca-update.sh"
 ```
 
 ### Bestimmte Version installieren:
 
 ```bash
-GITHUB_TOKEN=ghp_DEIN_TOKEN HOMECA_VERSION=v1.3.0 \
-  bash <(curl -fsSL -H 'Authorization: token ghp_DEIN_TOKEN' \
-  https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
+export GH_TOKEN="ghp_DEIN_TOKEN"
+GITHUB_TOKEN=$GH_TOKEN HOMECA_VERSION=v1.3.0 bash <(curl -fsSL \
+  -H "Authorization: token $GH_TOKEN" -H 'Accept: application/vnd.github.raw' \
+  'https://api.github.com/repos/senfpeitsche/HomeCA/contents/deploy/scripts/homeca-update.sh?ref=main')
 ```
 
-Das Update-Script:
+### Was das Update-Script macht:
 
 1. Prüft, ob die Zielversion bereits installiert ist
 2. Aktualisiert Systempakete
@@ -129,29 +150,21 @@ Gib dem Container keinen öffentlichen Port. Die mitgelieferte systemd-Unit bind
 
 ### 2. Grundsystem vorbereiten
 
-Melde dich an der LXC-Konsole an und aktualisiere das System:
-
 ```bash
 apt update
 apt full-upgrade
 apt install --yes ca-certificates curl openssh-client
 ```
 
-Installiere anschließend das .NET-10-Runtime-Paket aus der offiziellen Microsoft-Paketquelle für Debian. Prüfe die Installation:
+Installiere das .NET-10-Runtime-Paket aus der Microsoft-Paketquelle für Debian. Prüfe mit `dotnet --info`.
 
-```bash
-dotnet --info
-```
-
-Lege den Dienstbenutzer ohne Login-Shell an:
+Lege den Dienstbenutzer an:
 
 ```bash
 adduser --system --group --home /var/lib/homeca --shell /usr/sbin/nologin homeca
 ```
 
 ### 3. Anwendung und Schlüssel einspielen
-
-Kopiere den veröffentlichten Service nach `/opt/homeca`; dort müssen mindestens `HomeCA.Service.dll`, die zugehörigen Runtime-Dateien und `profiles.json` liegen.
 
 ```bash
 install -d -o root -g root -m 0755 /opt/homeca
@@ -163,28 +176,20 @@ chown homeca:homeca /etc/homeca/backup.key
 chmod 0600 /etc/homeca/backup.key
 ```
 
-Bewahre den Backup-Schlüssel getrennt vom LXC und von seinen Backups auf. Ohne ihn sind HCAB1-Backups nicht wiederherstellbar.
-
 ### 4. systemd-Dienst aktivieren
 
-Kopiere `deploy/systemd/homeca.service` nach `/etc/systemd/system/homeca.service`, dann:
-
 ```bash
+cp deploy/systemd/homeca.service /etc/systemd/system/homeca.service
 systemctl daemon-reload
 systemctl enable --now homeca
-systemctl status homeca
 curl --fail http://127.0.0.1:5080/health
 ```
 
-Logs sind über `journalctl -u homeca -f` verfügbar. Die Unit erlaubt Schreibzugriff ausschließlich auf die Daten- und Backupverzeichnisse.
-
 ### 5. Manuelles Update
-
-Vor einem Update ein verifiziertes Backup erzeugen. Dann Dienst anhalten, Release-Dateien in `/opt/homeca` austauschen, Dienst starten und Healthcheck sowie CA-Inventar prüfen:
 
 ```bash
 systemctl stop homeca
-# Release austauschen
+# Release in /opt/homeca austauschen
 systemctl start homeca
 curl --fail http://127.0.0.1:5080/health
 ```
@@ -197,4 +202,4 @@ Für Wiederherstellung und regelmäßige Prüfungen siehe [OPERATIONS.md](OPERAT
 | --- | --- | --- |
 | `deploy/scripts/homeca-lxc.sh` | LXC erstellen + Installation anstoßen | Proxmox-Shell |
 | `deploy/scripts/homeca-install.sh` | HomeCA im Container installieren | Im LXC (root) |
-| `deploy/scripts/homeca-update.sh` | HomeCA aktualisieren mit Backup + Rollback | Im LXC (root) oder via `pct exec` |
+| `deploy/scripts/homeca-update.sh` | HomeCA aktualisieren mit Backup + Rollback | Im LXC (root) oder via `pct push`/`pct exec` |

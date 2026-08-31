@@ -1,0 +1,678 @@
+@inject UiStrings L
+
+<MudText Typo="Typo.overline" Class="section-kicker">@L.HelpKicker</MudText>
+<MudText Typo="Typo.h3" Class="page-title">@L.HelpTitle</MudText>
+<MudText Class="mud-text-secondary mb-4">@L.HelpDescription</MudText>
+
+<MudPaper Class="panel" Elevation="0">
+    <MudTabs Rounded="false" PanelClass="pt-4" @bind-ActivePanelIndex="_activeTab">
+        <MudTabPanel Text="@L.HelpTabTls">
+            @TlsHelp
+        </MudTabPanel>
+        <MudTabPanel Text="@L.HelpTabSsh">
+            @SshHelp
+        </MudTabPanel>
+        <MudTabPanel Text="@L.HelpTabTrust">
+            @TrustHelp
+        </MudTabPanel>
+        <MudTabPanel Text="@L.HelpTabAcme">
+            @AcmeHelp
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private int _activeTab;
+
+    // ── TLS-Zertifikate ──────────────────────────────────────────────────────
+    private RenderFragment TlsHelp => @<div class="help-content">
+        <MudText Typo="Typo.h4" Class="mt-2 mb-3">TLS-Zertifikate ausstellen und einsetzen</MudText>
+        <MudText Class="mud-text-secondary mb-4">Diese Anleitung beschreibt, wie du mit HomeCA TLS- und mTLS-Zertifikate für interne Dienste ausstellst, auf Zielsysteme überträgst und die automatische Erneuerung einrichtest.</MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">Voraussetzungen</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Check">HomeCA läuft und <code>/health</code> antwortet erfolgreich.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Root- und Issuing-CA sind initialisiert (Zertifizierungsstellen > „CA erstellen").</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Das Root-CA-Zertifikat ist auf den Clients installiert — siehe Tab „Vertrauensstellung".</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check"><code>PublicUrl</code> ist in <code>appsettings.json</code> konfiguriert, damit CRL-Verteilungspunkte in die Zertifikate eingebettet werden.</MudListItem>
+        </MudList>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">1. Zertifikat über die Weboberfläche ausstellen</MudText>
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Schritt 1 — Zielprofil wählen</MudText>
+        <MudText>Öffne den Bereich <strong>Zertifikate</strong> und wähle im Tab „TLS- und mTLS-Zertifikat" ein Zielprofil aus der Dropdown-Liste. Das Profil setzt Standardwerte für Schlüsselalgorithmus, maximale Laufzeit, Exportformate und IP-SAN-Unterstützung.</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Profil</th><th>Algorithmus</th><th>Exportformate</th><th>Besonderheiten</th></tr></thead>
+            <tbody>
+                <tr><td>Generisches TLS</td><td>ECC</td><td>PEM, PFX</td><td>Universell einsetzbar</td></tr>
+                <tr><td>Windows IIS</td><td>RSA</td><td>PFX</td><td>Für IIS-Bindung und RDP</td></tr>
+                <tr><td>Proxmox VE</td><td>ECC</td><td>PEM</td><td>Kein IP-SAN</td></tr>
+                <tr><td>OPNsense</td><td>RSA</td><td>PFX, PEM</td><td>Firewall-Weboberfläche</td></tr>
+                <tr><td>Home Assistant</td><td>ECC</td><td>PEM</td><td>Kein IP-SAN</td></tr>
+                <tr><td>UniFi OS</td><td>ECC</td><td>PEM</td><td>Kein IP-SAN</td></tr>
+                <tr><td>HAProxy</td><td>ECC</td><td>PEM</td><td>Bundle-Export (Key+Cert+Chain)</td></tr>
+                <tr><td>nginx</td><td>ECC</td><td>PEM</td><td>Fullchain für <code>ssl_certificate</code></td></tr>
+                <tr><td>Cisco Switch</td><td>RSA</td><td>PEM, PFX</td><td>PKCS12-Import per CLI</td></tr>
+                <tr><td>Huawei Switch</td><td>RSA</td><td>PEM, PFX</td><td>VRP-spezifischer Import</td></tr>
+                <tr><td>Synology DSM</td><td>RSA</td><td>PEM</td><td>Kein IP-SAN</td></tr>
+                <tr><td>TeamCity</td><td>RSA</td><td>PFX, PEM</td><td>Java-Keystore oder Reverse Proxy</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Schritt 2 — Zertifikat definieren</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem><strong>Verwendung:</strong> <code>TLS-Server</code> für normale Serverzertifikate oder <code>mTLS / Client</code> für gegenseitige Authentifizierung.</MudListItem>
+            <MudListItem><strong>DNS-Namen:</strong> Kommagetrennt, z. B. <code>app.home.lab, api.home.lab</code>. Wildcards werden unterstützt (<code>*.home.lab</code>).</MudListItem>
+            <MudListItem><strong>IP-Adressen:</strong> Optional und kommagetrennt. Nicht bei allen Profilen verfügbar.</MudListItem>
+            <MudListItem><strong>Gültigkeit:</strong> 1 bis maximal 730 Tage, abhängig vom Profil.</MudListItem>
+            <MudListItem><strong>Schlüsselalgorithmus:</strong> ECC (P-256) oder RSA. Einige Profile erzwingen RSA.</MudListItem>
+        </MudList>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Schritt 3 — Ausstellen und herunterladen</MudText>
+        <MudText>Klicke auf den Ausstellungsbutton. HomeCA erzeugt das Zertifikat, signiert es mit der Issuing CA und erstellt ein Deployment-Paket.</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Export</th><th>Inhalt</th><th>Typischer Einsatz</th></tr></thead>
+            <tbody>
+                <tr><td>PEM</td><td>Serverzertifikat</td><td>Standardformat für Linux-Dienste</td></tr>
+                <tr><td>Key</td><td>Privater Schlüssel (PKCS#8)</td><td>Immer zusammen mit PEM verwenden</td></tr>
+                <tr><td>Chain</td><td>Issuing-CA + Root-CA</td><td>Dienste, die die Kette separat brauchen</td></tr>
+                <tr><td>Fullchain</td><td>Zertifikat + Chain</td><td>nginx <code>ssl_certificate</code>, Apache</td></tr>
+                <tr><td>Bundle</td><td>Key + Zertifikat + Chain</td><td>HAProxy <code>crt</code>-Datei</td></tr>
+                <tr><td>PFX</td><td>PKCS#12-Archiv mit Kennwort</td><td>Windows, Java-Keystores, Cisco</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Zertifikat über die API ausstellen</MudText>
+        <MudTextField Value="@_tlsApiIssue" Lines="8" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/certificates" />
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Parameter</th><th>Pflicht</th><th>Standard</th><th>Erklärung</th></tr></thead>
+            <tbody>
+                <tr><td><code>usage</code></td><td>Ja</td><td>—</td><td><code>TLS</code> oder <code>mTLS</code></td></tr>
+                <tr><td><code>dnsNames</code></td><td>Ja*</td><td>—</td><td>Liste von DNS-Namen</td></tr>
+                <tr><td><code>ipAddresses</code></td><td>Nein</td><td><code>[]</code></td><td>Liste von IP-Adressen</td></tr>
+                <tr><td><code>validityDays</code></td><td>Nein</td><td><code>365</code></td><td>1 bis 730 Tage</td></tr>
+                <tr><td><code>keyAlgorithm</code></td><td>Nein</td><td><code>ECC</code></td><td><code>ECC</code> (P-256) oder <code>RSA</code></td></tr>
+                <tr><td><code>rsaKeySize</code></td><td>Nein</td><td><code>2048</code></td><td>Nur bei RSA: <code>2048</code> oder <code>3072</code></td></tr>
+                <tr><td><code>targetProfileId</code></td><td>Nein</td><td><code>generic-tls</code></td><td>Profilbezogenes Deployment-Paket</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Exportdateien herunterladen</MudText>
+        <MudTextField Value="@_tlsApiExports" Lines="10" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="Exportendpunkte" />
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Zertifikate auf Zielsysteme einspielen</MudText>
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="Proxmox VE">
+                <MudTextField Value="@_tlsDeployProxmox" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="nginx">
+                <MudTextField Value="@_tlsDeployNginx" Lines="8" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="HAProxy">
+                <MudTextField Value="@_tlsDeployHaproxy" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Windows IIS">
+                <MudTextField Value="@_tlsDeployIis" Lines="6" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Windows RDP">
+                <MudTextField Value="@_tlsDeployRdp" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="OPNsense">
+                <MudText Class="pa-2">System > Trust > Certificates > Hinzufügen — Method: „Import an existing Certificate" — Zertifikat (PEM) und privaten Schlüssel einfügen — Speichern, dann unter System > Settings > Administration als Web-GUI-Zertifikat auswählen.</MudText>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Home Assistant">
+                <MudTextField Value="@_tlsDeployHomeAssistant" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="UniFi OS">
+                <MudText Class="pa-2">Einstellungen > System > Erweitert > TLS-Zertifikat hochladen (<code>certificate.pem</code> und <code>key.pem</code>).</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Selbst gehosteter Controller:</MudText>
+                <MudTextField Value="@_tlsDeployUnifi" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Synology DSM">
+                <MudText Class="pa-2">DSM > Systemsteuerung > Sicherheit > Zertifikat > Hinzufügen > Vorhandenes Zertifikat importieren: Zertifikat (<code>certificate.pem</code>), Privater Schlüssel (<code>key.pem</code>), Zwischenzertifikat (<code>chain.pem</code>).</MudText>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Cisco IOS/IOS-XE">
+                <MudTextField Value="@_tlsDeployCisco" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="TeamCity">
+                <MudTextField Value="@_tlsDeployTeamCity" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Automatische Erneuerung</MudText>
+        <MudText>Navigiere zu <strong>Automatik</strong> in der Seitenleiste. Wähle ein Zertifikat, setze die Anzahl Tage vor Ablauf (Standard: 30) und aktiviere den Plan. Der Hintergrunddienst prüft stündlich alle aktiven Pläne und stellt das Zertifikat automatisch mit denselben SANs, demselben Algorithmus und derselben Laufzeit neu aus.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Erneuerungsplan per API</MudText>
+        <MudTextField Value="@_tlsApiRenewal" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/renewal-plans" />
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">5. Zertifikat sperren</MudText>
+        <MudText>Im Zertifikatsinventar auf <strong>Widerrufen</strong> klicken. Das Zertifikat wird automatisch in die Sperrliste aufgenommen und die CRL neu generiert.</MudText>
+        <MudText Typo="Typo.subtitle2" Class="mt-2">Per API:</MudText>
+        <MudTextField Value="@_tlsApiRevoke" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" />
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">6. Ablaufwarnungen überwachen</MudText>
+        <MudText><code>GET /api/v1/warnings/expiring</code> liefert alle Zertifikate, die innerhalb von 30 Tagen ablaufen. Die Weboberfläche zeigt Ablaufwarnungen auf der Übersichtsseite als orangefarbene Meldung an.</MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">7. Typischer Ablauf von Anfang bis Ende</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.LooksOne">HomeCA installieren und starten</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.LooksTwo">Administrator einrichten — Setup-Endpunkt vom Loopback-Host</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Looks3">CAs initialisieren — Root-CA und Issuing-CA anlegen</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Looks4">Root-CA verteilen — siehe Tab „Vertrauensstellung"</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Looks5">Zertifikat ausstellen — Profil wählen, DNS-Namen eingeben</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Looks6">Exportdateien auf Zielsystem übertragen</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Erneuerungsplan anlegen und Monitoring einrichten</MudListItem>
+        </MudList>
+    </div>;
+
+    // ── SSH-Zertifikate ──────────────────────────────────────────────────────
+    private RenderFragment SshHelp => @<div class="help-content">
+        <MudText Typo="Typo.h4" Class="mt-2 mb-3">SSH-Zertifikate ausstellen und einsetzen</MudText>
+        <MudText Class="mud-text-secondary mb-4">SSH-Zertifikate ersetzen das manuelle Schlüsselmanagement durch eine zentrale Vertrauenshierarchie. HomeCA betreibt zwei getrennte SSH-CAs: eine für Host-Keys und eine für Benutzerschlüssel.</MudText>
+
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Problem</th><th>Lösung mit SSH-Zertifikaten</th></tr></thead>
+            <tbody>
+                <tr><td>Fingerprint-Abfrage bei jedem neuen Server</td><td>Clients vertrauen der Host-CA — signierte Host-Keys werden automatisch akzeptiert</td></tr>
+                <tr><td><code>authorized_keys</code> auf jedem Server pflegen</td><td>Server vertrauen der User-CA — signierte Benutzerschlüssel werden automatisch akzeptiert</td></tr>
+                <tr><td>Kein Ablaufdatum für SSH-Keys</td><td>Zertifikate haben eine konfigurierbare Gültigkeitsdauer</td></tr>
+                <tr><td>Kein zentrales Inventar</td><td>HomeCA stellt Zertifikate zentral aus und protokolliert die Ausstellung</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">Voraussetzungen</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Check">HomeCA läuft und <code>/health</code> antwortet erfolgreich.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Root- und Issuing-CA sind initialisiert (SSH-CA-Schlüsselpaare werden automatisch erzeugt).</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check"><code>openssh-client</code> ist auf dem HomeCA-Host installiert (für <code>ssh-keygen</code>).</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Zielsysteme haben OpenSSH 5.4 oder neuer.</MudListItem>
+        </MudList>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">1. SSH-Zertifikat über die Weboberfläche ausstellen</MudText>
+        <MudText>Öffne den Bereich <strong>Zertifikate</strong> und wechsle zum Tab <strong>SSH-Zertifikat</strong>.</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Feld</th><th>Erklärung</th><th>Beispiel</th></tr></thead>
+            <tbody>
+                <tr><td>Art</td><td><code>Host</code> für Server-Host-Keys, <code>Benutzer</code> für persönliche Schlüssel</td><td><code>Host</code></td></tr>
+                <tr><td>Identität</td><td>Frei wählbarer Name (Key-ID im Zertifikat)</td><td><code>webserver.home.lab</code></td></tr>
+                <tr><td>Principals</td><td>Kommagetrennte Liste gültiger Hostnamen oder Benutzernamen</td><td><code>webserver.home.lab, webserver</code></td></tr>
+                <tr><td>Öffentlicher SSH-Schlüssel</td><td>Public Key im OpenSSH-Format (Inhalt von <code>*.pub</code>)</td><td><code>ssh-ed25519 AAAA...</code></td></tr>
+                <tr><td>Gültigkeit in Tagen</td><td>1 bis 3650 (Standard: 365)</td><td><code>365</code></td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Principals richtig wählen</MudText>
+        <MudText><strong>Host-Zertifikate:</strong> Alle relevanten Hostnamen und FQDNs eintragen, z. B. <code>webserver, webserver.home.lab, 192.168.1.50</code>.</MudText>
+        <MudText><strong>Benutzerzertifikate:</strong> Die Unix-Benutzernamen, als die sich der Benutzer anmelden darf, z. B. <code>root, deploy, admin</code>.</MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. SSH-Zertifikat über die API ausstellen</MudText>
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Host-Zertifikat</MudText>
+        <MudTextField Value="@_sshApiHost" Lines="9" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/ssh-certificates" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Benutzerzertifikat</MudText>
+        <MudTextField Value="@_sshApiUser" Lines="9" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="POST /api/v1/ssh-certificates" />
+
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Parameter</th><th>Pflicht</th><th>Standard</th><th>Erklärung</th></tr></thead>
+            <tbody>
+                <tr><td><code>kind</code></td><td>Ja</td><td>—</td><td><code>host</code> oder <code>user</code></td></tr>
+                <tr><td><code>identity</code></td><td>Ja</td><td>—</td><td>Key-ID — frei wählbarer Bezeichner</td></tr>
+                <tr><td><code>principals</code></td><td>Ja</td><td>—</td><td>Liste gültiger Hostnamen (Host) oder Benutzernamen (User)</td></tr>
+                <tr><td><code>publicKey</code></td><td>Ja</td><td>—</td><td>Öffentlicher SSH-Schlüssel im OpenSSH-Format</td></tr>
+                <tr><td><code>validityDays</code></td><td>Nein</td><td><code>365</code></td><td>Gültigkeitsdauer in Tagen (1–3650)</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Vertrauensstellung einrichten</MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">Die CA-Public-Keys sind in der Weboberfläche unter <strong>Zertifizierungsstellen</strong> als Download verfügbar, oder per API unter <code>/api/v1/ssh-ca-keys/host</code> und <code>/api/v1/ssh-ca-keys/user</code>.</MudAlert>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Host-CA auf Clients einrichten (keine Fingerprint-Warnungen mehr)</MudText>
+        <MudTextField Value="@_sshTrustHost" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="known_hosts ergänzen" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">User-CA auf Servern einrichten (kein authorized_keys mehr nötig)</MudText>
+        <MudTextField Value="@_sshTrustUser" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview mb-3" Label="sshd_config ergänzen" />
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Zertifikate auf Zielsystemen einspielen</MudText>
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="Host-Zertifikat auf einem Server installieren">
+                <MudTextField Value="@_sshDeployHost" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Benutzerzertifikat verwenden">
+                <MudTextField Value="@_sshDeployUser" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Principals einschränken (empfohlen)">
+                <MudTextField Value="@_sshPrincipals" Lines="10" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">5. Empfohlene Gültigkeitsdauern</MudText>
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Zertifikatstyp</th><th>Empfehlung</th><th>Begründung</th></tr></thead>
+            <tbody>
+                <tr><td>Host-Zertifikat</td><td>365 Tage</td><td>Server sind stabil, seltene Erneuerung ausreichend</td></tr>
+                <tr><td>Benutzerzertifikat</td><td>1–90 Tage</td><td>Kürzere Laufzeit begrenzt das Risiko bei Schlüsselverlust</td></tr>
+                <tr><td>Benutzerzertifikat (CI/CD)</td><td>1–7 Tage</td><td>Kurzlebig für automatisierte Deployments</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">6. Fehlerbehebung</MudText>
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="'Permission denied (publickey)' trotz Zertifikat">
+                <MudList T="string" Dense="true">
+                    <MudListItem>Zertifikat liegt neben dem Schlüssel und ist korrekt benannt (<code>id_ed25519</code> erwartet <code>id_ed25519-cert.pub</code>).</MudListItem>
+                    <MudListItem>Principal im Zertifikat stimmt mit dem Unix-Benutzernamen überein.</MudListItem>
+                    <MudListItem><code>TrustedUserCAKeys</code> zeigt auf den richtigen Pfad.</MudListItem>
+                    <MudListItem>Verbose-Output prüfen: <code>ssh -vvv user@@server</code></MudListItem>
+                </MudList>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Host-Key-Warnung trotz Host-Zertifikat">
+                <MudList T="string" Dense="true">
+                    <MudListItem><code>@@cert-authority</code>-Eintrag in <code>known_hosts</code> passt zum Hostnamen.</MudListItem>
+                    <MudListItem>Server liefert das Zertifikat aus: <code>ssh-keyscan -c webserver.home.lab</code></MudListItem>
+                    <MudListItem>Veraltete Fingerprint-Einträge für den Host entfernen.</MudListItem>
+                </MudList>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </div>;
+
+    // ── Vertrauensstellung ───────────────────────────────────────────────────
+    private RenderFragment TrustHelp => @<div class="help-content">
+        <MudText Typo="Typo.h4" Class="mt-2 mb-3">Root-CA-Vertrauensstellung einrichten</MudText>
+        <MudText Class="mud-text-secondary mb-4">Damit Geräte und Browser den von HomeCA ausgestellten Zertifikaten vertrauen, muss das Root-CA-Zertifikat im jeweiligen Vertrauensspeicher installiert werden.</MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">Root-CA-Zertifikat herunterladen</MudText>
+        <MudText>HomeCA stellt das Root-CA-Zertifikat ohne Authentifizierung bereit:</MudText>
+        <MudTextField Value="@_trustDownload" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="Download-Endpunkte" />
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Prüfe den SHA-256-Fingerprint immer gegen die Ausgabe des <code>/api/v1/trust-anchor</code>-Endpunkts, bevor du das Zertifikat installierst.</MudAlert>
+
+        <MudExpansionPanels MultiExpansion="true" Elevation="0">
+            <MudExpansionPanel Text="Windows">
+                <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Einzelner Rechner (als Administrator)</MudText>
+                <MudTextField Value="@_trustWindows" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudText Class="mt-2">Alternativ: Doppelklick auf die <code>.cer</code>-Datei > „Zertifikat installieren" > Lokaler Computer > Vertrauenswürdige Stammzertifizierungsstellen.</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Per Gruppenrichtlinie (Active Directory)</MudText>
+                <MudText>Computerkonfiguration > Windows-Einstellungen > Sicherheitseinstellungen > Richtlinien öffentlicher Schlüssel > Vertrauenswürdige Stammzertifizierungsstellen > Importieren.</MudText>
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="Linux (Debian/Ubuntu)">
+                <MudTextField Value="@_trustLinux" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudText Class="mt-2">Hinweis: Die Datei muss die Endung <code>.crt</code> haben, auch wenn es PEM-Format ist.</MudText>
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="macOS">
+                <MudTextField Value="@_trustMacOs" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudText Class="mt-2">Alternativ: Doppelklick auf die <code>.pem</code>-Datei > Schlüsselbundverwaltung > System > Doppelklick > Vertrauen > „Immer vertrauen".</MudText>
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="Firefox">
+                <MudText Class="pa-2"><strong>Manuell:</strong> Einstellungen > Datenschutz & Sicherheit > Zertifikate > Zertifikate anzeigen > Zertifizierungsstellen > Importieren > „Dieser CA vertrauen, um Websites zu identifizieren" aktivieren.</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Per Richtlinie (Enterprise)</MudText>
+                <MudTextField Value="@_trustFirefox" Lines="7" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="OPNsense">
+                <MudText Class="pa-2">System > Trust > Authorities > Hinzufügen > Method: „Import an existing Certificate Authority" > PEM-Inhalt einfügen > Speichern.</MudText>
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="Netzwerk-Switches (Cisco, Huawei)">
+                <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Cisco IOS/IOS-XE</MudText>
+                <MudTextField Value="@_trustCisco" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Huawei VRP</MudText>
+                <MudTextField Value="@_trustHuawei" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="Android">
+                <MudText Class="pa-2">Einstellungen > Sicherheit > Verschlüsselung und Anmeldedaten > Zertifikate installieren > CA-Zertifikat > <code>.cer</code>-Datei auswählen.</MudText>
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">Ab Android 7 vertrauen Apps standardmäßig nur System-CAs. Benutzerdefinierte CAs gelten nur für den Browser.</MudAlert>
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="iOS / iPadOS">
+                <MudList T="string" Dense="true">
+                    <MudListItem><code>.cer</code>-Datei per AirDrop, Mail oder URL öffnen</MudListItem>
+                    <MudListItem>Einstellungen > Profil heruntergeladen > Installieren</MudListItem>
+                    <MudListItem>Einstellungen > Allgemein > Info > Zertifikatsvertrauenseinstellungen > Root-Zertifikat aktivieren</MudListItem>
+                </MudList>
+            </MudExpansionPanel>
+
+            <MudExpansionPanel Text="Proxmox VE Host">
+                <MudTextField Value="@_trustProxmox" Lines="2" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">Verifizierung</MudText>
+        <MudTextField Value="@_trustVerify" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview" Label="Installation prüfen" />
+    </div>;
+
+    // ── ACME ─────────────────────────────────────────────────────────────────
+    private RenderFragment AcmeHelp => @<div class="help-content">
+        <MudText Typo="Typo.h4" Class="mt-2 mb-3">ACME-Einrichtung</MudText>
+        <MudText Class="mud-text-secondary mb-4">HomeCA bietet zwei ACME-Betriebsarten: einen internen ACME-Server, der Zertifikate über die eigene TLS Issuing CA ausstellt, und eine verwaltete Registrierung für externe ACME-Aussteller (z. B. Let's Encrypt) mit DNS-01-Challenges.</MudText>
+
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">1. Interner ACME-Server</MudText>
+        <MudText>Der interne ACME-Server stellt Zertifikate für DNS-Namen aus, die unter einer aktivierten internen Ausstellungszone liegen. Orders gehen direkt in den Status <code>ready</code>, da alle Clients als vertrauenswürdig gelten.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.1 Ausstellungszone anlegen</MudText>
+        <MudText>Lege unter <strong>Einstellungen</strong> eine Domain mit aktivierter interner Ausstellung an. Der ACME-Server stellt Zertifikate für alle Namen aus, die exakt der Zone entsprechen oder eine Subdomain davon sind.</MudText>
+        <MudTextField Value="@_acmeZone" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/domains" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.2 Directory abrufen</MudText>
+        <MudText>Der Directory-Endpunkt ist ohne Authentifizierung erreichbar:</MudText>
+        <MudTextField Value="@_acmeDirectory" Lines="1" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.3 ACME-Account registrieren</MudText>
+        <MudTextField Value="@_acmeAccount" Lines="3" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/accounts" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.4 Order erstellen</MudText>
+        <MudTextField Value="@_acmeOrder" Lines="4" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/orders" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">1.5 Order finalisieren</MudText>
+        <MudTextField Value="@_acmeFinalize" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/orders/{id}/finalize" />
+        <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
+            <thead><tr><th>Parameter</th><th>Standard</th><th>Erklärung</th></tr></thead>
+            <tbody>
+                <tr><td><code>validityDays</code></td><td>365</td><td>1 bis 730 Tage</td></tr>
+                <tr><td><code>keyAlgorithm</code></td><td><code>ECC</code></td><td><code>ECC</code> (P-256) oder <code>RSA</code></td></tr>
+                <tr><td><code>rsaKeySize</code></td><td>2048</td><td>Nur bei RSA: 2048 oder 3072</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Externe ACME-Aussteller</MudText>
+        <MudText>Externe ACME-Aussteller verweisen auf die Directory-URL einer öffentlichen CA. Die DNS-01-Challenge-Verwaltung wird über einen DNS-Connector abgewickelt.</MudText>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">2.1 DNS-Connector einrichten</MudText>
+        <MudText>Richte unter <strong>Einstellungen</strong> eine Connector-Instanz ein. Unterstützte Typen: <code>technitium</code> und <code>hetzner</code>.</MudText>
+        <MudTextField Value="@_acmeConnector" Lines="6" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/connectors" />
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">2.2 Externen Aussteller registrieren</MudText>
+        <MudTextField Value="@_acmeIssuer" Lines="5" ReadOnly="true" Variant="Variant.Outlined" Class="script-preview my-3" Label="POST /api/v1/acme/external-issuers" />
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Tipps zur Betriebsführung</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Warning"><strong>Ablaufwarnungen:</strong> <code>GET /api/v1/warnings/expiring</code> liefert Zertifikate, die innerhalb von 30 Tagen ablaufen.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Backup"><strong>Backup:</strong> Nach jeder ACME-Einrichtung ein verifiziertes Backup erzeugen — siehe Bereich „Betrieb".</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.DomainDisabled"><strong>Zonenänderungen:</strong> Wird eine Zone deaktiviert, lehnt der ACME-Server neue Orders ab. Bestehende Zertifikate bleiben gültig.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Dns"><strong>Connector-Test:</strong> Nach dem Anlegen eines DNS-Connectors den Berechtigungs- und TXT-Test ausführen, bevor ein externer Aussteller zugewiesen wird.</MudListItem>
+        </MudList>
+    </div>;
+
+    // ── Code-Schnipsel ───────────────────────────────────────────────────────
+
+    // TLS
+    private const string _tlsApiIssue = """
+        curl -s http://HOMECA:5080/api/v1/certificates \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "usage": "TLS",
+            "dnsNames": ["app.home.lab", "api.home.lab"],
+            "ipAddresses": ["192.168.1.10"],
+            "validityDays": 365,
+            "keyAlgorithm": "ECC",
+            "targetProfileId": "generic-tls"
+          }'
+        """;
+    private const string _tlsApiExports = """
+        # Serverzertifikat
+        curl -s -o certificate.pem -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/certificates/<id>/export/pem
+        # Privater Schlüssel
+        curl -s -o key.pem -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/certificates/<id>/export/key
+        # CA-Kette
+        curl -s -o chain.pem -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/certificates/<id>/export/chain
+        # Fullchain
+        curl -s -o fullchain.pem -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/certificates/<id>/export/fullchain
+        # Bundle (HAProxy)
+        curl -s -o bundle.pem -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/certificates/<id>/export/bundle
+        """;
+    private const string _tlsApiRenewal = """
+        curl -s http://HOMECA:5080/api/v1/renewal-plans \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "certificateId": "<zertifikat-id>",
+            "renewBeforeDays": 30,
+            "enabled": true
+          }'
+        """;
+    private const string _tlsApiRevoke = """
+        curl -s -X DELETE "http://HOMECA:5080/api/v1/certificates/<id>?reason=keyCompromise" \
+          -H "Authorization: Bearer $TOKEN"
+        """;
+    private const string _tlsDeployProxmox = """
+        scp certificate.pem root@pve:/etc/pve/local/pveproxy-ssl.pem
+        scp key.pem root@pve:/etc/pve/local/pveproxy-ssl.key
+        ssh root@pve "systemctl restart pveproxy"
+        """;
+    private const string _tlsDeployNginx = """
+        cp fullchain.pem /etc/nginx/ssl/fullchain.pem
+        cp key.pem /etc/nginx/ssl/key.pem
+        nginx -t && systemctl reload nginx
+
+        # nginx-Konfiguration:
+        # ssl_certificate     /etc/nginx/ssl/fullchain.pem;
+        # ssl_certificate_key /etc/nginx/ssl/key.pem;
+        """;
+    private const string _tlsDeployHaproxy = """
+        # Bundle-Export direkt verwenden:
+        cp bundle.pem /etc/haproxy/certs/app.pem
+        systemctl reload haproxy
+        """;
+    private const string _tlsDeployIis = """
+        # PFX importieren
+        $cert = Import-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\LocalMachine\My
+
+        # IIS-Bindung zuweisen
+        Import-Module WebAdministration
+        New-WebBinding -Name "Default Web Site" -Protocol https -Port 443 -HostHeader app.home.lab
+        $binding = Get-WebBinding -Name "Default Web Site" -Protocol https
+        $binding.AddSslCertificate($cert.Thumbprint, "My")
+        """;
+    private const string _tlsDeployRdp = """
+        $cert = Import-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\LocalMachine\My
+        $path = (Get-WmiObject -Class Win32_TSGeneralSetting -Namespace root\cimv2\TerminalServices)
+        $path.SetSSLCertificateSHA1Hash($cert.Thumbprint)
+        """;
+    private const string _tlsDeployHomeAssistant = """
+        # configuration.yaml ergänzen:
+        http:
+          ssl_certificate: /ssl/certificate.pem
+          ssl_key: /ssl/key.pem
+
+        # Dann: ha core restart
+        """;
+    private const string _tlsDeployUnifi = """
+        openssl pkcs12 -export -in certificate.pem -inkey key.pem \
+          -out unifi.p12 -name unifi -password pass:aircontrolenterprise
+        keytool -importkeystore -srckeystore unifi.p12 -srcstoretype PKCS12 \
+          -srcstorepass aircontrolenterprise -destkeystore /var/lib/unifi/keystore \
+          -deststorepass aircontrolenterprise -noprompt
+        systemctl restart unifi
+        """;
+    private const string _tlsDeployCisco = """
+        conf t
+        no crypto pki certificate chain HOMECA
+        crypto pki import HOMECA pkcs12 terminal password <pfx-kennwort>
+        ! Base64-kodierten PFX-Inhalt einfügen
+        end
+        write memory
+        """;
+    private const string _tlsDeployTeamCity = """
+        keytool -importkeystore -srckeystore certificate.pfx -srcstoretype PKCS12 \
+          -destkeystore /opt/teamcity/conf/keystore.jks -deststoretype JKS \
+          -deststorepass changeit -noprompt
+        systemctl restart teamcity
+        """;
+
+    // SSH
+    private const string _sshApiHost = """
+        # Host-Key vom Zielserver holen
+        PUBKEY=$(ssh-keyscan -t ed25519 webserver.home.lab 2>/dev/null | awk '{print $2" "$3}')
+
+        curl -s http://HOMECA:5080/api/v1/ssh-certificates \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d "{
+            \"kind\": \"host\",
+            \"identity\": \"webserver.home.lab\",
+            \"principals\": [\"webserver.home.lab\", \"webserver\"],
+            \"publicKey\": \"$PUBKEY\",
+            \"validityDays\": 365
+          }"
+        """;
+    private const string _sshApiUser = """
+        PUBKEY=$(cat ~/.ssh/id_ed25519.pub)
+
+        curl -s http://HOMECA:5080/api/v1/ssh-certificates \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d "{
+            \"kind\": \"user\",
+            \"identity\": \"max.mustermann\",
+            \"principals\": [\"deploy\", \"admin\"],
+            \"publicKey\": \"$PUBKEY\",
+            \"validityDays\": 90
+          }"
+        """;
+    private const string _sshTrustHost = """
+        # Einzelner Benutzer — alle Hosts in *.home.lab vertrauen
+        echo "@cert-authority *.home.lab $(cat ssh-host-ca.pub)" >> ~/.ssh/known_hosts
+
+        # Systemweit (alle Benutzer)
+        echo "@cert-authority *.home.lab $(cat ssh-host-ca.pub)" | sudo tee -a /etc/ssh/ssh_known_hosts
+        """;
+    private const string _sshTrustUser = """
+        # User-CA-Schlüssel auf den Server kopieren
+        sudo cp ssh-user-ca.pub /etc/ssh/trusted-user-ca.pub
+        sudo chmod 644 /etc/ssh/trusted-user-ca.pub
+
+        # /etc/ssh/sshd_config ergänzen:
+        # TrustedUserCAKeys /etc/ssh/trusted-user-ca.pub
+
+        sudo systemctl reload sshd
+        """;
+    private const string _sshDeployHost = """
+        # Zertifikat auf den Server schreiben
+        echo 'ssh-ed25519-cert-v01@openssh.com AAAA...' \
+          | sudo tee /etc/ssh/ssh_host_ed25519_key-cert.pub
+        sudo chmod 644 /etc/ssh/ssh_host_ed25519_key-cert.pub
+
+        # /etc/ssh/sshd_config ergänzen:
+        # HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
+
+        sudo systemctl reload sshd
+        """;
+    private const string _sshDeployUser = """
+        # Zertifikat neben dem privaten Schlüssel speichern
+        echo 'ssh-ed25519-cert-v01@openssh.com AAAA...' > ~/.ssh/id_ed25519-cert.pub
+
+        # Verbindung testen
+        ssh -v deploy@webserver.home.lab
+        """;
+    private const string _sshPrincipals = """
+        # Verzeichnis anlegen
+        sudo mkdir -p /etc/ssh/auth_principals
+
+        # Für jeden Benutzer eine Datei mit erlaubten Principals:
+        # /etc/ssh/auth_principals/deploy
+        echo -e "deploy\nadmin" | sudo tee /etc/ssh/auth_principals/deploy
+
+        # /etc/ssh/sshd_config ergänzen:
+        # AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+
+        sudo systemctl reload sshd
+        """;
+
+    // Trust
+    private const string _trustDownload = """
+        # PEM-Format (Linux, macOS, Firefox, Appliances)
+        curl -o homeca-root-ca.pem http://HOMECA:5080/api/v1/trust-anchor/pem
+
+        # DER-Format (Windows .cer)
+        curl -o homeca-root-ca.cer http://HOMECA:5080/api/v1/trust-anchor/der
+        """;
+    private const string _trustWindows = "certutil -addstore -f \"Root\" homeca-root-ca.cer";
+    private const string _trustLinux = """
+        sudo cp homeca-root-ca.pem /usr/local/share/ca-certificates/homeca-root-ca.crt
+        sudo update-ca-certificates
+        """;
+    private const string _trustMacOs = "sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain homeca-root-ca.pem";
+    private const string _trustFirefox = """
+        {
+          "policies": {
+            "Certificates": {
+              "ImportEnterpriseRoots": true,
+              "Install": ["http://HOMECA:5080/api/v1/trust-anchor/pem"]
+            }
+          }
+        }
+        """;
+    private const string _trustCisco = """
+        conf t
+        crypto pki trustpoint HOMECA
+         enrollment terminal
+         revocation-check none
+        exit
+        crypto pki authenticate HOMECA
+        ! PEM-Inhalt einfügen und mit quit bestätigen
+        """;
+    private const string _trustHuawei = """
+        system-view
+        pki realm homeca
+         ca-certificate import file homeca-root-ca.pem
+        """;
+    private const string _trustProxmox = """
+        scp homeca-root-ca.pem root@pve-node:/usr/local/share/ca-certificates/homeca-root-ca.crt
+        ssh root@pve-node "update-ca-certificates"
+        """;
+    private const string _trustVerify = """
+        # Linux: OpenSSL gegen einen HomeCA-gesicherten Dienst testen
+        openssl s_client -connect dienst.home.lab:443 -CApath /etc/ssl/certs
+
+        # Fingerprint prüfen
+        curl -s http://HOMECA:5080/api/v1/trust-anchor | python3 -m json.tool
+        """;
+
+    // ACME
+    private const string _acmeZone = """
+        curl -s http://HOMECA:5080/api/v1/domains \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{"name":"lab.example.com","internalIssuanceEnabled":true,"connectorId":null}'
+        """;
+    private const string _acmeDirectory = "curl -s http://HOMECA:5080/api/v1/acme/directory";
+    private const string _acmeAccount = """
+        curl -s http://HOMECA:5080/api/v1/acme/accounts \
+          -H 'Content-Type: application/json' \
+          -d '{"contact":"admin@lab.example.com"}'
+        """;
+    private const string _acmeOrder = """
+        curl -s http://HOMECA:5080/api/v1/acme/orders \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{"accountId":"<account-id>","identifiers":["node1.lab.example.com"]}'
+        """;
+    private const string _acmeFinalize = """
+        curl -s http://HOMECA:5080/api/v1/acme/orders/<order-id>/finalize \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{"validityDays":365,"keyAlgorithm":"ECC","rsaKeySize":2048}'
+        """;
+    private const string _acmeConnector = """
+        curl -s http://HOMECA:5080/api/v1/connectors \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "name":"Hetzner Prod",
+            "type":"hetzner",
+            "secrets":{"apiToken":"<hetzner-dns-api-token>"}
+          }'
+        """;
+    private const string _acmeIssuer = """
+        curl -s http://HOMECA:5080/api/v1/acme/external-issuers \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "name":"Lets Encrypt Production",
+            "directoryUrl":"https://acme-v2.api.letsencrypt.org/directory",
+            "connectorId":"<connector-id>"
+          }'
+        """;
+}

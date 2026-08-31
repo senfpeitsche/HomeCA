@@ -49,6 +49,16 @@ public sealed class UiStrings
     public string NavAutomation => L("Automatik", "Automation");
     public string NavSettings => L("Einstellungen", "Settings");
     public string NavOperations => L("Betrieb", "Operations");
+    public string NavHelp => L("Hilfe", "Help");
+
+    // ── Help ─────────────────────────────────────────────────────────────────
+    public string HelpKicker => L("Anleitungen und Referenz", "Guides and Reference");
+    public string HelpTitle => L("Hilfe", "Help");
+    public string HelpDescription => L("Schritt-für-Schritt-Anleitungen für TLS- und SSH-Zertifikate, Vertrauensstellung und ACME-Einrichtung.", "Step-by-step guides for TLS and SSH certificates, trust installation and ACME setup.");
+    public string HelpTabTls => L("TLS-Zertifikate", "TLS Certificates");
+    public string HelpTabSsh => L("SSH-Zertifikate", "SSH Certificates");
+    public string HelpTabTrust => L("Vertrauensstellung", "Trust Installation");
+    public string HelpTabAcme => L("ACME-Einrichtung", "ACME Setup");
 
     // ── Overview ─────────────────────────────────────────────────────────────
     public string OverviewKicker => L("Zustand der Vertrauensbasis", "Trust Foundation Status");
