@@ -174,10 +174,23 @@ msg_info "Starting HomeCA …"
 systemctl start "$SERVICE"
 
 # ── Health check ────────────────────────────────────────────────────
-msg_info "Waiting for health endpoint …"
+# TLS activation keeps its configuration outside the release directory, so it
+# survives an update. When present, probe the same HTTPS listener that systemd
+# restores through its TLS override. The certificate may be issued by HomeCA's
+# private CA, therefore curl must not require it to be trusted locally.
+HEALTH_URL="http://127.0.0.1:5080/health"
+TLS_CONFIG="/etc/homeca/tls.json"
+if [[ -f "$TLS_CONFIG" ]]; then
+  HTTPS_URL=$(grep -oP '"httpsUrl"\s*:\s*"\K[^"]+' "$TLS_CONFIG" || true)
+  if [[ "$HTTPS_URL" =~ ^https://[^/]+/?$ ]]; then
+    HEALTH_URL="${HTTPS_URL%/}/health"
+  fi
+fi
+
+msg_info "Waiting for health endpoint (${HEALTH_URL}) …"
 HEALTHY=false
 for i in $(seq 1 20); do
-  if curl -sf http://127.0.0.1:5080/health >/dev/null 2>&1; then
+  if curl -sfk "$HEALTH_URL" >/dev/null 2>&1; then
     HEALTHY=true
     break
   fi
