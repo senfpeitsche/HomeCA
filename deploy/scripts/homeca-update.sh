@@ -61,6 +61,15 @@ if [[ ! -f "${APP_DIR}/HomeCA.Service.dll" ]]; then
   msg_error "HomeCA is not installed. Run homeca-install.sh first."
 fi
 
+# Older installations did not install sudo, although it is required by the
+# passwordless sudoers rule used for TLS activation from the web UI.
+if ! command -v sudo >/dev/null 2>&1; then
+  msg_info "Installing missing TLS activation dependency (sudo) …"
+  apt-get update -qq
+  apt-get install -y -qq sudo
+  msg_ok "sudo installed"
+fi
+
 CURRENT="unknown"
 if [[ -f "${APP_DIR}/.homeca-version" ]]; then
   CURRENT=$(cat "${APP_DIR}/.homeca-version")

@@ -16,7 +16,9 @@ Environment=ASPNETCORE_URLS=http://0.0.0.0:5080
 Environment=Storage__RootPath=/var/lib/homeca
 Environment=Storage__BackupPath=/var/backups/homeca
 Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
-NoNewPrivileges=true
+# TLS activation from the web UI uses narrowly scoped, passwordless sudo rules.
+# NoNewPrivileges would prevent sudo from performing that permitted escalation.
+NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true

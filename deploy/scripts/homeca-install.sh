@@ -62,7 +62,7 @@ apt-get full-upgrade -y -qq
 msg_ok "System updated"
 
 msg_info "Installing dependencies …"
-apt-get install -y -qq ca-certificates curl openssh-client apt-transport-https
+apt-get install -y -qq ca-certificates curl openssh-client apt-transport-https sudo
 msg_ok "Dependencies installed"
 
 # ── .NET 10 Runtime ─────────────────────────────────────────────────
@@ -152,7 +152,9 @@ Environment=ASPNETCORE_URLS=http://0.0.0.0:5080
 Environment=Storage__RootPath=/var/lib/homeca
 Environment=Storage__BackupPath=/var/backups/homeca
 Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
-NoNewPrivileges=true
+# TLS activation from the web UI uses narrowly scoped, passwordless sudo rules.
+# NoNewPrivileges would prevent sudo from performing that permitted escalation.
+NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
