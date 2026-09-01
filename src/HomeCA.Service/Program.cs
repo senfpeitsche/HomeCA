@@ -31,6 +31,8 @@ builder.Services.AddSingleton<DomainRegistry>();
 builder.Services.AddSingleton<TargetProfileRegistry>();
 builder.Services.AddSingleton<DeploymentPackageService>();
 builder.Services.AddSingleton<RenewalPlanRegistry>();
+builder.Services.AddSingleton<RenewalNotificationSettingsRegistry>();
+builder.Services.AddSingleton<RenewalMailNotificationService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IDnsConnector, TechnitiumDnsConnector>();
 builder.Services.AddSingleton<IDnsConnector, HetznerDnsConnector>();
@@ -127,6 +129,16 @@ app.MapGet("/api/v1/trust-anchor/pem", async (CertificateAuthorityService author
 app.MapGet("/api/v1/trust-anchor/der", async (CertificateAuthorityService authorities, CancellationToken ct) =>
 {
     var export = await authorities.GetTrustAnchorAsync("der", ct);
+    return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName);
+});
+app.MapGet("/api/v1/trust-anchor/intermediate/pem", async (CertificateAuthorityService authorities, CancellationToken ct) =>
+{
+    var export = await authorities.GetTrustIntermediateAsync("pem", ct);
+    return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName);
+});
+app.MapGet("/api/v1/trust-anchor/intermediate/der", async (CertificateAuthorityService authorities, CancellationToken ct) =>
+{
+    var export = await authorities.GetTrustIntermediateAsync("der", ct);
     return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName);
 });
 app.MapGet("/api/v1/crl/latest", async (CrlService crl, CancellationToken ct) =>
@@ -959,6 +971,20 @@ api.MapPut("/renewal-plans/{id}", async (string id, UpdateRenewalPlanRequest bod
     return plan is null ? Results.NotFound() : Results.Ok(plan);
 });
 api.MapDelete("/renewal-plans/{id}", async (string id, RenewalPlanRegistry plans, CancellationToken ct) => await plans.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
+
+// Renewal notification delivery settings. The GET response deliberately omits passwords and client secrets.
+api.MapGet("/renewal-notifications", async (RenewalNotificationSettingsRegistry settings, CancellationToken ct) => Results.Ok(await settings.GetAsync(ct)));
+api.MapPut("/renewal-notifications", async (UpdateRenewalNotificationSettingsRequest body, RenewalNotificationSettingsRegistry settings, CancellationToken ct) =>
+{
+    try { return Results.Ok(await settings.UpdateAsync(body, ct)); }
+    catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["notifications"] = [exception.Message] }); }
+});
+api.MapPost("/renewal-notifications/test", async (RenewalMailNotificationService notifications, CancellationToken ct) =>
+{
+    try { await notifications.SendTestAsync(ct); return Results.NoContent(); }
+    catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
+    catch (Exception exception) when (exception is not OperationCanceledException) { return Results.Problem("The test e-mail could not be sent. Check the delivery settings and server logs.", statusCode: 502); }
+});
 
 // Operations
 api.MapGet("/warnings/expiring", (CertificateExpiryService expiry) => Results.Ok(expiry.GetWarnings()));

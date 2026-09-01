@@ -112,5 +112,19 @@ public sealed class CertificateAuthorityTests : IDisposable
         Assert.Contains("Root", info.Subject);
     }
 
+    [Fact]
+    public async Task TrustIntermediate_Returns_Active_Issuing_Certificate()
+    {
+        var storage = _fixture.CreateStorage();
+        var service = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+        await service.InitializeAsync(CancellationToken.None);
+
+        var export = await service.GetTrustIntermediateAsync("pem", CancellationToken.None);
+
+        Assert.NotNull(export);
+        Assert.Equal("homeca-issuing-ca.pem", export.FileName);
+        Assert.Contains("BEGIN CERTIFICATE", System.Text.Encoding.UTF8.GetString(export.Content));
+    }
+
     public void Dispose() => _fixture.Dispose();
 }

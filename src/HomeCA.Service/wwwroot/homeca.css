@@ -14,7 +14,7 @@ html, body { background: var(--homeca-canvas); color: var(--homeca-ink); }
 *::-webkit-scrollbar-thumb:hover { background: var(--homeca-forest); }
 
 .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; background: linear-gradient(135deg, var(--homeca-forest) 0%, #0d2521 72%, #183f38 100%); }
-.login-card { width: min(100%, 28rem); padding: 3rem; border: 1px solid rgba(224,217,110,.5); border-radius: 5px; }
+.login-card { width: min(100%, 44rem); padding: 3rem; border: 1px solid rgba(224,217,110,.5); border-radius: 5px; }
 .service-title, .page-title { font-family: Georgia, serif; color: var(--homeca-forest); }
 .login-card .service-title { font-size: 3.1rem; margin: .25rem 0 .5rem; }
 .signal-text, .section-kicker { color: #827900; font-weight: 800; letter-spacing: .12em; }

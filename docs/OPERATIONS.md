@@ -12,6 +12,15 @@
 
 `GET /api/v1/warnings/expiring` liefert Zertifikate, die innerhalb von 30 Tagen ablaufen. Der Abruf sollte mindestens täglich über einen lokalen Monitoring-Job erfolgen; kritische Warnungen werden vor Ablauf an den Administrator weitergegeben.
 
+## E-Mail-Benachrichtigungen für die Erneuerung
+
+Unter **Erneuerungsautomatik** können E-Mail-Benachrichtigungen aktiviert werden. HomeCA sendet dann eine Nachricht, wenn ein Zertifikat automatisch erneuert wurde oder wenn eine automatische Erneuerung fehlschlägt. Über **Test-E-Mail senden** lässt sich die Konfiguration vor dem Produktiveinsatz prüfen.
+
+- **SMTP:** Funktioniert mit jedem TLS-geschützten SMTP-Server. Für Microsoft 365 SMTP lautet der Server üblicherweise `smtp.office365.com` mit Port `587`; SMTP-Authentifizierung muss für das Absenderpostfach erlaubt sein.
+- **Microsoft 365 über Graph:** Die App-Registrierung benötigt die Microsoft-Graph-Anwendungsberechtigung `Mail.Send` und einen erteilten Administrator-Consent. Tenant-ID, Client-ID, Client-Secret und Absenderpostfach werden in HomeCA hinterlegt.
+
+Kennwörter und Client-Secrets werden nur bei der Eingabe verarbeitet und nicht über die Verwaltungs-API zurückgeliefert. Die gespeicherte Konfiguration liegt im geschützten HomeCA-Datenverzeichnis; dessen Berechtigungen müssen auf den Dienstbenutzer beschränkt bleiben.
+
 ## Backup und Restore
 
 Erzeuge ein verschlüsseltes Backup über `POST /api/v1/backups`. Prüfe es anschließend mit `POST /api/v1/backups/{fileName}/verify`; die Prüfung entschlüsselt das Archiv und liest dessen ZIP-Inhalt ohne den laufenden Zustand zu verändern.

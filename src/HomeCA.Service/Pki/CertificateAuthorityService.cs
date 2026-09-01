@@ -51,6 +51,21 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         };
     }
 
+    /// <summary>Returns the active issuing intermediate CA certificate (public part only) for trust distribution.</summary>
+    public async Task<AuthorityCertificateExport?> GetTrustIntermediateAsync(string format, CancellationToken ct)
+    {
+        var all = await ReadAsync(ct);
+        var intermediate = all.FirstOrDefault(x => x.Type == "intermediate" && x.IsActive && !x.IsRevoked);
+        if (intermediate is null) return null;
+        using var certificate = Load(intermediate);
+        return format.ToLowerInvariant() switch
+        {
+            "pem" => new AuthorityCertificateExport("homeca-issuing-ca.pem", "application/x-pem-file", Encoding.UTF8.GetBytes(certificate.ExportCertificatePem())),
+            "der" => new AuthorityCertificateExport("homeca-issuing-ca.cer", "application/pkix-cert", certificate.Export(X509ContentType.Cert)),
+            _ => new AuthorityCertificateExport("homeca-issuing-ca.pem", "application/x-pem-file", Encoding.UTF8.GetBytes(certificate.ExportCertificatePem()))
+        };
+    }
+
     /// <summary>Returns trust anchor metadata including fingerprint and subject for verification.</summary>
     public async Task<TrustAnchorInfo?> GetTrustAnchorInfoAsync(CancellationToken ct)
     {

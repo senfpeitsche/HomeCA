@@ -39,8 +39,8 @@ public sealed class UiStrings
     public string ChangePasswordTooShort => L("Das neue Passwort muss mindestens 12 Zeichen lang sein.", "The new password must be at least 12 characters.");
 
     // ── Trust Installation ───────────────────────────────────────────────────
-    public string TrustInstallTitle => L("Root-CA auf Geräten installieren", "Install Root CA on Devices");
-    public string TrustInstallDescription => L("Kopieren Sie das passende Skript und führen Sie es auf dem Zielgerät aus, um das HomeCA-Root-Zertifikat zu vertrauen.", "Copy the appropriate script and run it on the target device to trust the HomeCA root certificate.");
+    public string TrustInstallTitle => L("Zertifikatskette auf Geräten installieren", "Install Certificate Chain on Devices");
+    public string TrustInstallDescription => L("Kopieren Sie das passende Skript und führen Sie es auf dem Zielgerät aus. Es installiert die HomeCA-Root-CA und die ausstellende Intermediate-CA.", "Copy the appropriate script and run it on the target device. It installs the HomeCA root CA and the issuing intermediate CA.");
     public string TrustInstallCopied => L("In die Zwischenablage kopiert.", "Copied to clipboard.");
 
     // ── Navigation ───────────────────────────────────────────────────────────

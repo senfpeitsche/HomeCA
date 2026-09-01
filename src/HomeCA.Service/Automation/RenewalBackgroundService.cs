@@ -44,6 +44,7 @@ public sealed class RenewalBackgroundService(
         var plans = scope.ServiceProvider.GetRequiredService<RenewalPlanRegistry>();
         var certificates = scope.ServiceProvider.GetRequiredService<CertificateIssuanceService>();
         var storage = scope.ServiceProvider.GetRequiredService<HomeCaStorage>();
+        var notifications = scope.ServiceProvider.GetRequiredService<RenewalMailNotificationService>();
 
         var allPlans = await plans.ListAsync(cancellationToken);
         var enabledPlans = allPlans.Where(plan => plan.Enabled).ToList();
@@ -80,11 +81,29 @@ public sealed class RenewalBackgroundService(
 
                 logger.LogInformation("Renewed certificate {OldId} → {NewId} ({Subject}), valid until {ExpiresAt:yyyy-MM-dd}",
                     plan.CertificateId, result.Id, result.Subject, result.ExpiresAt);
+                try
+                {
+                    await notifications.SendRenewedAsync(result.Subject, result.ExpiresAt, cancellationToken);
+                }
+                catch (Exception notificationException) when (notificationException is not OperationCanceledException)
+                {
+                    // A mail-delivery failure must not make an already completed certificate renewal fail.
+                    logger.LogError(notificationException, "Could not send renewal success notification for certificate {CertificateId}", result.Id);
+                }
                 renewed++;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.LogError(exception, "Failed to renew certificate {CertificateId} (plan {PlanId})", plan.CertificateId, plan.Id);
+                try
+                {
+                    var subject = certificateMap.TryGetValue(plan.CertificateId, out var certificate) ? certificate.Subject : plan.CertificateId;
+                    await notifications.SendFailureAsync(subject, exception, cancellationToken);
+                }
+                catch (Exception notificationException) when (notificationException is not OperationCanceledException)
+                {
+                    logger.LogError(notificationException, "Could not send renewal failure notification for plan {PlanId}", plan.Id);
+                }
             }
         }
 
