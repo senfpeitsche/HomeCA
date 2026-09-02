@@ -10,6 +10,8 @@ using HomeCA.Service.Revocation;
 using HomeCA.Service.Deployments;
 using HomeCA.Service.Automation;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace HomeCA.Service.Endpoints;
  static class Rfc8555AcmeEndpoints
@@ -330,15 +332,51 @@ namespace HomeCA.Service.Endpoints;
                 catch (Exception ex) { logger.LogError(ex, "ACME cert download internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
             });
         
-            // revokeCert (stub — accept but log only)
-            endpoints.MapPost("/acme/revoke-cert", async (HttpContext ctx, Rfc8555AcmeService acme, ILogger<global::Program> logger, CancellationToken ct) =>
+            // revokeCert
+            endpoints.MapPost("/acme/revoke-cert", async (HttpContext ctx, Rfc8555AcmeService acme, RevocationRegistry revocations, CrlService crl, CertificateAuthorityService authorities, ILogger<global::Program> logger, CancellationToken ct) =>
             {
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/revoke-cert";
                     var jws = acme.VerifyJws(body, expectedUrl);
-                    logger.LogWarning("RFC 8555 revokeCert requested — not implemented, returning success for compatibility");
+
+                    var payload = System.Text.Json.Nodes.JsonNode.Parse(jws.Payload)?.AsObject()
+                        ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "revokeCert payload is required.");
+                    var certificateDer = Rfc8555AcmeService.Base64UrlDecode(payload["certificate"]?.GetValue<string>()
+                        ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Missing certificate in revokeCert payload."));
+                    using var certificate = X509CertificateLoader.LoadCertificate(certificateDer);
+                    if (!acme.IsManagedCertificate(certificate))
+                        throw Rfc8555AcmeService.AcmeProblem("malformed", "Certificate was not issued by this ACME server.");
+
+                    var certificateId = certificate.SerialNumber.ToLowerInvariant();
+                    if (jws.Kid is not null)
+                    {
+                        var account = await acme.FindAccountByKidAsync(jws.Kid, ct);
+                        if (account is null)
+                            throw Rfc8555AcmeService.AcmeProblem("unauthorized", "Account not found.");
+
+                        var storedJwk = System.Text.Json.Nodes.JsonNode.Parse(account.JwkJson)?.AsObject()
+                            ?? throw Rfc8555AcmeService.AcmeProblem("serverInternal", "Stored account key is invalid.", 500);
+                        var algorithm = jws.ProtectedHeader["alg"]?.GetValue<string>()
+                            ?? throw Rfc8555AcmeService.AcmeProblem("badSignatureAlgorithm", "Missing JWS algorithm.");
+                        acme.VerifySignatureWithStoredKey(storedJwk, algorithm, body);
+                        if (!await acme.IsCertificateOwnedByAccountAsync(certificateId, account.Id, ct))
+                            throw Rfc8555AcmeService.AcmeProblem("unauthorized", "Account does not own this certificate.");
+                    }
+                    else if (jws.Jwk is null || !IsCertificatePublicKey(jws.Jwk, certificate))
+                    {
+                        throw Rfc8555AcmeService.AcmeProblem("unauthorized", "JWS key does not match the certificate public key.");
+                    }
+
+                    var reason = ParseRevocationReason(payload["reason"]);
+                    var authorityId = await authorities.FindIssuingIdBySubjectAsync(certificate.Issuer, ct);
+                    if (authorityId is null)
+                        throw Rfc8555AcmeService.AcmeProblem("malformed", "Certificate issuer is not an active issuing CA.");
+
+                    await revocations.RevokeAsync(certificate.SerialNumber, reason, ct, authorityId);
+                    await crl.GenerateAsync(authorityId, ct);
+                    logger.LogInformation("RFC 8555 revoked certificate {CertificateId} for reason {Reason}", certificateId, reason);
                     AddAcmeHeaders(ctx, acme);
                     return Results.Ok();
                 }
@@ -354,6 +392,62 @@ namespace HomeCA.Service.Endpoints;
             });
         
             // Helper: format an order for JSON response.
+            static bool IsCertificatePublicKey(System.Text.Json.Nodes.JsonObject jwk, X509Certificate2 certificate)
+            {
+                var keyType = jwk["kty"]?.GetValue<string>();
+                if (keyType == "RSA")
+                {
+                    using var rsa = certificate.GetRSAPublicKey();
+                    if (rsa is null) return false;
+                    var parameters = rsa.ExportParameters(false);
+                    return Matches(jwk["n"], parameters.Modulus) && Matches(jwk["e"], parameters.Exponent);
+                }
+
+                if (keyType == "EC")
+                {
+                    using var ecdsa = certificate.GetECDsaPublicKey();
+                    if (ecdsa is null) return false;
+                    var parameters = ecdsa.ExportParameters(false);
+                    var curve = parameters.Curve.Oid.Value switch
+                    {
+                        "1.2.840.10045.3.1.7" => "P-256",
+                        "1.3.132.0.34" => "P-384",
+                        "1.3.132.0.35" => "P-521",
+                        _ => null
+                    };
+                    return curve is not null && curve == jwk["crv"]?.GetValue<string>() &&
+                           Matches(jwk["x"], parameters.Q.X) && Matches(jwk["y"], parameters.Q.Y);
+                }
+
+                return false;
+
+                static bool Matches(System.Text.Json.Nodes.JsonNode? value, byte[]? expected) =>
+                    expected is not null && value?.GetValue<string>() is { } encoded &&
+                    CryptographicOperations.FixedTimeEquals(Rfc8555AcmeService.Base64UrlDecode(encoded), expected);
+            }
+
+            static string ParseRevocationReason(System.Text.Json.Nodes.JsonNode? reason)
+            {
+                if (reason is null) return "unspecified";
+                if (reason is not System.Text.Json.Nodes.JsonValue value || !value.TryGetValue<int>(out var code))
+                    throw Rfc8555AcmeService.AcmeProblem("malformed", "Invalid revocation reason.");
+
+                return code switch
+                {
+                0 => "unspecified",
+                1 => "keyCompromise",
+                2 => "cACompromise",
+                3 => "affiliationChanged",
+                4 => "superseded",
+                5 => "cessationOfOperation",
+                6 => "certificateHold",
+                8 => "removeFromCRL",
+                9 => "privilegeWithdrawn",
+                10 => "aACompromise",
+                _ => throw Rfc8555AcmeService.AcmeProblem("malformed", "Invalid revocation reason.")
+                };
+            }
+
             object FormatOrder(Rfc8555Order order, string baseUrl) => new
             {
                 status = order.Status,

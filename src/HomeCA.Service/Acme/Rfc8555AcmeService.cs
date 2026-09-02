@@ -489,6 +489,29 @@ public sealed class Rfc8555AcmeService
         return await File.ReadAllTextAsync(fullchainPath, ct);
     }
 
+    /// <summary>
+    /// Returns whether a certificate supplied to revokeCert is byte-for-byte one
+    /// of the certificates issued and retained by this CA.
+    /// </summary>
+    public bool IsManagedCertificate(X509Certificate2 certificate)
+    {
+        var certificateId = certificate.SerialNumber.ToLowerInvariant();
+        var path = Path.Combine(_storage.RootPath, "certificates", certificateId, "certificate.pfx");
+        if (!File.Exists(path)) return false;
+
+        using var managedCertificate = X509CertificateLoader.LoadPkcs12FromFile(path, null);
+        return CryptographicOperations.FixedTimeEquals(certificate.RawData, managedCertificate.RawData);
+    }
+
+    /// <summary>Returns whether the RFC 8555 account created the certificate's order.</summary>
+    public async Task<bool> IsCertificateOwnedByAccountAsync(string certificateId, string accountId, CancellationToken ct)
+    {
+        var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
+        return orders.Any(order =>
+            order.AccountId == accountId &&
+            string.Equals(order.CertificateId, certificateId, StringComparison.OrdinalIgnoreCase));
+    }
+
     // ───────────────────────── Certificate issuance from CSR ────────────────────
 
     private async Task<string> IssueCertificateFromCsrAsync(CertificateRequest csr, IReadOnlyList<string> dnsNames, CancellationToken ct)
