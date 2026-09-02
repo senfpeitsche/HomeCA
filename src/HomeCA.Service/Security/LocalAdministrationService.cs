@@ -6,6 +6,7 @@ namespace HomeCA.Service.Security;
 
 public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvironment environment, ILogger<LocalAdministrationService> logger)
 {
+    private readonly IHostEnvironment _environment = environment;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _adminPath = Path.Combine(storage.RootPath, "state", "administrator.json");
     private readonly string _sessionPath = Path.Combine(storage.RootPath, "state", "sessions.json");
@@ -46,12 +47,14 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
 
     public async Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
-        if (environment.IsDevelopment()
+#if DEBUG
+        if (_environment.IsDevelopment()
             && string.Equals(request.UserName, "admin", StringComparison.Ordinal)
             && string.Equals(request.Password, "foobar", StringComparison.Ordinal))
         {
             return new LoginResponse("homeca-debug", 43200, false);
         }
+#endif
 
         await _gate.WaitAsync(cancellationToken);
         try
@@ -107,7 +110,9 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
 
     public async Task<bool> IsSessionValidAsync(string? token, CancellationToken cancellationToken)
     {
-        if (environment.IsDevelopment() && string.Equals(token, "homeca-debug", StringComparison.Ordinal)) return true;
+#if DEBUG
+        if (_environment.IsDevelopment() && string.Equals(token, "homeca-debug", StringComparison.Ordinal)) return true;
+#endif
         if (string.IsNullOrWhiteSpace(token)) return false;
         await _gate.WaitAsync(cancellationToken);
         try
