@@ -119,6 +119,8 @@ msg_ok "HomeCA ${VERSION} deployed to ${APP_DIR}"
 msg_info "Installing TLS activation helper …"
 gh_raw "deploy/scripts/homeca-activate-tls.sh" "${APP_DIR}/homeca-activate-tls.sh"
 chmod 0755 "${APP_DIR}/homeca-activate-tls.sh"
+gh_raw "deploy/scripts/homeca-deactivate-tls.sh" "${APP_DIR}/homeca-deactivate-tls.sh"
+chmod 0755 "${APP_DIR}/homeca-deactivate-tls.sh"
 msg_ok "TLS helper installed"
 
 # ── sudoers for web-triggered TLS activation ────────────────────────

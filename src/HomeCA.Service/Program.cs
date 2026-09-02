@@ -830,7 +830,7 @@ api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest 
 {
     var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
     if (!File.Exists(pfxPath)) return Results.NotFound();
-    using var certificate = CertificatePfxExporter.LoadLeafForExport(pfxPath);
+    using var certificate = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(pfxPath);
     var chainPath = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
     var bytes = CertificatePfxExporter.ExportWithIssuingCertificate(certificate, chainPath, request.Password);
     var name = CertificateDownloadName(storage, id);

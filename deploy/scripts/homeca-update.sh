@@ -169,6 +169,17 @@ else
   msg_ok "Could not fetch remote sudoers — keeping current"
 fi
 
+# ── Refresh TLS helper scripts ──────────────────────────────────────
+msg_info "Refreshing TLS helper scripts …"
+for helper in homeca-activate-tls.sh homeca-deactivate-tls.sh; do
+  if gh_raw "deploy/scripts/${helper}" "${APP_DIR}/${helper}" 2>/dev/null; then
+    chmod 0755 "${APP_DIR}/${helper}"
+  else
+    msg_info "Could not fetch ${helper} — keeping current version"
+  fi
+done
+msg_ok "TLS helper scripts refreshed"
+
 # ── Start service ───────────────────────────────────────────────────
 msg_info "Starting HomeCA …"
 systemctl start "$SERVICE"

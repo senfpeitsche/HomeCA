@@ -171,7 +171,7 @@ public sealed class CertificateIssuanceTests : IDisposable
         var certificatePath = Path.Combine(_fixture.RootPath, "certificates", result.Id, "certificate.pfx");
         var chainPath = Path.Combine(result.ExportPath, "chain.pem");
 
-        using var leaf = CertificatePfxExporter.LoadLeafForExport(certificatePath);
+        using var leaf = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(certificatePath);
         var exportedPfx = CertificatePfxExporter.ExportWithIssuingCertificate(leaf, chainPath, "test-password");
         var exportedPfxPath = Path.Combine(_fixture.RootPath, "exported.pfx");
         File.WriteAllBytes(exportedPfxPath, exportedPfx);
@@ -180,6 +180,21 @@ public sealed class CertificateIssuanceTests : IDisposable
         Assert.Equal(2, exportedCertificates.Count);
         Assert.Contains(exportedCertificates, certificate => certificate.HasPrivateKey);
         Assert.Contains(exportedCertificates, certificate => string.Equals(certificate.Subject, leaf.Issuer, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CrlGeneration_Supports_Ecc_IssuingCertificates()
+    {
+        var storage = _fixture.CreateStorage();
+        var authorities = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+        await authorities.InitializeAsync(CancellationToken.None);
+        var revocations = new RevocationRegistry(storage, NullLogger<RevocationRegistry>.Instance);
+        var crl = new CrlService(storage, revocations, authorities, NullLogger<CrlService>.Instance);
+
+        var path = await crl.GenerateAsync(CancellationToken.None);
+
+        Assert.True(File.Exists(path));
+        Assert.NotEmpty(File.ReadAllBytes(path));
     }
 
     public void Dispose() => _fixture.Dispose();

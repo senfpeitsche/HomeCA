@@ -64,6 +64,19 @@ pct exec 100 -- bash /tmp/homeca-update.sh
 HOMECA_VERSION=v1.3.0 bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
 ```
 
+### TLS wieder deaktivieren (zurück zu HTTP)
+
+Im Container als `root` ausführen:
+
+```bash
+bash /opt/homeca/homeca-deactivate-tls.sh
+```
+
+Das Skript entfernt nur den aktiven systemd-TLS-Override, prüft anschließend
+`http://127.0.0.1:5080/health` und sichert den Override unter
+`/etc/homeca/tls.conf.disabled`. Zertifikat und TLS-Konfiguration bleiben für
+eine spätere Reaktivierung erhalten.
+
 ### Was das Update-Script macht:
 
 1. Prüft, ob die Zielversion bereits installiert ist

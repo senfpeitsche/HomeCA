@@ -5,7 +5,7 @@ namespace HomeCA.Service.Pki;
 /// <summary>Creates deployment PFX files with the leaf certificate and issuing CA.</summary>
 public static class CertificatePfxExporter
 {
-    public static X509Certificate2 LoadLeafForExport(string pfxPath)
+    public static X509Certificate2 LoadCertificateWithExportablePrivateKey(string pfxPath)
     {
         var certificates = LoadExportableCollection(pfxPath, password: null);
         return certificates.FirstOrDefault(certificate => certificate.HasPrivateKey)

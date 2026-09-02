@@ -18,8 +18,11 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
         try
         {
             var authority = await authorities.GetDefaultIssuingAsync(cancellationToken);
-            using var issuer = X509CertificateLoader.LoadPkcs12FromFile(authority.IssuingPath, null);
-            using var key = issuer.GetECDsaPrivateKey() ?? throw new InvalidOperationException("TLS issuing CA private key is unavailable.");
+            using var issuer = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(authority.IssuingPath);
+            using var ecdsa = issuer.GetECDsaPrivateKey();
+            using var rsa = ecdsa is null ? issuer.GetRSAPrivateKey() : null;
+            if (ecdsa is null && rsa is null)
+                throw new InvalidOperationException("TLS issuing CA private key is unavailable.");
             var parser = new X509CertificateParser();
             var generator = new X509V2CrlGenerator();
             generator.SetIssuerDN(parser.ReadCertificate(issuer.RawData).SubjectDN);
@@ -28,7 +31,13 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
             var revocationRecords = await revocations.ListAsync(cancellationToken);
             foreach (var record in revocationRecords)
                 generator.AddCrlEntry(new BigInteger(record.SerialNumber, 16), record.RevokedAt.UtcDateTime, 0);
-            var signer = new Asn1SignatureFactory("SHA384WITHECDSA", DotNetUtilities.GetKeyPair(key).Private);
+            // DotNetUtilities cannot convert ECDsa keys. Import the PKCS#8 key
+            // material through BouncyCastle instead; this also supports RSA CAs.
+            var privateKey = ecdsa is not null
+                ? PrivateKeyFactory.CreateKey(ecdsa.ExportPkcs8PrivateKey())
+                : PrivateKeyFactory.CreateKey(rsa!.ExportPkcs8PrivateKey());
+            var signatureAlgorithm = ecdsa is not null ? "SHA384WITHECDSA" : "SHA384WITHRSA";
+            var signer = new Asn1SignatureFactory(signatureAlgorithm, privateKey);
             var crl = generator.Generate(signer);
             var path = Path.Combine(storage.RootPath, "crl", $"{authority.Id}.crl");
             await File.WriteAllBytesAsync(path, crl.GetEncoded(), cancellationToken);
