@@ -148,6 +148,11 @@ app.MapGet("/api/v1/crl/latest", async (CrlService crl, CancellationToken ct) =>
     var export = await crl.GetLatestAsync(ct);
     return export is null ? Results.NotFound(new { detail = "No CRL has been generated yet. Generate one first via POST /api/v1/crl." }) : Results.File(export.Content, "application/pkix-crl", export.FileName);
 });
+app.MapGet("/api/v1/crl/{authorityId}", async (string authorityId, CrlService crl, CancellationToken ct) =>
+{
+    try { var export = await crl.GetAsync(authorityId, ct); return export is null ? Results.NotFound() : Results.File(export.Content, "application/pkix-crl", export.FileName); }
+    catch (InvalidOperationException) { return Results.NotFound(); }
+});
 
 // ── Unauthenticated management endpoints ────────────────────────────────────
 
@@ -742,6 +747,12 @@ api.MapPost("/authorities", async (CreateAuthorityRequest request, CertificateAu
     catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["authority"] = [ex.Message] }); }
     catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
 });
+api.MapPost("/authorities/rotate-intermediate", async (RotateIntermediateRequest request, CertificateAuthorityService authorities, CancellationToken ct) =>
+{
+    try { return Results.Ok(await authorities.RotateIntermediateAsync(request, ct)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["authority"] = [ex.Message] }); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+});
 api.MapPut("/authorities/{id}", async (string id, UpdateAuthorityRequest request, CertificateAuthorityService authorities, CancellationToken ct) =>
 {
     try { var authority = await authorities.UpdateAsync(id, request, ct); return authority is null ? Results.NotFound() : Results.Ok(authority); }
@@ -825,6 +836,15 @@ api.MapGet("/certificates/{id}/export/bundle", async (string id, HomeCaStorage s
     if (!File.Exists(path)) return Results.NotFound();
     var name = CertificateDownloadName(storage, id);
     return Results.File(path, "application/x-pem-file", $"{name}-bundle.pem");
+});
+api.MapGet("/certificates/{id}/export/package", async (string id, HomeCaStorage storage, DeploymentPackageService deployments, CancellationToken ct) =>
+{
+    if (!string.Equals(Path.GetFileName(id), id, StringComparison.Ordinal)) return Results.NotFound();
+    var exportPath = Path.Combine(storage.RootPath, "exports", id);
+    var archive = await deployments.CreateArchiveAsync(exportPath, ct);
+    if (archive is null) return Results.NotFound();
+    var name = CertificateDownloadName(storage, id);
+    return Results.File(archive, "application/zip", $"{name}-deployment-package.zip");
 });
 api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest request, HomeCaStorage storage) =>
 {
@@ -967,6 +987,34 @@ api.MapGet("/acme/rfc8555-accounts", async (Rfc8555AcmeService acme, Cancellatio
 api.MapDelete("/acme/rfc8555-accounts/{id}", async (string id, Rfc8555AcmeService acme, CancellationToken ct) => await acme.DeleteAccountAsync(id, ct) ? Results.NoContent() : Results.NotFound());
 api.MapGet("/acme/rfc8555-orders", async (Rfc8555AcmeService acme, CancellationToken ct) => Results.Ok(await acme.ListOrdersAsync(ct)));
 api.MapDelete("/acme/rfc8555-orders/{id}", async (string id, Rfc8555AcmeService acme, CancellationToken ct) => await acme.DeleteOrderAsync(id, ct) ? Results.NoContent() : Results.NotFound());
+api.MapGet("/acme/rfc8555-accounts/{id}", async (string id, Rfc8555AcmeService acme, CancellationToken ct) =>
+{
+    var account = await acme.GetAccountAsync(id, ct);
+    if (account is null) return Results.NotFound();
+    var orders = await acme.ListOrdersAsync(ct);
+    return Results.Ok(new Rfc8555AccountDetailsDto(
+        account.Id, account.Thumbprint, account.Contact, account.Status, account.CreatedAt,
+        orders.Where(order => order.AccountId == account.Id)
+            .Select(order => new Rfc8555AccountOrderDto(order.Id, order.Status, order.CreatedAt))
+            .OrderByDescending(order => order.CreatedAt)
+            .ToList()));
+});
+api.MapGet("/acme/rfc8555-orders/{id}", async (string id, Rfc8555AcmeService acme, CancellationToken ct) =>
+{
+    var order = await acme.GetOrderAsync(id, ct);
+    if (order is null) return Results.NotFound();
+    return Results.Ok(new Rfc8555OrderDetailsDto(
+        order.Id, order.AccountId,
+        order.Identifiers.Select(identifier => new Rfc8555IdentifierDto(identifier.Type, identifier.Value)).ToList(),
+        order.Status, order.CreatedAt, order.Expires, order.CertificateId, order.Error,
+        order.Authorizations.Select(authorization => new Rfc8555AuthorizationDetailsDto(
+            authorization.Id,
+            new Rfc8555IdentifierDto(authorization.Identifier.Type, authorization.Identifier.Value),
+            authorization.Status,
+            authorization.Expires,
+            authorization.Challenges.Select(challenge => new Rfc8555ChallengeDetailsDto(
+                challenge.Id, challenge.Type, challenge.Status, challenge.ValidatedAt)).ToList())).ToList()));
+});
 
 // Renewal plans
 api.MapGet("/renewal-plans", async (RenewalPlanRegistry plans, CancellationToken ct) => Results.Ok(await plans.ListAsync(ct)));
@@ -1206,3 +1254,9 @@ static void ConfigureTlsCertificateChain(WebApplicationBuilder builder)
 
 record ProcessResult(bool Success, string Output, string Error);
 record TlsConfigDto(string? HttpsUrl, string? PfxPath, string? PublicUrl, string? Hostname);
+record Rfc8555IdentifierDto(string Type, string Value);
+record Rfc8555ChallengeDetailsDto(string Id, string Type, string Status, DateTimeOffset? ValidatedAt);
+record Rfc8555AuthorizationDetailsDto(string Id, Rfc8555IdentifierDto Identifier, string Status, DateTimeOffset Expires, IReadOnlyList<Rfc8555ChallengeDetailsDto> Challenges);
+record Rfc8555OrderDetailsDto(string Id, string AccountId, IReadOnlyList<Rfc8555IdentifierDto> Identifiers, string Status, DateTimeOffset CreatedAt, DateTimeOffset Expires, string? CertificateId, string? Error, IReadOnlyList<Rfc8555AuthorizationDetailsDto> Authorizations);
+record Rfc8555AccountOrderDto(string Id, string Status, DateTimeOffset CreatedAt);
+record Rfc8555AccountDetailsDto(string Id, string Thumbprint, string[] Contact, string Status, DateTimeOffset CreatedAt, IReadOnlyList<Rfc8555AccountOrderDto> Orders);

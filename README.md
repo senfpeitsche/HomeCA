@@ -12,14 +12,14 @@ HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Sy
 - Internal ACME server for automated internal certificate provisioning
 - External ACME client (Let's Encrypt, etc.) with DNS-01 via Technitium or Hetzner DNS
 - 11 target system profiles: Proxmox, OPNsense, IIS/RDP, UniFi, HAProxy, Cisco, Huawei, Synology, TeamCity, Home Assistant, generic TLS
-- Export formats: PEM, key, chain, fullchain, bundle (HAProxy), PFX
+- Export formats: PEM, key, chain, fullchain, bundle (HAProxy), PFX with issuing CA, and complete deployment-package ZIP downloads
 - CRL generation and HTTP distribution with CDP extension in issued certificates
 - Automatic renewal via background service
 - Encrypted backups (AES-256-GCM)
 - Audit logging
 - Blazor Server UI with MudBlazor (German and English)
 - OpenAPI documentation at `/openapi/v1.json`
-- Unauthenticated trust anchor download for easy Root CA distribution
+- Unauthenticated Root-CA download for trust distribution; issuing certificates are delivered with certificate exports, not installed as trust anchors
 
 ## Quick Start
 
@@ -45,7 +45,7 @@ The UI opens at `http://localhost:5152`. In development mode, log in with `admin
 dotnet test
 ```
 
-28 tests covering CA management, certificate issuance (ECC + RSA), security (password hashing, rate limiting), and backup/restore.
+34 tests covering CA management, certificate issuance (ECC + RSA), CRL generation, certificate exports, security (password hashing, rate limiting), and backup/restore.
 
 ## Architecture
 
@@ -90,7 +90,7 @@ All state is file-based (JSON + PFX/PEM files) under a configurable root path. N
 |-----------|---------|
 | `authorities/` | CA certificates and key material |
 | `certificates/` | Issued certificate records (PFX) |
-| `exports/` | Deployment packages (PEM, key, chain, fullchain, bundle) |
+| `exports/` | Immutable deployment snapshots: PEM/key/chain/fullchain/bundle plus profile snapshot, README, checksums and renewal script; downloadable as ZIP |
 | `external-certificates/` | Certificates from external ACME CAs |
 | `profiles/` | Target system profile snapshots |
 | `crl/` | Certificate revocation lists |
@@ -107,8 +107,12 @@ HomeCA runs as a systemd service in a Debian-based LXC container. See:
 - [docs/TRUST-INSTALLATION.md](docs/TRUST-INSTALLATION.md) — Installing the Root CA on clients and devices
 - [docs/ACME-SETUP.md](docs/ACME-SETUP.md) — ACME configuration
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — Day-to-day operations
+- [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) — Security boundaries and operating assumptions
+- [docs/EMERGENCY-RUNBOOK.md](docs/EMERGENCY-RUNBOOK.md) — Recovery and compromise response
+- [docs/LIFECYCLE.md](docs/LIFECYCLE.md) — Certificate lifecycle routine
+- [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md) — LAN access through Caddy or nginx
 
-The production service binds to `127.0.0.1:5080` only. Place a reverse proxy (HAProxy, nginx, Caddy) in front for LAN access.
+By default the production service listens on LAN port `5080`, so that a homelab administrator can reach the PKI from the network. Do not expose that port to the Internet. Activate TLS in the web UI before normal operation, limit access with the host firewall or a reverse proxy, and use VPN for remote administration. TLS activation switches the service to the configured HTTPS listener (normally `https://<hostname>:5443`) and redirects the browser to that configured URL. A reverse proxy (HAProxy, nginx, Caddy) may instead terminate TLS on port 443; see [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md).
 
 ## API
 
@@ -122,6 +126,8 @@ Key public (unauthenticated) endpoints:
 - `GET /api/v1/crl/latest` — Current CRL download
 
 All management endpoints require a Bearer token obtained via `POST /api/v1/login`.
+
+Certificate exports also provide `GET /api/v1/certificates/{id}/export/package`, which downloads the complete deployment snapshot as a ZIP. It contains the private key and is intentionally only available to authenticated users.
 
 ## Backup Format
 

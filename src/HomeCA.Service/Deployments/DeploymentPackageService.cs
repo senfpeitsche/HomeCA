@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using HomeCA.Service.Profiles;
@@ -27,6 +28,32 @@ public sealed class DeploymentPackageService(TargetProfileRegistry profiles, ILo
             logger.LogError(ex, "Failed to create deployment package for certificate {CertificateId}", certificateId);
             throw;
         }
+    }
+
+    /// <summary>Creates an in-memory ZIP of the immutable deployment snapshot for download.</summary>
+    public async Task<byte[]?> CreateArchiveAsync(string exportPath, CancellationToken ct)
+    {
+        if (!Directory.Exists(exportPath)) return null;
+
+        var files = Directory.EnumerateFiles(exportPath, "*", SearchOption.TopDirectoryOnly)
+            .OrderBy(Path.GetFileName, StringComparer.Ordinal)
+            .ToList();
+        if (files.Count == 0) return null;
+
+        await using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var path in files)
+            {
+                ct.ThrowIfCancellationRequested();
+                var entry = archive.CreateEntry(Path.GetFileName(path), CompressionLevel.Optimal);
+                await using var entryStream = entry.Open();
+                await using var source = File.OpenRead(path);
+                await source.CopyToAsync(entryStream, ct);
+            }
+        }
+
+        return stream.ToArray();
     }
 }
 

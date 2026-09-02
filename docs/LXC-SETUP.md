@@ -10,7 +10,7 @@ Diese Anleitung richtet eine einzelne HomeCA-Instanz in einem Debian-12-LXC ein.
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
 ```
 
-Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installiert .NET 10, HomeCA und den systemd-Dienst. Danach ist HomeCA unter `http://127.0.0.1:5080` im Container erreichbar.
+Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installiert .NET 10, HomeCA und den systemd-Dienst. Danach ist HomeCA im LAN auf Port `5080` erreichbar. Dieser HTTP-Zugang ist nur für die Ersteinrichtung gedacht: aktiviere danach TLS und begrenze den Zugriff auf Admin- und Servernetze.
 
 ### Standardwerte anpassen
 
@@ -77,6 +77,12 @@ Das Skript entfernt nur den aktiven systemd-TLS-Override, prüft anschließend
 `/etc/homeca/tls.conf.disabled`. Zertifikat und TLS-Konfiguration bleiben für
 eine spätere Reaktivierung erhalten.
 
+### TLS über die Weboberfläche aktivieren
+
+Öffne **Einstellungen > Webserver TLS**, gib den DNS-Namen ein und stelle das Zertifikat aus. Mit **TLS jetzt aktivieren und neu starten** wird der systemd-Override geschrieben und HomeCA auf HTTPS umgestellt. Der Browser wechselt nach dem Neustart automatisch zur konfigurierten Zieladresse (üblicherweise `https://<hostname>:5443`).
+
+Installiere vorher die Root-CA auf dem verwendeten Browser oder Betriebssystem; siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md). Falls der Wechsel fehlschlägt, im Container `bash /opt/homeca/homeca-deactivate-tls.sh` ausführen, um sicher zu HTTP zurückzukehren.
+
 ### Was das Update-Script macht:
 
 1. Prüft, ob die Zielversion bereits installiert ist
@@ -90,11 +96,11 @@ eine spätere Reaktivierung erhalten.
 
 ## Ersteinrichtung nach Installation
 
-1. Führe die Administrator-Ersteinrichtung über den lokalen Endpoint aus (`http://127.0.0.1:5080`)
+1. Führe die Administrator-Ersteinrichtung über die HomeCA-LAN-Adresse aus (`http://<homeca-host>:5080`) und nur aus einem vertrauenswürdigen Admin-Netz.
 2. Initialisiere Root- und Issuing-CA
 3. Lege mindestens eine interne Ausstellungszone an und stelle ein Testzertifikat aus
 4. Prüfe Zertifikatskette, CRL, Backup und die DNS-Connector-Berechtigungen
-5. Richte erst danach den LAN-Zugriff über einen TLS-terminierenden Reverse Proxy mit eigener Zugriffskontrolle ein
+5. Aktiviere TLS und begrenze den LAN-Zugriff mit Host-Firewall oder einem TLS-terminierenden Reverse Proxy. Eine sofort nutzbare Referenz steht unter [REVERSE-PROXY.md](REVERSE-PROXY.md).
 
 ## Backup-Schlüssel
 
@@ -121,7 +127,7 @@ Erstelle im Proxmox-Webinterface einen **unprivilegierten** LXC mit dem Debian-1
 | Netzwerk | feste DHCP-Reservierung oder statische interne Adresse |
 | Features | keine verschachtelte Virtualisierung; `nesting` nur falls es anderweitig benötigt wird |
 
-Gib dem Container keinen öffentlichen Port. Die mitgelieferte systemd-Unit bindet HomeCA absichtlich nur an `127.0.0.1:5080`. Für Zugriff aus dem LAN ist ein separater Reverse Proxy oder ein kontrollierter SSH-Tunnel erforderlich.
+Gib dem Container keinen öffentlichen Port. Die mitgelieferte systemd-Unit stellt HomeCA im LAN auf Port `5080` bereit. Für den dauerhaften Betrieb TLS aktivieren und den Zugriff mit Host-Firewall oder Reverse Proxy auf Admin- und Servernetze begrenzen.
 
 ### 2. Grundsystem vorbereiten
 
@@ -178,3 +184,5 @@ Für Wiederherstellung und regelmäßige Prüfungen siehe [OPERATIONS.md](OPERAT
 | `deploy/scripts/homeca-lxc.sh` | LXC erstellen + Installation anstoßen | Proxmox-Shell |
 | `deploy/scripts/homeca-install.sh` | HomeCA im Container installieren | Im LXC (root) |
 | `deploy/scripts/homeca-update.sh` | HomeCA aktualisieren mit Backup + Rollback | Im LXC (root) oder via `pct push`/`pct exec` |
+| `deploy/scripts/homeca-activate-tls.sh` | TLS-Listener aus der vorbereiteten TLS-Konfiguration aktivieren | Im LXC (root), normalerweise über die Weboberfläche ausgelöst |
+| `deploy/scripts/homeca-deactivate-tls.sh` | TLS-Override entfernen und HTTP wiederherstellen | Im LXC (root) |

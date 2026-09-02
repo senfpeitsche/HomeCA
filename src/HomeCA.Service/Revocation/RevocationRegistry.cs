@@ -18,13 +18,13 @@ public sealed class RevocationRegistry(HomeCaStorage storage, ILogger<Revocation
         finally { _gate.Release(); }
     }
 
-    public async Task<RevocationRecord> RevokeAsync(string serialNumber, string reason, CancellationToken cancellationToken)
+    public async Task<RevocationRecord> RevokeAsync(string serialNumber, string reason, CancellationToken cancellationToken, string? authorityId = null)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var records = (await ReadUnsafeAsync(cancellationToken)).ToList();
-            var record = new RevocationRecord(serialNumber, reason, DateTimeOffset.UtcNow);
+            var record = new RevocationRecord(serialNumber, reason, DateTimeOffset.UtcNow, authorityId);
             records.RemoveAll(item => item.SerialNumber.Equals(serialNumber, StringComparison.OrdinalIgnoreCase));
             records.Add(record);
             await WriteAtomicAsync(records, cancellationToken);
@@ -50,4 +50,4 @@ public sealed class RevocationRegistry(HomeCaStorage storage, ILogger<Revocation
     }
 }
 
-public sealed record RevocationRecord(string SerialNumber, string Reason, DateTimeOffset RevokedAt);
+public sealed record RevocationRecord(string SerialNumber, string Reason, DateTimeOffset RevokedAt, string? AuthorityId = null);

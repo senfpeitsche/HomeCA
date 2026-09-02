@@ -78,8 +78,10 @@ Das Zertifikat erscheint im **Zertifikatsinventar** mit Download-Buttons:
 | **Fullchain** | Zertifikat + Chain | nginx `ssl_certificate`, Apache |
 | **Bundle** | Key + Zertifikat + Chain | HAProxy `crt`-Datei (alles in einer Datei) |
 | **PFX** | PKCS#12-Archiv mit Kennwort | Windows, Java-Keystores, Cisco |
+| **Paket ZIP** | Alle Exporte, Anleitung, Snapshot, Prüfsummen und Erneuerungsskript | Vollständige Übergabe an ein Zielsystem |
 
 Beim PFX-Download wirst du nach einem Kennwort gefragt, mit dem das Archiv verschlüsselt wird.
+Das **Paket ZIP** enthält auch den privaten Schlüssel und ist nicht zusätzlich verschlüsselt. Lade es nur über einen vertrauenswürdigen Client herunter und bewahre es wie den privaten Schlüssel selbst auf.
 
 Über den Button **Details** kannst du Subject, Aussteller, Seriennummer, SHA-256-Fingerabdruck, SANs und EKUs des Zertifikats einsehen.
 
@@ -165,7 +167,15 @@ curl -s -o certificate.pfx \
   -H 'Content-Type: application/json' \
   -d '{"password":"MeinSicheresKennwort"}' \
   http://127.0.0.1:5080/api/v1/certificates/<id>/export/pfx
+
+# Vollständigen Deployment-Snapshot als ZIP herunterladen
+# Enthält auch den privaten Schlüssel; nur über einen vertrauenswürdigen Client speichern.
+curl -s -o deployment-package.zip \
+  -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:5080/api/v1/certificates/<id>/export/package
 ```
+
+Der PFX-Export enthält das ausgestellte Zertifikat samt privatem Schlüssel und Issuing-CA. Die Root-CA wird absichtlich nicht mitgeliefert; sie wird einmalig als Vertrauensanker auf Clients und Geräten installiert.
 
 ### 2.3 Zertifikat verifizieren
 
@@ -384,6 +394,8 @@ Jedes ausgestellte Zertifikat — ob manuell oder automatisch erneuert — erzeu
 | `checksums.json` | SHA-256-Prüfsummen aller Dateien |
 
 Die Verteilung auf die Zielsysteme liegt beim Betreiber. Das `install.ps1`-Skript enthält profilspezifische Befehle als Vorlage — prüfe und passe es vor der Ausführung an.
+
+Über **Paket ZIP** im Zertifikatsinventar lässt sich dieser vollständige Snapshot für ein ausgestelltes Zertifikat als einzelnes Archiv herunterladen.
 
 ---
 

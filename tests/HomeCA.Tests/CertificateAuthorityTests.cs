@@ -72,6 +72,36 @@ public sealed class CertificateAuthorityTests : IDisposable
     }
 
     [Fact]
+    public async Task Rotate_Intermediate_Activates_Replacement_And_Deactivates_Previous()
+    {
+        var storage = _fixture.CreateStorage();
+        var service = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+        await service.InitializeAsync(CancellationToken.None);
+        var root = (await service.ListAsync(CancellationToken.None)).Single(authority => authority.Type == "root");
+
+        var result = await service.RotateIntermediateAsync(
+            new RotateIntermediateRequest("TLS Issuing CA 2028", "CN=HomeCA TLS Issuing CA 2028", root.Id, 1825, "ECC", 7),
+            CancellationToken.None);
+
+        Assert.False(result.PreviousAuthority.IsActive);
+        Assert.True(result.ReplacementAuthority.IsActive);
+        Assert.True(result.ReplacementAuthority.IsDefaultIssuing);
+        var issuing = await service.GetDefaultIssuingAsync(CancellationToken.None);
+        Assert.Equal(result.ReplacementAuthority.Id, issuing.Id);
+    }
+
+    [Fact]
+    public async Task Create_Intermediate_Rejects_Expiry_After_Parent()
+    {
+        var storage = _fixture.CreateStorage();
+        var service = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+        var root = await service.CreateAsync(new CreateAuthorityRequest("Root", "CN=Root", "root", null, 10, "ECC", 7), CancellationToken.None);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(
+            new CreateAuthorityRequest("Issuing", "CN=Issuing", "intermediate", root.Id, 11, "ECC", 7), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Revoke_Authority()
     {
         var storage = _fixture.CreateStorage();

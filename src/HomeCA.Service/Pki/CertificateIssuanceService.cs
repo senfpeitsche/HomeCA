@@ -113,11 +113,12 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
 
         logger.LogInformation("Revoking certificate {CertificateId} (serial {SerialNumber}), reason: {Reason}", id, serialNumber, reason);
 
-        await revocations.RevokeAsync(serialNumber, reason, cancellationToken);
+        var authorityId = await authorities.FindIssuingIdBySubjectAsync(certificate.Issuer, cancellationToken);
+        await revocations.RevokeAsync(serialNumber, reason, cancellationToken, authorityId);
 
         try
         {
-            await crl.GenerateAsync(cancellationToken);
+            if (authorityId is not null) await crl.GenerateAsync(authorityId, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -146,6 +147,9 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         var authorityPaths = await authorities.GetDefaultIssuingAsync(cancellationToken);
 
         using var issuer = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.IssuingPath, null);
+        var requestedNotAfter = DateTimeOffset.UtcNow.AddDays(request.ValidityDays);
+        if (issuer.NotAfter <= requestedNotAfter)
+            throw new InvalidOperationException($"The issuing CA expires on {issuer.NotAfter:yyyy-MM-dd}; rotate it or choose a shorter certificate validity.");
         using var ecc = request.KeyAlgorithm == "RSA" ? null : ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var rsa = request.KeyAlgorithm == "RSA" ? RSA.Create(request.RsaKeySize is 2048 or 3072 ? request.RsaKeySize : 2048) : null;
         CertificateRequest certificateRequest = ecc is not null
@@ -167,11 +171,11 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         var publicUrl = options.Value.PublicUrl?.TrimEnd('/');
         if (!string.IsNullOrEmpty(publicUrl))
         {
-            certificateRequest.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/latest"));
+            certificateRequest.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{authorityPaths.Id}"));
         }
         var serial = RandomNumberGenerator.GetBytes(16);
         var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var notAfter = DateTimeOffset.UtcNow.AddDays(request.ValidityDays);
+        var notAfter = requestedNotAfter;
         // Use X509SignatureGenerator to handle cross-algorithm signing (e.g. RSA cert signed by ECC CA)
         using var issuerEcc = issuer.GetECDsaPrivateKey();
         using var issuerRsa = issuerEcc is null ? issuer.GetRSAPrivateKey() : null;

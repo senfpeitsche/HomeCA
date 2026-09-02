@@ -31,10 +31,24 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
     public async Task<IssuingAuthorityPaths> GetDefaultIssuingAsync(CancellationToken ct)
     {
         var all = await ReadAsync(ct);
-        var issuer = all.FirstOrDefault(x => x.Type == "intermediate" && x.IsActive && !x.IsRevoked) ?? throw new InvalidOperationException("Create and activate an intermediate CA before issuing certificates.");
+        var issuer = all.FirstOrDefault(x => x.Type == "intermediate" && x.IsDefaultIssuing && x.IsActive && !x.IsRevoked)
+            ?? all.FirstOrDefault(x => x.Type == "intermediate" && x.IsActive && !x.IsRevoked)
+            ?? throw new InvalidOperationException("Create and activate an intermediate CA before issuing certificates.");
         var parent = all.SingleOrDefault(x => x.Id == issuer.ParentId) ?? throw new InvalidOperationException("The issuing CA has no parent CA.");
         return new IssuingAuthorityPaths(issuer.Id, PathFor(issuer.Id), PathFor(parent.Id), issuer.CrlValidityDays);
     }
+
+    public async Task<IssuingAuthorityPaths> GetIssuingAsync(string id, CancellationToken ct)
+    {
+        var all = await ReadAsync(ct);
+        var issuer = all.SingleOrDefault(x => x.Id == id && x.Type == "intermediate" && !x.IsRevoked)
+            ?? throw new InvalidOperationException("The issuing CA is unavailable.");
+        var parent = all.SingleOrDefault(x => x.Id == issuer.ParentId) ?? throw new InvalidOperationException("The issuing CA has no parent CA.");
+        return new IssuingAuthorityPaths(issuer.Id, PathFor(issuer.Id), PathFor(parent.Id), issuer.CrlValidityDays);
+    }
+
+    public async Task<string?> FindIssuingIdBySubjectAsync(string subject, CancellationToken ct) =>
+        (await ReadAsync(ct)).SingleOrDefault(x => x.Type == "intermediate" && x.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase))?.Id;
 
     /// <summary>Returns the active root CA certificate (public part only) for trust distribution. No authentication required.</summary>
     public async Task<AuthorityCertificateExport?> GetTrustAnchorAsync(string format, CancellationToken ct)
@@ -55,7 +69,8 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
     public async Task<AuthorityCertificateExport?> GetTrustIntermediateAsync(string format, CancellationToken ct)
     {
         var all = await ReadAsync(ct);
-        var intermediate = all.FirstOrDefault(x => x.Type == "intermediate" && x.IsActive && !x.IsRevoked);
+        var intermediate = all.FirstOrDefault(x => x.Type == "intermediate" && x.IsDefaultIssuing && x.IsActive && !x.IsRevoked)
+            ?? all.FirstOrDefault(x => x.Type == "intermediate" && x.IsActive && !x.IsRevoked);
         if (intermediate is null) return null;
         using var certificate = Load(intermediate);
         return format.ToLowerInvariant() switch
@@ -81,11 +96,14 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
     {
         if ((await ReadAsync(ct)).Count > 0) throw new InvalidOperationException("Certificate authorities are already configured.");
         var root = await CreateAsync(new("Root CA", "CN=HomeCA Root CA", "root", null, 3650, "ECC", 30), ct);
-        var issuing = await CreateAsync(new("TLS Issuing CA", "CN=HomeCA TLS Issuing CA", "intermediate", root.Id, 1825, "ECC", 7), ct);
+        var issuing = await CreateAsync(new("TLS Issuing CA", "CN=HomeCA TLS Issuing CA", "intermediate", root.Id, 1825, "ECC", 7), ct, true);
         return new(root.Subject, root.ExpiresAt, issuing.Subject, issuing.ExpiresAt, "ssh-host", "ssh-user");
     }
 
-    public async Task<CertificateAuthorityInventoryItem> CreateAsync(CreateAuthorityRequest request, CancellationToken ct)
+    public async Task<CertificateAuthorityInventoryItem> CreateAsync(CreateAuthorityRequest request, CancellationToken ct) =>
+        await CreateAsync(request, ct, false);
+
+    private async Task<CertificateAuthorityInventoryItem> CreateAsync(CreateAuthorityRequest request, CancellationToken ct, bool isDefaultIssuing)
     {
         Validate(request);
         await _gate.WaitAsync(ct);
@@ -98,15 +116,50 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             {
                 parent = all.SingleOrDefault(x => x.Id == request.ParentId) ?? throw new ArgumentException("The selected parent CA does not exist.");
                 if (!parent.IsActive || parent.IsRevoked) throw new InvalidOperationException("The selected parent CA is not active.");
+                using var parentCertificate = Load(parent);
+                if (parentCertificate.NotAfter <= DateTime.UtcNow.AddDays(request.ValidityDays))
+                    throw new ArgumentException("The intermediate CA must expire before its parent CA.");
             }
             var id = Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(Path.Combine(_root, id));
             using var certificate = CreateCertificate(request, parent is null ? null : Load(parent));
             await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12), ct);
-            var item = new AuthorityState(id, request.Name.Trim(), request.Type, request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter);
+            var item = new AuthorityState(id, request.Name.Trim(), request.Type, request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, isDefaultIssuing);
             all.Add(item); await WriteAsync(all, ct);
             logger.LogInformation("Created {Type} certificate authority {AuthorityId}", request.Type, id);
             return ToItem(item);
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<IntermediateRotationResult> RotateIntermediateAsync(RotateIntermediateRequest request, CancellationToken ct)
+    {
+        Validate(new CreateAuthorityRequest(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays));
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var all = await ReadAsync(ct);
+            var current = all.FirstOrDefault(x => x.Type == "intermediate" && x.IsDefaultIssuing && x.IsActive && !x.IsRevoked)
+                ?? all.FirstOrDefault(x => x.Type == "intermediate" && x.IsActive && !x.IsRevoked)
+                ?? throw new InvalidOperationException("No active issuing CA is available for rotation.");
+            var parent = all.SingleOrDefault(x => x.Id == request.ParentId) ?? throw new ArgumentException("The selected parent CA does not exist.");
+            if (parent.Type != "root" || !parent.IsActive || parent.IsRevoked) throw new InvalidOperationException("The selected parent root CA is not active.");
+            if (all.Any(x => x.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("A certificate authority with this name already exists.");
+            using var parentCertificate = Load(parent);
+            if (parentCertificate.NotAfter <= DateTime.UtcNow.AddDays(request.ValidityDays)) throw new ArgumentException("The replacement intermediate CA must expire before its parent root CA.");
+
+            var id = Guid.NewGuid().ToString("N");
+            Directory.CreateDirectory(Path.Combine(_root, id));
+            using var certificate = CreateCertificate(new(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays), parentCertificate);
+            await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12), ct);
+            var replacement = new AuthorityState(id, request.Name.Trim(), "intermediate", request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, true);
+            var currentIndex = all.FindIndex(x => x.Id == current.Id);
+            all[currentIndex] = current with { IsActive = false, IsDefaultIssuing = false };
+            all.Add(replacement);
+            await WriteAsync(all, ct);
+            var dependent = GetIssuedCertificateExpiry(current);
+            logger.LogInformation("Rotated TLS issuing CA from {PreviousAuthorityId} to {ReplacementAuthorityId}", current.Id, replacement.Id);
+            return new IntermediateRotationResult(ToItem(current with { IsActive = false, IsDefaultIssuing = false }), ToItem(replacement), dependent.Count, dependent.LatestExpiry);
         }
         finally { _gate.Release(); }
     }
@@ -120,6 +173,8 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             if (index < 0) return null;
             if (string.IsNullOrWhiteSpace(request.Name) || request.CrlValidityDays is < 1 or > 365) throw new ArgumentException("Name and CRL validity are invalid.");
             var item = all[index];
+            if (item.IsDefaultIssuing && !request.IsActive)
+                throw new InvalidOperationException("Rotate the active issuing CA before deactivating it.");
             if (item.IsRevoked && request.IsActive) throw new InvalidOperationException("A revoked CA cannot be reactivated. Create a replacement CA instead.");
             all[index] = item with { Name = request.Name.Trim(), IsActive = request.IsActive, CrlValidityDays = request.CrlValidityDays };
             await WriteAsync(all, ct); return ToItem(all[index]);
@@ -168,7 +223,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             using var issuer = X509CertificateLoader.LoadPkcs12FromFile(legacyIssuer, null);
             Directory.CreateDirectory(Path.Combine(_root, "root")); Directory.CreateDirectory(Path.Combine(_root, "tls-issuing"));
             File.Copy(legacyRoot, PathFor("root"), true); File.Copy(legacyIssuer, PathFor("tls-issuing"), true);
-            var migrated = new List<AuthorityState> { new("root", "Root CA", "root", root.Subject, null, (int)(root.NotAfter - DateTime.UtcNow).TotalDays, "ECC", 30, true, false, DateTimeOffset.UtcNow, root.NotAfter), new("tls-issuing", "TLS Issuing CA", "intermediate", issuer.Subject, "root", (int)(issuer.NotAfter - DateTime.UtcNow).TotalDays, "ECC", 7, true, false, DateTimeOffset.UtcNow, issuer.NotAfter) };
+            var migrated = new List<AuthorityState> { new("root", "Root CA", "root", root.Subject, null, (int)(root.NotAfter - DateTime.UtcNow).TotalDays, "ECC", 30, true, false, DateTimeOffset.UtcNow, root.NotAfter), new("tls-issuing", "TLS Issuing CA", "intermediate", issuer.Subject, "root", (int)(issuer.NotAfter - DateTime.UtcNow).TotalDays, "ECC", 7, true, false, DateTimeOffset.UtcNow, issuer.NotAfter, true) };
             await WriteAsync(migrated, ct); return migrated;
         }
         await using var stream = File.OpenRead(_statePath);
@@ -192,8 +247,20 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             return certificate.Issuer.Equals(authority.Subject, StringComparison.OrdinalIgnoreCase);
         });
     }
+    private (int Count, DateTime? LatestExpiry) GetIssuedCertificateExpiry(AuthorityState authority)
+    {
+        var certificates = Path.Combine(storage.RootPath, "certificates");
+        if (!Directory.Exists(certificates)) return (0, null);
+        var matching = new List<DateTime>();
+        foreach (var path in Directory.EnumerateFiles(certificates, "certificate.pfx", SearchOption.AllDirectories))
+        {
+            using var certificate = X509CertificateLoader.LoadPkcs12FromFile(path, null);
+            if (certificate.Issuer.Equals(authority.Subject, StringComparison.OrdinalIgnoreCase)) matching.Add(certificate.NotAfter);
+        }
+        return (matching.Count, matching.Count == 0 ? null : matching.Max());
+    }
     private string PathFor(string id) => Path.Combine(_root, id, "authority.pfx");
-    private static CertificateAuthorityInventoryItem ToItem(AuthorityState x) => new(x.Id, x.Name, x.Type, x.Subject, x.ExpiresAt, x.ParentId, x.IsActive, x.IsRevoked, x.CrlValidityDays);
+    private static CertificateAuthorityInventoryItem ToItem(AuthorityState x) => new(x.Id, x.Name, x.Type, x.Subject, x.ExpiresAt, x.ParentId, x.IsActive, x.IsRevoked, x.CrlValidityDays, x.IsDefaultIssuing);
     private static void Validate(CreateAuthorityRequest x)
     {
         if (string.IsNullOrWhiteSpace(x.Name) || string.IsNullOrWhiteSpace(x.Subject) || x.Type is not ("root" or "intermediate") || x.KeyAlgorithm is not ("ECC" or "RSA")) throw new ArgumentException("Name, subject, type and key algorithm are invalid.");
@@ -212,13 +279,15 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         using var issued = request.Create(parent, from, until, RandomNumberGenerator.GetBytes(16));
         return ecc is not null ? issued.CopyWithPrivateKey(ecc) : issued.CopyWithPrivateKey(rsa!);
     }
-    private sealed record AuthorityState(string Id, string Name, string Type, string Subject, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, bool IsActive, bool IsRevoked, DateTimeOffset CreatedAt, DateTime ExpiresAt);
+    private sealed record AuthorityState(string Id, string Name, string Type, string Subject, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, bool IsActive, bool IsRevoked, DateTimeOffset CreatedAt, DateTime ExpiresAt, bool IsDefaultIssuing = false);
 }
 
 public sealed record CreateAuthorityRequest(string Name, string Subject, string Type, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays);
 public sealed record UpdateAuthorityRequest(string Name, bool IsActive, int CrlValidityDays);
+public sealed record RotateIntermediateRequest(string Name, string Subject, string ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays);
+public sealed record IntermediateRotationResult(CertificateAuthorityInventoryItem PreviousAuthority, CertificateAuthorityInventoryItem ReplacementAuthority, int DependentCertificateCount, DateTime? LatestDependentCertificateExpiry);
 public sealed record IssuingAuthorityPaths(string Id, string IssuingPath, string RootPath, int CrlValidityDays);
 public sealed record AuthorityCertificateExport(string FileName, string ContentType, byte[] Content);
 public sealed record AuthorityInventory(string RootSubject, DateTime RootExpiresAt, string TlsIssuingSubject, DateTime TlsIssuingExpiresAt, string SshHostAuthority, string SshUserAuthority);
-public sealed record CertificateAuthorityInventoryItem(string Id, string Name, string Type, string Subject, DateTime ExpiresAt, string? ParentId, bool IsActive, bool IsRevoked, int CrlValidityDays);
+public sealed record CertificateAuthorityInventoryItem(string Id, string Name, string Type, string Subject, DateTime ExpiresAt, string? ParentId, bool IsActive, bool IsRevoked, int CrlValidityDays, bool IsDefaultIssuing = false);
 public sealed record TrustAnchorInfo(string Subject, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt);

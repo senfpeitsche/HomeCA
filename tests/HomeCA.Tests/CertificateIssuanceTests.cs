@@ -3,6 +3,7 @@ using HomeCA.Service.Deployments;
 using HomeCA.Service.Profiles;
 using HomeCA.Service.Revocation;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Compression;
 using System.Security.Cryptography.X509Certificates;
 
 namespace HomeCA.Tests;
@@ -161,6 +162,25 @@ public sealed class CertificateIssuanceTests : IDisposable
         // Should contain at least 3 certificates (leaf + issuing + root) plus the key
         var certCount = bundle.Split("BEGIN CERTIFICATE").Length - 1;
         Assert.True(certCount >= 3, $"Expected at least 3 certificates in bundle, found {certCount}");
+    }
+
+    [Fact]
+    public async Task DeploymentPackageArchive_Contains_Exports_And_Snapshot()
+    {
+        var (_, certificates) = await SetupAsync();
+        var result = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["archive.example.com"], []), CancellationToken.None);
+        var deployments = new DeploymentPackageService(new TargetProfileRegistry(_fixture.CreateStorage()), NullLogger<DeploymentPackageService>.Instance);
+
+        var archive = await deployments.CreateArchiveAsync(result.ExportPath, CancellationToken.None);
+
+        Assert.NotNull(archive);
+        using var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);
+        var entries = zip.Entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
+        Assert.Subset(new HashSet<string>(StringComparer.Ordinal)
+        {
+            "certificate.pem", "key.pem", "chain.pem", "fullchain.pem", "bundle.pem",
+            "profile-snapshot.json", "README.md", "install.ps1", "checksums.json"
+        }, entries);
     }
 
     [Fact]

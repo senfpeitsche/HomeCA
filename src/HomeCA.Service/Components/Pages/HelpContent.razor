@@ -18,11 +18,31 @@
         <MudTabPanel Text="@L.HelpTabAcme">
             @AcmeHelp
         </MudTabPanel>
+        <MudTabPanel Text="@L.HelpTabCaRotation">
+            @CaRotationHelp
+        </MudTabPanel>
     </MudTabs>
 </MudPaper>
 
 @code {
     private int _activeTab;
+
+    private RenderFragment CaRotationHelp => @<div class="help-content">
+        <MudText Typo="Typo.h4" Class="mt-2 mb-3">Intermediate-CA rotieren</MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">Eine reguläre Rotation ersetzt nur die ausstellende Intermediate-CA. Die Root-CA bleibt unverändert und muss nicht erneut auf Clients installiert werden.</MudAlert>
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">Wann rotieren?</MudText>
+        <MudText>Plane die Rotation, bevor die gewünschte Laufzeit neuer Serverzertifikate nicht mehr vollständig innerhalb der Laufzeit der Intermediate liegt. Bei maximal 730 Tagen für TLS-Zertifikate empfiehlt sich ein Vorlauf von mindestens zwei Jahren.</MudText>
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">Ablauf für Administratoren</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.LooksOne">Unter <strong>Zertifizierungsstellen</strong> die neue Intermediate-CA unter derselben Root-CA anlegen und als neue Ausstellungs-CA festlegen.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Neue oder automatisch erneuerte TLS-Zertifikate ausstellen und auf die Zielsysteme verteilen. Das Deployment-Paket enthält die neue Kette.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Die bisherige Intermediate nur deaktivieren, niemals für einen normalen Ablauf sperren. Bereits ausgestellte Zertifikate bleiben so bis zu ihrem Ablauf prüfbar.</MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">Die alte Intermediate und ihre CRL erreichbar lassen, bis das letzte von ihr ausgestellte Zertifikat abgelaufen oder ersetzt ist.</MudListItem>
+        </MudList>
+        <MudText Typo="Typo.h5" Class="mt-4 mb-2">CRLs und Prüfung</MudText>
+        <MudText>Neue Zertifikate enthalten eine CA-spezifische CRL-Adresse. Die CRL einer konkreten Intermediate ist unter <code>/api/v1/crl/&lt;authority-id&gt;</code> abrufbar. Zertifikate, die vor dieser Umstellung die allgemeine <code>/api/v1/crl/latest</code>-Adresse erhalten haben, sollten im Zuge der Rotation erneuert und ausgerollt werden.</MudText>
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">Eine CA-Sperrung ist nur bei einem Sicherheitsvorfall (z. B. kompromittierter Schlüssel) vorgesehen. In diesem Fall müssen alle von ihr ausgestellten Zertifikate ersetzt werden.</MudAlert>
+    </div>;
 
     // ── TLS-Zertifikate ──────────────────────────────────────────────────────
     private RenderFragment TlsHelp => @<div class="help-content">
@@ -78,8 +98,10 @@
                 <tr><td>Fullchain</td><td>Zertifikat + Chain</td><td>nginx <code>ssl_certificate</code>, Apache</td></tr>
                 <tr><td>Bundle</td><td>Key + Zertifikat + Chain</td><td>HAProxy <code>crt</code>-Datei</td></tr>
                 <tr><td>PFX</td><td>PKCS#12-Archiv mit Kennwort</td><td>Windows, Java-Keystores, Cisco</td></tr>
+                <tr><td>Paket ZIP</td><td>Alle Exporte, Anleitung, Snapshot, Prüfsummen und Erneuerungsskript</td><td>Vollständige Übergabe an ein Zielsystem</td></tr>
             </tbody>
         </MudSimpleTable>
+        <MudAlert Severity="Severity.Warning" Dense="true">Das Paket ZIP enthält den privaten Schlüssel und ist nicht zusätzlich verschlüsselt. Behandle es wie den privaten Schlüssel selbst.</MudAlert>
 
         <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Zertifikat über die API ausstellen</MudText>
         <CodePreview Text="@_tlsApiIssue" Lines="8" />

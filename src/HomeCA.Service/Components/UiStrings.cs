@@ -81,6 +81,7 @@ public sealed class UiStrings
     public string HelpTabSsh => L("SSH-Zertifikate", "SSH Certificates");
     public string HelpTabTrust => L("Vertrauensstellung", "Trust Installation");
     public string HelpTabAcme => L("ACME-Einrichtung", "ACME Setup");
+    public string HelpTabCaRotation => L("CA-Rotation", "CA Rotation");
 
     // ── Overview ─────────────────────────────────────────────────────────────
     public string OverviewKicker => L("Zustand der Vertrauensbasis", "Trust Foundation Status");

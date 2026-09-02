@@ -14,10 +14,16 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
 
     public async Task<string> GenerateAsync(CancellationToken cancellationToken)
     {
+        var authority = await authorities.GetDefaultIssuingAsync(cancellationToken);
+        return await GenerateAsync(authority.Id, cancellationToken);
+    }
+
+    public async Task<string> GenerateAsync(string authorityId, CancellationToken cancellationToken)
+    {
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var authority = await authorities.GetDefaultIssuingAsync(cancellationToken);
+            var authority = await authorities.GetIssuingAsync(authorityId, cancellationToken);
             using var issuer = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(authority.IssuingPath);
             using var ecdsa = issuer.GetECDsaPrivateKey();
             using var rsa = ecdsa is null ? issuer.GetRSAPrivateKey() : null;
@@ -28,7 +34,10 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
             generator.SetIssuerDN(parser.ReadCertificate(issuer.RawData).SubjectDN);
             generator.SetThisUpdate(DateTime.UtcNow);
             generator.SetNextUpdate(DateTime.UtcNow.AddDays(authority.CrlValidityDays));
-            var revocationRecords = await revocations.ListAsync(cancellationToken);
+            var defaultAuthority = await authorities.GetDefaultIssuingAsync(cancellationToken);
+            var revocationRecords = (await revocations.ListAsync(cancellationToken))
+                .Where(record => record.AuthorityId == authority.Id || record.AuthorityId is null && authority.Id == defaultAuthority.Id)
+                .ToList();
             foreach (var record in revocationRecords)
                 generator.AddCrlEntry(new BigInteger(record.SerialNumber, 16), record.RevokedAt.UtcDateTime, 0);
             // DotNetUtilities cannot convert ECDsa keys. Import the PKCS#8 key
@@ -56,6 +65,12 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
     public async Task<CrlExport?> GetLatestAsync(CancellationToken cancellationToken)
     {
         var authority = await authorities.GetDefaultIssuingAsync(cancellationToken);
+        return await GetAsync(authority.Id, cancellationToken);
+    }
+
+    public async Task<CrlExport?> GetAsync(string authorityId, CancellationToken cancellationToken)
+    {
+        var authority = await authorities.GetIssuingAsync(authorityId, cancellationToken);
         var path = Path.Combine(storage.RootPath, "crl", $"{authority.Id}.crl");
         if (!File.Exists(path)) return null;
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken);

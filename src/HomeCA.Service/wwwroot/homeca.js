@@ -9,6 +9,10 @@ window.homeca.download = (fileName, contentType, base64) => {
   URL.revokeObjectURL(url);
 };
 
+window.homeca.redirectAfter = (url, delayMilliseconds) => {
+  window.setTimeout(() => window.location.assign(url), delayMilliseconds);
+};
+
 window.homeca.copyToClipboard = async (text) => {
   // Try modern Clipboard API first (works on HTTPS / localhost)
   if (navigator.clipboard && navigator.clipboard.writeText) {

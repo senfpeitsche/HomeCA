@@ -2,19 +2,24 @@
 
 Damit Geräte und Browser den von HomeCA ausgestellten Zertifikaten vertrauen, muss das Root-CA-Zertifikat im jeweiligen Vertrauensspeicher installiert werden.
 
+Installiere **nur die Root-CA** als Vertrauensanker. Das Intermediate-/Issuing-Zertifikat wird zusammen mit Serverzertifikaten ausgeliefert (etwa über `chain.pem`, `fullchain.pem` oder den PFX-Export) und gehört nicht in den Truststore von Clients.
+
 ## Root-CA-Zertifikat herunterladen
 
-HomeCA stellt das Root-CA-Zertifikat ohne Authentifizierung bereit. Ersetze `HOMECA` durch den Hostnamen oder die IP des HomeCA-Dienstes.
+HomeCA stellt das Root-CA-Zertifikat ohne Authentifizierung bereit. Ersetze `HOMECA_BASE_URL` durch die erreichbare Basis-URL, zum Beispiel `http://homeca:5080` oder nach TLS-Aktivierung `https://homeca.example.lan:5443`.
 
 ```
+# Beispiele: http://homeca:5080 oder https://homeca.example.lan:5443
+HOMECA_BASE_URL="https://homeca.example.lan:5443"
+
 # PEM-Format (Linux, macOS, Firefox, Appliances)
-curl -o homeca-root-ca.pem http://HOMECA:5080/api/v1/trust-anchor/pem
+curl -o homeca-root-ca.pem "$HOMECA_BASE_URL/api/v1/trust-anchor/pem"
 
 # DER-Format (Windows .cer)
-curl -o homeca-root-ca.cer http://HOMECA:5080/api/v1/trust-anchor/der
+curl -o homeca-root-ca.cer "$HOMECA_BASE_URL/api/v1/trust-anchor/der"
 
 # Metadaten und SHA-256-Fingerprint zur Verifizierung
-curl http://HOMECA:5080/api/v1/trust-anchor
+curl "$HOMECA_BASE_URL/api/v1/trust-anchor"
 ```
 
 Prüfe den SHA-256-Fingerprint immer gegen die Ausgabe des `/api/v1/trust-anchor`-Endpunkts, bevor du das Zertifikat installierst.

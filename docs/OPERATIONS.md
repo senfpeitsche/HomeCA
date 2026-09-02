@@ -3,7 +3,7 @@
 ## Prüfung nach der Bereitstellung
 
 1. Prüfe `GET /health` auf eine erfolgreiche Antwort.
-2. Richte über den nur lokal erreichbaren Setup-Endpunkt den Administrator ein und melde dich an.
+2. Richte den Administrator aus einem vertrauenswürdigen Admin-Netz ein und melde dich an. Nach der Ersteinrichtung TLS aktivieren und den Zugriff mit Firewall oder Reverse Proxy begrenzen.
 3. Initialisiere die CAs und stelle ein Testzertifikat für eine interne Ausstellungszone aus.
 4. Prüfe die PEM-Kette mit `openssl verify` gegen die exportierte Root-CA.
 5. Führe für jeden DNS-Connector zuerst den Berechtigungstest und dann den TXT-Test aus.
@@ -11,6 +11,14 @@
 ## Ablaufwarnungen
 
 `GET /api/v1/warnings/expiring` liefert Zertifikate, die innerhalb von 30 Tagen ablaufen. Der Abruf sollte mindestens täglich über einen lokalen Monitoring-Job erfolgen; kritische Warnungen werden vor Ablauf an den Administrator weitergegeben.
+
+## Intermediate-CA rotieren
+
+Eine regulär ablaufende TLS-Intermediate wird **nicht** gesperrt. Der Administrator erstellt rechtzeitig eine Ersatz-Intermediate unter derselben Root-CA, macht sie zur Ausstellungs-CA und verteilt alle danach ausgestellten oder erneuerten Zertifikate samt neuer Kette. Die alte Intermediate bleibt deaktiviert, aber verfügbar, bis das letzte von ihr ausgestellte Zertifikat abgelaufen oder ersetzt ist. Die Root-CA bleibt unverändert; sie muss nicht neu verteilt werden.
+
+Eine neue Intermediate muss vor ihrer Root-CA ablaufen. Ebenso darf ein TLS-Zertifikat nicht über das Ablaufdatum seiner ausstellenden Intermediate hinausreichen. Plane die Rotation daher mindestens so früh, wie die längste zulässige TLS-Zertifikatslaufzeit (derzeit 730 Tage) beträgt.
+
+Jede Intermediate besitzt eine eigene CRL unter `GET /api/v1/crl/<authority-id>`. Diese Adresse wird in neu ausgestellte Zertifikate eingebettet. Zertifikate, die vor dieser Umstellung die allgemeine Adresse `GET /api/v1/crl/latest` erhielten, sollten während der Rotation erneuert und ausgerollt werden.
 
 ## E-Mail-Benachrichtigungen für die Erneuerung
 

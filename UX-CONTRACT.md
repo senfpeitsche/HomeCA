@@ -13,3 +13,4 @@ The MudBlazor client is a local-admin tool. The session token exists only in the
 | Certificate, SSH certificate, ACME order, revocation or CRL action | Remain in the relevant work area | Persistent result or inline error plus a shared notification |
 
 The application uses German locale formatting. Native `select` controls are acceptable for the small fixed profile list. Destructive recovery actions are not exposed in the UI; restore remains a documented operator procedure.
+, auch die andern .md file prüfen

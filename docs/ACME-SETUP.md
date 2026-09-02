@@ -48,7 +48,7 @@ http://<hostname>:<port>/acme/directory
 | HTTPS nach TLS-Aktivierung | `https://homeca.lab.example.com:5443/acme/directory` |
 | Hinter Reverse-Proxy (Port 443) | `https://homeca.lab.example.com/acme/directory` |
 
-Hostname und Port entsprechen der `PublicUrl`, die beim Setup über `POST /api/v1/setup/configure-instance` festgelegt wurde. Die aktuell konfigurierte Basis-URL lässt sich über `GET /api/v1/storage/info` im Feld `publicUrl` ablesen.
+Hostname und Port entsprechen der beim Setup gewählten Basis-URL. Nach der TLS-Aktivierung verwende die Zieladresse, zu der die HomeCA-Weboberfläche automatisch wechselt; bei der Standardkonfiguration ist das `https://<hostname>:5443`.
 
 ### Konfigurationsbeispiele für gängige ACME-Clients
 
@@ -73,7 +73,7 @@ acme.sh --issue --server http://homeca.lab.example.com:5080/acme/directory \
 wacs.exe --baseuri http://homeca.lab.example.com:5080/acme/directory
 ```
 
-> **Hinweis:** Da der interne ACME-Server keine Challenge-Validierung durchführt (alle Clients gelten als vertrauenswürdig), muss der Client keine DNS- oder HTTP-Challenge lösen. Challenges werden serverseitig sofort als `valid` markiert. Einige Clients erfordern trotzdem die Angabe eines Challenge-Typs — die Wahl ist in diesem Fall irrelevant.
+> **Hinweis:** Der RFC-8555-Endpunkt stellt eine `http-01`-Challenge bereit. Sobald der Client diese Challenge bestätigt, markiert HomeCA Challenge und Authorization automatisch als `valid`; eine externe HTTP- oder DNS-Erreichbarkeitsprüfung findet nicht statt. Konfiguriere daher beim Client **HTTP-01**. Die Infrastruktur muss dafür nicht öffentlich erreichbar sein.
 
 ### Externer ACME-Aussteller
 
@@ -223,7 +223,7 @@ Externe ACME-Aussteller verweisen auf die Directory-URL einer öffentlichen CA. 
 Richte zuerst eine Connector-Instanz ein, falls noch nicht vorhanden. Unterstützte Typen sind `technitium` und `hetzner`.
 
 ```bash
-curl -s http://127.0.0.1:5080/api/v1/connectors \
+curl -s http://127.0.0.1:5080/api/v1/connector-instances \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -290,7 +290,7 @@ Die Felder **Key Identifier** und **HMAC Key** bleiben leer — HomeCA benötigt
 3. Auf **Save** klicken.
 4. In der Kontoliste die **Register**-Aktion (Kreispfeil-Symbol) auf der neuen Zeile ausführen. Die Registrierung ist ein separater Schritt — erst wenn sie erfolgreich war, können Zertifikate mit diesem Konto ausgestellt werden.
 
-> **Hinweis:** Die Custom CA URL muss genau die Directory-URL des HomeCA RFC 8555 ACME-Servers sein. Wurde TLS aktiviert, lautet sie `https://homeca.lab.example.com:5443/acme/directory`. Die aktuell gültige Basis-URL lässt sich über `GET /api/v1/storage/info` (Feld `publicUrl`) ermitteln.
+> **Hinweis:** Die Custom CA URL muss genau die Directory-URL des HomeCA RFC 8555 ACME-Servers sein. Wurde TLS aktiviert, übernimm die Zieladresse, zu der die HomeCA-Weboberfläche wechselt (standardmäßig `https://homeca.lab.example.com:5443/acme/directory`).
 >
 > **Wichtig:** Nicht die vereinfachte API-URL `/api/v1/acme/directory` verwenden — diese spricht nicht das RFC 8555-Protokoll, das acme.sh erwartet.
 
@@ -307,7 +307,7 @@ Die Felder **Key Identifier** und **HMAC Key** bleiben leer — HomeCA benötigt
 
 3. Auf **Save** klicken.
 
-> **Warum HTTP-01?** Der interne ACME-Server von HomeCA führt keine tatsächliche Challenge-Validierung durch — alle Clients gelten als vertrauenswürdig und Orders gehen direkt in den Status `ready`. Der Challenge-Typ muss im Plugin trotzdem konfiguriert werden, da das Formular ihn erfordert. HTTP-01 ist die einfachste Wahl, weil keine DNS-API-Credentials nötig sind. Alternativ kann auch DNS-01 oder TLS-ALPN-01 gewählt werden — das Ergebnis ist identisch, da HomeCA die Challenge überspringt.
+> **Warum HTTP-01?** HomeCA liefert für RFC 8555 eine HTTP-01-Challenge und setzt sie nach der Bestätigung durch den Client automatisch auf `valid`; eine externe Validierung findet nicht statt. HTTP-01 ist daher die passende und einfachste Wahl, weil keine DNS-API-Credentials nötig sind. DNS-01 oder TLS-ALPN-01 passen nicht zu der von HomeCA angebotenen Challenge.
 
 ### 3.4 Automation anlegen (optional, aber empfohlen)
 
@@ -362,7 +362,7 @@ Das ausgestellte Zertifikat liegt nun im OPNsense Trust Store, wird aber noch vo
 
 Damit OPNsense und die Clients im Netz dem Zertifikat vertrauen, muss die HomeCA Root-CA als vertrauenswürdige Zertifizierungsstelle importiert werden:
 
-1. Die Root-CA-Datei von HomeCA herunterladen: `GET /api/v1/authorities/root/export` liefert das PEM.
+1. Die Root-CA-Datei von HomeCA herunterladen: `GET /api/v1/trust-anchor/pem` liefert das PEM ohne Anmeldung.
 2. In OPNsense unter **System > Trust > Authorities** auf **+ Add** klicken.
 3. **Method** auf **Import an existing Certificate Authority** setzen und das PEM einfügen.
 4. Speichern.
@@ -374,7 +374,7 @@ Für Clients im Netz siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md).
 | Problem | Lösung |
 | --- | --- |
 | Konto-Registrierung schlägt fehl | Custom CA URL prüfen — muss exakt auf `/acme/directory` enden (nicht `/api/v1/acme/directory`). HomeCA muss von OPNsense erreichbar sein. |
-| „domain validation failed (http01)" | Auf dem HomeCA-Server die Logs prüfen: `journalctl -u homeca -f`. Alle ACME-Requests werden mit Prefix `ACME` geloggt. Häufigste Ursachen: (1) DNS-Name ist nicht unter einer aktiven Ausstellungszone (`internalIssuanceEnabled: true`), (2) HomeCA ist von OPNsense nicht erreichbar, (3) OPNsense-CA-Trust fehlt (Root-CA unter System > Trust > Authorities importieren). |
+| „domain validation failed (http01)" | Auf dem HomeCA-Server die Logs prüfen: `journalctl -u homeca -f`. Häufigste Ursachen: (1) DNS-Name ist nicht unter einer aktiven Ausstellungszone (`internalIssuanceEnabled: true`), (2) der Client hat die HTTP-01-Challenge nicht bestätigt, (3) HomeCA ist von OPNsense nicht erreichbar, (4) OPNsense-CA-Trust fehlt (Root-CA unter System > Trust > Authorities importieren). Die Auftragsdetails in HomeCA zeigen Authorization- und Challenge-Status. |
 | Zertifikat-Ausstellung hängt | Unter **Services > ACME Client > Log Files** das acme.sh-Log prüfen. Bei Verbindungsproblemen die Erreichbarkeit von HomeCA testen: `curl -s http://homeca.lab.example.com:5080/acme/directory` |
 | Browser zeigt weiterhin altes Zertifikat | Automation fehlt oder nicht dem Zertifikat zugewiesen. Siehe Schritt 3.4. |
 | Zertifikat wird nicht als vertrauenswürdig erkannt | HomeCA Root-CA ist nicht importiert. Siehe Schritt 3.7. |
@@ -389,3 +389,4 @@ Für Clients im Netz siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md).
 - **Zonenänderungen:** Wird eine Zone nachträglich auf `internalIssuanceEnabled: false` gesetzt, lehnt der ACME-Server neue Orders für diese Zone ab. Bestehende Zertifikate bleiben gültig.
 - **Connector-Test:** Führe nach dem Anlegen eines DNS-Connectors den Berechtigungs- und TXT-Test über die API aus, bevor du einen externen Aussteller zuweist.
 - **Token-Sicherheit:** Das Bearer-Token ist ein 32-Byte-Zufallswert mit 12 Stunden Gültigkeit. Speichere es nicht dauerhaft und gib es nicht an Dritte weiter.
+- **RFC-8555-Diagnose:** In der ACME-Ansicht öffnen **Details** bei einem Auftrag oder Konto. Aufträge zeigen IDs, Ablaufzeit, Authorizationen und Challenge-Status; Konten zeigen Fingerabdruck, Kontakt und zugeordnete Aufträge. Challenge-Tokens werden nicht angezeigt.

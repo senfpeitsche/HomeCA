@@ -259,6 +259,12 @@ public sealed class Rfc8555AcmeService
     public async Task<IReadOnlyList<Rfc8555Account>> ListAccountsAsync(CancellationToken ct) =>
         await ReadAsync<List<Rfc8555Account>>(_accountsPath, ct) ?? [];
 
+    public async Task<Rfc8555Account?> GetAccountAsync(string id, CancellationToken ct)
+    {
+        var accounts = await ReadAsync<List<Rfc8555Account>>(_accountsPath, ct) ?? [];
+        return accounts.FirstOrDefault(account => account.Id == id);
+    }
+
     public async Task<bool> DeleteAccountAsync(string id, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
