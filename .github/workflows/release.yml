@@ -13,6 +13,7 @@ on:
       - "v*"
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
@@ -50,8 +51,42 @@ jobs:
         run: |
           tar -czf homeca-linux-x64.tar.gz -C ./publish .
 
+      - name: Create versioned release bundle and checksums
+        run: |
+          mkdir -p release-bundle/app release-bundle/deploy/scripts release-bundle/deploy/systemd release-bundle/deploy/sudoers
+          cp -a ./publish/. release-bundle/app/
+          cp deploy/scripts/homeca-activate-tls.sh deploy/scripts/homeca-deactivate-tls.sh deploy/scripts/homeca-update.sh release-bundle/deploy/scripts/
+          cp deploy/systemd/homeca.service release-bundle/deploy/systemd/
+          cp deploy/sudoers/homeca-tls release-bundle/deploy/sudoers/
+          tar -czf homeca-release-bundle.tar.gz -C release-bundle .
+          cp deploy/scripts/homeca-lxc.sh homeca-lxc.sh
+          cp deploy/scripts/homeca-install.sh homeca-install.sh
+          sha256sum homeca-linux-x64.tar.gz homeca-release-bundle.tar.gz homeca-lxc.sh homeca-install.sh > SHA256SUMS
+
+      - name: Verify release bundle layout and checksum
+        run: |
+          tar -tzf homeca-release-bundle.tar.gz | grep -qx './app/HomeCA.Service.dll'
+          tar -tzf homeca-release-bundle.tar.gz | grep -qx './deploy/systemd/homeca.service'
+          tar -tzf homeca-release-bundle.tar.gz | grep -qx './deploy/sudoers/homeca-tls'
+          sha256sum --check SHA256SUMS
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./publish
+          format: spdx-json
+          output-file: homeca-linux-x64.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: homeca-linux-x64.tar.gz
+          files: |
+            homeca-linux-x64.tar.gz
+            homeca-release-bundle.tar.gz
+            SHA256SUMS
+            homeca-lxc.sh
+            homeca-install.sh
+            homeca-linux-x64.spdx.json

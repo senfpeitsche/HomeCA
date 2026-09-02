@@ -35,31 +35,35 @@ Der GitHub Actions Workflow (`.github/workflows/release.yml`) wird durch den Tag
 2. Installiert .NET 10
 3. Extrahiert die Versionsnummer aus dem Tag (`v1.0.0` → `1.0.0`)
 4. Baut `dotnet publish` mit `--runtime linux-x64` und setzt `-p:Version=1.0.0`
-5. Packt das Ergebnis als `homeca-linux-x64.tar.gz`
-6. Erstellt ein GitHub Release mit automatischen Release-Notes und dem Tarball als Asset
+5. Packt das Ergebnis als `homeca-linux-x64.tar.gz` und als vollständiges `homeca-release-bundle.tar.gz`
+6. Erzeugt `SHA256SUMS` sowie ein SPDX-SBOM (`homeca-linux-x64.spdx.json`)
+7. Erstellt ein GitHub Release mit allen Artefakten als Assets
 
 ### 4. Ergebnis prüfen
 
 Nach dem Workflow (ca. 2–3 Minuten) unter **Releases** im GitHub-Repository:
 
 - Ein Release namens `v1.0.0` mit generierten Release-Notes
-- Ein Asset `homeca-linux-x64.tar.gz` als Download
+- Die Assets `homeca-linux-x64.tar.gz`, `homeca-release-bundle.tar.gz`, `SHA256SUMS` und `homeca-linux-x64.spdx.json`
 
 Die URL für das Asset ist dann:
 ```
 https://github.com/senfpeitsche/HomeCA/releases/download/v1.0.0/homeca-linux-x64.tar.gz
 ```
 
-Genau diese URL verwenden die LXC-Scripts (`homeca-install.sh`, `homeca-update.sh`).
+Installer und Updater laden ausschließlich `homeca-release-bundle.tar.gz` eines
+konkreten Release-Tags und prüfen dessen SHA-256-Wert aus `SHA256SUMS`, bevor
+sie Dateien entpacken oder den Dienst anhalten.
 
 ## Wie die Scripts das Release finden
 
 | Script-Variable | latest | Bestimmte Version |
 | --- | --- | --- |
-| `HOMECA_VERSION=latest` | `…/releases/latest/download/homeca-linux-x64.tar.gz` | — |
-| `HOMECA_VERSION=v1.0.0` | — | `…/releases/download/v1.0.0/homeca-linux-x64.tar.gz` |
+| `HOMECA_VERSION=latest` | löst zuerst einen konkreten Release-Tag auf | — |
+| `HOMECA_VERSION=v1.0.0` | — | `…/releases/download/v1.0.0/homeca-release-bundle.tar.gz` |
 
-GitHub leitet `/releases/latest/download/…` automatisch auf den neuesten Release um.
+Der aufgelöste Tag wird anschließend für alle Downloads verwendet; produktive
+Deployments beziehen keine Dateien aus dem `main`-Branch.
 
 ## Build-Optionen
 
@@ -78,6 +82,6 @@ Das erzeugt ein größeres Artefakt (~80 MB statt ~15 MB), braucht aber kein vor
 - [ ] Änderungen committet und gepusht
 - [ ] Tag gesetzt und gepusht (`git tag vX.Y.Z && git push origin vX.Y.Z`)
 - [ ] GitHub Actions Workflow läuft durch (grün)
-- [ ] Release enthält `homeca-linux-x64.tar.gz`
-- [ ] Test-Update auf einem LXC: `HOMECA_VERSION=vX.Y.Z bash <(curl -fsSL …/homeca-update.sh)`
+- [ ] Release enthält Bundle, `SHA256SUMS` und SPDX-SBOM
+- [ ] Test-Update auf einem LXC: `HOMECA_VERSION=vX.Y.Z /opt/homeca/homeca-update.sh`
 - [ ] `/api/v1/version` zeigt die neue Version

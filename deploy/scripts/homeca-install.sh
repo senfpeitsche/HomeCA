@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # HomeCA — in-container install script
 #
-# Called automatically by homeca-lxc.sh, or run manually inside a Debian 12 LXC:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-install.sh)
+# Called automatically by homeca-lxc.sh, or run manually from a versioned GitHub Release asset.
 #
 # Environment overrides:
 #   HOMECA_VERSION    — release tag (default: latest)
@@ -18,26 +17,35 @@ BACKUP_DIR="/var/backups/homeca"
 CONFIG_DIR="/etc/homeca"
 SERVICE_FILE="/etc/systemd/system/homeca.service"
 
-# ── Download helpers ─────────────────────────────────────────────────
-gh_download_release() {
-  local version="$1" asset="$2" dest="$3"
-  local base="https://github.com/${GH_REPO}/releases"
-  if [[ "$version" == "latest" ]]; then
-    curl -fsSL -o "$dest" "${base}/latest/download/${asset}"
+gh_resolve_latest_tag() {
+  curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
+    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+'
+}
+
+resolve_release_tag() {
+  if [[ "$VERSION" == "latest" ]]; then
+    gh_resolve_latest_tag || msg_error "Could not resolve the latest HomeCA release tag."
   else
-    curl -fsSL -o "$dest" "${base}/download/${version}/${asset}"
+    printf '%s\n' "$VERSION"
   fi
 }
 
-gh_raw() {
-  local path="$1" dest="${2:--}"
-  curl -fsSL -o "$dest" \
-    "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
-}
-
-gh_resolve_latest_tag() {
-  curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
-    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+' || echo "latest"
+download_and_verify_bundle() {
+  local tag="$1" workdir="$2"
+  local base="https://github.com/${GH_REPO}/releases/download/${tag}"
+  local checksum expected
+  curl -fsSL -o "$workdir/SHA256SUMS" "$base/SHA256SUMS"
+  curl -fsSL -o "$workdir/homeca-release-bundle.tar.gz" "$base/homeca-release-bundle.tar.gz"
+  checksum=$(awk '$2 == "homeca-release-bundle.tar.gz" { print $1 }' "$workdir/SHA256SUMS")
+  [[ "$checksum" =~ ^[[:xdigit:]]{64}$ ]] || msg_error "Release checksum for the bundle is missing or invalid."
+  printf '%s  %s\n' "$checksum" "homeca-release-bundle.tar.gz" | (cd "$workdir" && sha256sum --check --status -) \
+    || msg_error "HomeCA release bundle checksum verification failed."
+  tar -xzf "$workdir/homeca-release-bundle.tar.gz" -C "$workdir/bundle" --no-same-owner --no-same-permissions \
+    || msg_error "HomeCA release bundle could not be extracted."
+  [[ -f "$workdir/bundle/app/HomeCA.Service.dll" ]] \
+    && [[ -f "$workdir/bundle/deploy/systemd/homeca.service" ]] \
+    && [[ -f "$workdir/bundle/deploy/sudoers/homeca-tls" ]] \
+    || msg_error "HomeCA release bundle is incomplete."
 }
 
 # ── Colors / helpers ────────────────────────────────────────────────
@@ -105,67 +113,34 @@ else
   msg_ok "Backup key already exists"
 fi
 
-# ── Download HomeCA release ─────────────────────────────────────────
-msg_info "Downloading HomeCA (${VERSION}) …"
-TMPFILE=$(mktemp /tmp/homeca-release.XXXXXX.tar.gz)
-gh_download_release "$VERSION" "homeca-linux-x64.tar.gz" "$TMPFILE"
-tar -xzf "$TMPFILE" -C "$APP_DIR" --strip-components=0
-rm -f "$TMPFILE"
+# ── Download and verify the versioned release bundle ────────────────
+RESOLVED_TAG=$(resolve_release_tag)
+RELEASE_DIR=$(mktemp -d /tmp/homeca-release.XXXXXX)
+trap 'rm -rf "$RELEASE_DIR"' EXIT
+mkdir -p "$RELEASE_DIR/bundle"
+msg_info "Downloading and verifying HomeCA ${RESOLVED_TAG} …"
+download_and_verify_bundle "$RESOLVED_TAG" "$RELEASE_DIR"
+cp -a "$RELEASE_DIR/bundle/app/." "$APP_DIR/"
 chown -R root:root "$APP_DIR"
 chmod 0755 "$APP_DIR"
-msg_ok "HomeCA ${VERSION} deployed to ${APP_DIR}"
+msg_ok "HomeCA ${RESOLVED_TAG} deployed to ${APP_DIR}"
 
 # ── TLS activation helper ──────────────────────────────────────────
-msg_info "Installing TLS activation helper …"
-gh_raw "deploy/scripts/homeca-activate-tls.sh" "${APP_DIR}/homeca-activate-tls.sh"
-chmod 0755 "${APP_DIR}/homeca-activate-tls.sh"
-gh_raw "deploy/scripts/homeca-deactivate-tls.sh" "${APP_DIR}/homeca-deactivate-tls.sh"
-chmod 0755 "${APP_DIR}/homeca-deactivate-tls.sh"
+msg_info "Installing release-bundled operational helpers …"
+install -m 0755 "$RELEASE_DIR/bundle/deploy/scripts/homeca-activate-tls.sh" "${APP_DIR}/homeca-activate-tls.sh"
+install -m 0755 "$RELEASE_DIR/bundle/deploy/scripts/homeca-deactivate-tls.sh" "${APP_DIR}/homeca-deactivate-tls.sh"
+install -m 0755 "$RELEASE_DIR/bundle/deploy/scripts/homeca-update.sh" "${APP_DIR}/homeca-update.sh"
 msg_ok "TLS helper installed"
 
 # ── sudoers for web-triggered TLS activation ────────────────────────
 msg_info "Installing sudoers drop-in for TLS activation …"
 mkdir -p /etc/sudoers.d
-cat > /etc/sudoers.d/homeca-tls << 'SUDOERS'
-# Allow the homeca service user to activate TLS from the web UI.
-homeca ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl restart homeca, /usr/bin/mkdir -p /etc/systemd/system/homeca.service.d, /usr/bin/tee /etc/systemd/system/homeca.service.d/tls.conf
-SUDOERS
-chmod 0440 /etc/sudoers.d/homeca-tls
+install -m 0440 "$RELEASE_DIR/bundle/deploy/sudoers/homeca-tls" /etc/sudoers.d/homeca-tls
 msg_ok "sudoers drop-in installed"
 
 # ── systemd unit ────────────────────────────────────────────────────
 msg_info "Installing systemd service …"
-cat > "$SERVICE_FILE" << 'UNIT'
-[Unit]
-Description=HomeCA private certificate authority
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=exec
-User=homeca
-Group=homeca
-WorkingDirectory=/opt/homeca
-ExecStart=/usr/bin/dotnet /opt/homeca/HomeCA.Service.dll
-Restart=always
-RestartSec=5
-Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://0.0.0.0:5080
-Environment=Storage__RootPath=/var/lib/homeca
-Environment=Storage__BackupPath=/var/backups/homeca
-Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
-# TLS activation from the web UI uses narrowly scoped, passwordless sudo rules.
-# NoNewPrivileges would prevent sudo from performing that permitted escalation.
-NoNewPrivileges=false
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-# The service may create only its TLS drop-in via the constrained sudoers rule.
-ReadWritePaths=/var/lib/homeca /var/backups/homeca /etc/homeca /etc/systemd/system/homeca.service.d
-
-[Install]
-WantedBy=multi-user.target
-UNIT
+install -m 0644 "$RELEASE_DIR/bundle/deploy/systemd/homeca.service" "$SERVICE_FILE"
 
 systemctl daemon-reload
 systemctl enable --now homeca
@@ -189,10 +164,6 @@ else
 fi
 
 # ── Version marker (used by update script) ──────────────────────────
-RESOLVED_TAG="$VERSION"
-if [[ "$VERSION" == "latest" ]]; then
-  RESOLVED_TAG=$(gh_resolve_latest_tag)
-fi
 echo "${RESOLVED_TAG}" > "${APP_DIR}/.homeca-version"
 
 # ── Done ────────────────────────────────────────────────────────────

@@ -2,12 +2,15 @@
 
 Diese Anleitung richtet eine einzelne HomeCA-Instanz in einem Debian-12-LXC ein. HomeCA ist eine private CA: sichere den Container wie ein administratives Kernsystem und veröffentliche ihn nicht direkt im Internet.
 
-## Schnellstart — One-Liner-Installation
+## Schnellstart — versionierte Installation
 
-Öffne die **Proxmox-Shell** (Knoten → Shell im Webinterface) und füge ein:
+Öffne die **Proxmox-Shell** (Knoten → Shell im Webinterface), wähle einen
+Release-Tag und führe dessen Bootstrap aus:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+export HOMECA_VERSION=v1.3.0
+curl -fsSLO "https://github.com/senfpeitsche/HomeCA/releases/download/${HOMECA_VERSION}/homeca-lxc.sh"
+bash ./homeca-lxc.sh
 ```
 
 Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installiert .NET 10, HomeCA und den systemd-Dienst. Danach ist HomeCA im LAN auf Port `5080` erreichbar. Dieser HTTP-Zugang ist nur für die Ersteinrichtung gedacht: aktiviere danach TLS und begrenze den Zugriff auf Admin- und Servernetze.
@@ -17,8 +20,7 @@ Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installier
 Alle Einstellungen lassen sich über Umgebungsvariablen überschreiben:
 
 ```bash
-HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 bash ./homeca-lxc.sh
 ```
 
 | Variable | Standard | Beschreibung |
@@ -38,7 +40,9 @@ HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 \
 Falls der LXC bereits existiert, kann das Install-Script direkt im Container ausgeführt werden:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-install.sh)
+export HOMECA_VERSION=v1.3.0
+curl -fsSLO "https://github.com/senfpeitsche/HomeCA/releases/download/${HOMECA_VERSION}/homeca-install.sh"
+bash ./homeca-install.sh
 ```
 
 ## Update
@@ -46,22 +50,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/dep
 ### Direkt im Container:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
+/opt/homeca/homeca-update.sh
 ```
 
 ### Vom Proxmox-Host aus (Container-ID anpassen):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh \
-  -o /tmp/homeca-update.sh
-pct push 100 /tmp/homeca-update.sh /tmp/homeca-update.sh
-pct exec 100 -- bash /tmp/homeca-update.sh
+pct exec 100 -- /opt/homeca/homeca-update.sh
 ```
 
 ### Bestimmte Version installieren:
 
 ```bash
-HOMECA_VERSION=v1.3.0 bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
+HOMECA_VERSION=v1.3.0 /opt/homeca/homeca-update.sh
 ```
 
 ### TLS wieder deaktivieren (zurück zu HTTP)

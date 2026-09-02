@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 # HomeCA — update script
 #
-# Run inside the container:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh)
-#
-# From the Proxmox host (replace 100 with your CT ID):
-#   curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-update.sh \
-#     -o /tmp/homeca-update.sh
-#   pct push 100 /tmp/homeca-update.sh /tmp/homeca-update.sh
-#   pct exec 100 -- bash /tmp/homeca-update.sh
+# Run inside the container (the installed script is release-bundled):
+#   /opt/homeca/homeca-update.sh
 #
 # Environment overrides:
 #   HOMECA_VERSION     — target release tag (default: latest)
@@ -24,26 +18,28 @@ DATA_DIR="/var/lib/homeca"
 BACKUP_DIR="/var/backups/homeca"
 SERVICE="homeca"
 
-# ── Download helpers ─────────────────────────────────────────────────
-gh_download_release() {
-  local version="$1" asset="$2" dest="$3"
-  local base="https://github.com/${GH_REPO}/releases"
-  if [[ "$version" == "latest" ]]; then
-    curl -fsSL -o "$dest" "${base}/latest/download/${asset}"
-  else
-    curl -fsSL -o "$dest" "${base}/download/${version}/${asset}"
-  fi
-}
-
-gh_raw() {
-  local path="$1" dest="${2:--}"
-  curl -fsSL -o "$dest" \
-    "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
-}
-
 gh_resolve_latest_tag() {
   curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
-    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+' || echo "latest"
+    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+'
+}
+
+download_and_verify_bundle() {
+  local tag="$1" workdir="$2"
+  local base="https://github.com/${GH_REPO}/releases/download/${tag}"
+  local checksum
+  curl -fsSL -o "$workdir/SHA256SUMS" "$base/SHA256SUMS"
+  curl -fsSL -o "$workdir/homeca-release-bundle.tar.gz" "$base/homeca-release-bundle.tar.gz"
+  checksum=$(awk '$2 == "homeca-release-bundle.tar.gz" { print $1 }' "$workdir/SHA256SUMS")
+  [[ "$checksum" =~ ^[[:xdigit:]]{64}$ ]] || msg_error "Release checksum for the bundle is missing or invalid."
+  printf '%s  %s\n' "$checksum" "homeca-release-bundle.tar.gz" | (cd "$workdir" && sha256sum --check --status -) \
+    || msg_error "HomeCA release bundle checksum verification failed. The current installation was not changed."
+  mkdir -p "$workdir/bundle"
+  tar -xzf "$workdir/homeca-release-bundle.tar.gz" -C "$workdir/bundle" --no-same-owner --no-same-permissions \
+    || msg_error "HomeCA release bundle could not be extracted. The current installation was not changed."
+  [[ -f "$workdir/bundle/app/HomeCA.Service.dll" ]] \
+    && [[ -f "$workdir/bundle/deploy/systemd/homeca.service" ]] \
+    && [[ -f "$workdir/bundle/deploy/sudoers/homeca-tls" ]] \
+    || msg_error "HomeCA release bundle is incomplete. The current installation was not changed."
 }
 
 # ── Colors / helpers ────────────────────────────────────────────────
@@ -79,7 +75,7 @@ msg_info "Target version:  ${VERSION}"
 
 # ── Resolve latest tag for comparison ───────────────────────────────
 if [[ "$VERSION" == "latest" ]]; then
-  RESOLVED_TAG=$(gh_resolve_latest_tag)
+  RESOLVED_TAG=$(gh_resolve_latest_tag) || msg_error "Could not resolve the latest HomeCA release tag."
 else
   RESOLVED_TAG="$VERSION"
 fi
@@ -88,6 +84,13 @@ if [[ "$RESOLVED_TAG" == "$CURRENT" && "$RESOLVED_TAG" != "latest" ]]; then
   msg_ok "Already on version ${CURRENT} — nothing to do."
   exit 0
 fi
+
+# ── Download and verify before changing the running installation ────
+RELEASE_DIR=$(mktemp -d /tmp/homeca-release.XXXXXX)
+trap 'rm -rf "$RELEASE_DIR"' EXIT
+msg_info "Downloading and verifying HomeCA ${RESOLVED_TAG} …"
+download_and_verify_bundle "$RESOLVED_TAG" "$RELEASE_DIR"
+msg_ok "Release bundle checksum verified"
 
 # ── System update ───────────────────────────────────────────────────
 msg_info "Updating system packages …"
@@ -125,60 +128,32 @@ fi
 cp -a "$APP_DIR" "$ROLLBACK_DIR"
 msg_ok "Previous release saved to ${ROLLBACK_DIR}"
 
-# ── Download and deploy new release ─────────────────────────────────
-msg_info "Downloading HomeCA (${RESOLVED_TAG}) …"
-TMPFILE=$(mktemp /tmp/homeca-release.XXXXXX.tar.gz)
-if ! gh_download_release "$RESOLVED_TAG" "homeca-linux-x64.tar.gz" "$TMPFILE"; then
-  msg_info "Download failed — rolling back …"
-  rm -rf "$APP_DIR"
-  mv "$ROLLBACK_DIR" "$APP_DIR"
-  systemctl start "$SERVICE"
-  msg_error "Download failed. Rolled back to ${CURRENT}."
-fi
-
+# ── Deploy verified release bundle ──────────────────────────────────
+msg_info "Deploying verified HomeCA ${RESOLVED_TAG} …"
 rm -rf "${APP_DIR:?}"/*
-tar -xzf "$TMPFILE" -C "$APP_DIR" --strip-components=0
-rm -f "$TMPFILE"
+cp -a "$RELEASE_DIR/bundle/app/." "$APP_DIR/"
 chown -R root:root "$APP_DIR"
 chmod 0755 "$APP_DIR"
 msg_ok "HomeCA ${RESOLVED_TAG} deployed"
 
 # ── Update systemd unit (in case it changed) ────────────────────────
-msg_info "Refreshing systemd unit …"
-if gh_raw "deploy/systemd/homeca.service" /tmp/homeca.service.new 2>/dev/null; then
-  if ! diff -q /tmp/homeca.service.new /etc/systemd/system/homeca.service &>/dev/null; then
-    cp /tmp/homeca.service.new /etc/systemd/system/homeca.service
-    systemctl daemon-reload
-    msg_ok "systemd unit updated"
-  else
-    msg_ok "systemd unit unchanged"
-  fi
-  rm -f /tmp/homeca.service.new
-else
-  msg_ok "Could not fetch remote unit — keeping current"
-fi
+msg_info "Refreshing release-bundled systemd unit …"
+install -m 0644 "$RELEASE_DIR/bundle/deploy/systemd/homeca.service" /etc/systemd/system/homeca.service
+systemctl daemon-reload
+msg_ok "systemd unit updated"
 
 # ── Update sudoers drop-in for web-triggered TLS activation ─────────
-msg_info "Refreshing sudoers drop-in …"
-if gh_raw "deploy/sudoers/homeca-tls" /tmp/homeca-tls.sudoers 2>/dev/null; then
-  mkdir -p /etc/sudoers.d
-  install -m 0440 /tmp/homeca-tls.sudoers /etc/sudoers.d/homeca-tls
-  rm -f /tmp/homeca-tls.sudoers
-  msg_ok "sudoers drop-in updated"
-else
-  msg_ok "Could not fetch remote sudoers — keeping current"
-fi
+msg_info "Refreshing release-bundled sudoers drop-in …"
+mkdir -p /etc/sudoers.d
+install -m 0440 "$RELEASE_DIR/bundle/deploy/sudoers/homeca-tls" /etc/sudoers.d/homeca-tls
+msg_ok "sudoers drop-in updated"
 
 # ── Refresh TLS helper scripts ──────────────────────────────────────
-msg_info "Refreshing TLS helper scripts …"
-for helper in homeca-activate-tls.sh homeca-deactivate-tls.sh; do
-  if gh_raw "deploy/scripts/${helper}" "${APP_DIR}/${helper}" 2>/dev/null; then
-    chmod 0755 "${APP_DIR}/${helper}"
-  else
-    msg_info "Could not fetch ${helper} — keeping current version"
-  fi
+msg_info "Refreshing release-bundled operational helpers …"
+for helper in homeca-activate-tls.sh homeca-deactivate-tls.sh homeca-update.sh; do
+  install -m 0755 "$RELEASE_DIR/bundle/deploy/scripts/${helper}" "${APP_DIR}/${helper}"
 done
-msg_ok "TLS helper scripts refreshed"
+msg_ok "Operational helpers refreshed"
 
 # ── Start service ───────────────────────────────────────────────────
 msg_info "Starting HomeCA …"

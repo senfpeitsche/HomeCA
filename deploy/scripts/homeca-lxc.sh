@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # HomeCA LXC — Proxmox one-liner entry script
 #
-# Usage (paste into Proxmox shell):
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/senfpeitsche/HomeCA/main/deploy/scripts/homeca-lxc.sh)"
+# Usage: download homeca-lxc.sh from the desired GitHub Release and run it.
 #
 # What it does:
 #   1. Downloads the latest Debian 12 template (if missing)
@@ -33,11 +32,14 @@ NET="${HOMECA_NET:-dhcp}"
 VERSION="${HOMECA_VERSION:-latest}"
 GH_REPO="senfpeitsche/HomeCA"
 
-# ── Download helpers ─────────────────────────────────────────────────
-gh_raw() {
-  local path="$1" dest="${2:--}"
-  curl -fsSL -o "$dest" \
-    "https://raw.githubusercontent.com/${GH_REPO}/main/${path}"
+gh_resolve_latest_tag() {
+  curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
+    | grep -i '^location:' | grep -oP 'tag/\K[^\s\r]+'
+}
+
+gh_download_release() {
+  local version="$1" asset="$2" dest="$3"
+  curl -fsSL -o "$dest" "https://github.com/${GH_REPO}/releases/download/${version}/${asset}"
 }
 
 # ── Colors / helpers ────────────────────────────────────────────────
@@ -127,8 +129,11 @@ msg_ok "curl available"
 
 # ── Fetch install script and push into container ─────────────────────
 msg_info "Running HomeCA installer inside CT ${CTID} …"
+if [[ "$VERSION" == "latest" ]]; then
+  VERSION=$(gh_resolve_latest_tag) || { msg_error "Could not resolve the latest HomeCA release tag."; exit 1; }
+fi
 INSTALL_SCRIPT=$(mktemp /tmp/homeca-install.XXXXXX.sh)
-gh_raw "deploy/scripts/homeca-install.sh" "$INSTALL_SCRIPT"
+gh_download_release "$VERSION" "homeca-install.sh" "$INSTALL_SCRIPT"
 pct push "$CTID" "$INSTALL_SCRIPT" /tmp/homeca-install.sh
 rm -f "$INSTALL_SCRIPT"
 
