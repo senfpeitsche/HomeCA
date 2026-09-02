@@ -40,7 +40,7 @@ public sealed class UiStrings
 
     // ── Trust Installation ───────────────────────────────────────────────────
     public string TrustInstallTitle => L("Zertifikatskette auf Geräten installieren", "Install Certificate Chain on Devices");
-    public string TrustInstallDescription => L("Kopieren Sie das passende Skript und führen Sie es auf dem Zielgerät aus. Es installiert die HomeCA-Root-CA und die ausstellende Intermediate-CA.", "Copy the appropriate script and run it on the target device. It installs the HomeCA root CA and the issuing intermediate CA.");
+    public string TrustInstallDescription => L("Kopieren Sie das passende Skript und führen Sie es auf dem Zielgerät aus. Es installiert die HomeCA-Root-CA.", "Copy the appropriate script and run it on the target device. It installs the HomeCA root CA.");
     public string TrustInstallCopied => L("In die Zwischenablage kopiert.", "Copied to clipboard.");
 
     // ── Navigation ───────────────────────────────────────────────────────────

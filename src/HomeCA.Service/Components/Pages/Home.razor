@@ -29,26 +29,28 @@
             <MudExpansionPanels MultiExpansion="true" Elevation="0">
                 <MudExpansionPanel Text="@L.TrustInstallTitle">
                     <MudText Class="mud-text-secondary mb-2">@L.TrustInstallDescription</MudText>
-                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Windows (PowerShell als Administrator)</MudText>
-                    <div class="script-preview script-preview-static">
-                        <pre><code>@TrustScriptWindows</code></pre>
-                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Windows-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptWindows))" />
-                    </div>
-                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Linux (Debian/Ubuntu)</MudText>
-                    <div class="script-preview script-preview-static">
-                        <pre><code>@TrustScriptLinux</code></pre>
-                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Linux-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptLinux))" />
-                    </div>
-                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">macOS</MudText>
-                    <div class="script-preview script-preview-static">
-                        <pre><code>@TrustScriptMacOs</code></pre>
-                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="macOS-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptMacOs))" />
-                    </div>
-                    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Firefox (Enterprise-Richtlinie)</MudText>
-                    <div class="script-preview script-preview-static">
-                        <pre><code>@TrustScriptFirefox</code></pre>
-                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Firefox-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptFirefox))" />
-                    </div>
+                    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-1">Zertifikatskette</MudText>
+                    <MudSimpleTable Dense="true" Bordered="true" Class="trust-anchor-table">
+                        <thead><tr><th>Zertifikat</th><th>Verwendung</th><th>Download</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>Root-CA</strong></td><td>In den vertrauenswürdigen Stammzertifikatsspeicher installieren.</td><td><MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"{BaseUrl}/api/v1/trust-anchor/pem")" Target="_blank">PEM</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"{BaseUrl}/api/v1/trust-anchor/der")" Target="_blank">Windows CER</MudButton></td></tr>
+                            <tr><td><strong>Intermediate-CA</strong></td><td>Wird normalerweise mit dem Serverzertifikat ausgeliefert; nur importieren, wenn das Zielsystem dies ausdrücklich verlangt.</td><td><MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"{BaseUrl}/api/v1/trust-anchor/intermediate/pem")" Target="_blank">PEM</MudButton><MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"{BaseUrl}/api/v1/trust-anchor/intermediate/der")" Target="_blank">Windows CER</MudButton></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Installiere grundsätzlich die <strong>Root-CA</strong>. Die Intermediate-CA gehört bei TLS-Diensten in die ausgelieferte Zertifikatskette, nicht in den Root-Speicher.</MudAlert>
+
+                    <MudText Typo="Typo.subtitle2" Class="mt-5 mb-2">Installationsanleitungen</MudText>
+                    <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="trust-install-guides">
+                        <MudExpansionPanel Text="Windows – PowerShell (als Administrator)"><div class="script-preview script-preview-static"><pre><code>@TrustScriptWindows</code></pre><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Windows-PowerShell-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptWindows))" /></div></MudExpansionPanel>
+                        <MudExpansionPanel Text="Windows Server / Active Directory – Gruppenrichtlinie"><MudText Class="mud-text-secondary">In der Gruppenrichtlinienverwaltung: <strong>Computerkonfiguration › Richtlinien › Windows-Einstellungen › Sicherheitseinstellungen › Richtlinien öffentlicher Schlüssel › Vertrauenswürdige Stammzertifizierungsstellen</strong>. Dort die heruntergeladene Root-CA als <code>.cer</code> importieren und die Richtlinie auf die Zielcomputer verknüpfen.</MudText></MudExpansionPanel>
+                        <MudExpansionPanel Text="Debian / Ubuntu"><div class="script-preview script-preview-static"><pre><code>@TrustScriptLinux</code></pre><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Debian- oder Ubuntu-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptLinux))" /></div></MudExpansionPanel>
+                        <MudExpansionPanel Text="Proxmox VE"><div class="script-preview script-preview-static"><pre><code>@TrustScriptProxmox</code></pre><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Proxmox-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptProxmox))" /></div></MudExpansionPanel>
+                        <MudExpansionPanel Text="OPNsense"><MudText Class="mud-text-secondary"><strong>System › Trust › Authorities › +</strong> öffnen, als Methode <em>Import an existing Certificate Authority</em> wählen, die Root-CA als PEM einfügen und speichern. Wenn Dienste eine vollständige Kette benötigen, unter <strong>System › Trust › Settings</strong> die Behandlung von Intermediate-CAs passend konfigurieren.</MudText></MudExpansionPanel>
+                        <MudExpansionPanel Text="HAProxy (TLS-Backends prüfen)"><MudText Class="mud-text-secondary mb-2">Nutze die Root-CA für die Prüfung von HTTPS-Upstreams und referenziere sie über <code>ca-file</code> in der jeweiligen Backend-Server-Zeile.</MudText><div class="script-preview script-preview-static"><pre><code>@TrustScriptHaProxy</code></pre><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="HAProxy-Anleitung kopieren" OnClick="@(() => CopyToClipboard(TrustScriptHaProxy))" /></div></MudExpansionPanel>
+                        <MudExpansionPanel Text="VMware vCenter / ESXi"><MudText Class="mud-text-secondary">Für vCenter die Root-CA in der Zertifikatsverwaltung als vertrauenswürdige Root-CA importieren. In aktuellen vSphere-Versionen: <strong>Menü › Administration › Certificate Management › Trusted Root Certificates › Add</strong>. Für einen einzelnen ESXi-Host erfolgt der Browser-Vertrauensimport auf dem zugreifenden Client; bei TLS-Verbindungen zu anderen Diensten ist die jeweilige Host- oder vCenter-Vertrauensverwaltung maßgeblich.</MudText></MudExpansionPanel>
+                        <MudExpansionPanel Text="macOS"><div class="script-preview script-preview-static"><pre><code>@TrustScriptMacOs</code></pre><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="macOS-Skript kopieren" OnClick="@(() => CopyToClipboard(TrustScriptMacOs))" /></div></MudExpansionPanel>
+                        <MudExpansionPanel Text="Firefox (Enterprise-Richtlinie)"><div class="script-preview script-preview-static"><pre><code>@TrustScriptFirefox</code></pre><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" aria-label="Firefox-Richtlinie kopieren" OnClick="@(() => CopyToClipboard(TrustScriptFirefox))" /></div></MudExpansionPanel>
+                    </MudExpansionPanels>
                 </MudExpansionPanel>
             </MudExpansionPanels>
         </MudPaper>
@@ -386,7 +388,7 @@ else
 
     private HttpClient Client()
     {
-        var client = new HttpClient { BaseAddress = new Uri(Navigation.BaseUri) };
+        var client = HomeCaInternalHttpClient.Create(new Uri(Navigation.BaseUri));
         if (!string.IsNullOrEmpty(_token)) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
         return client;
     }
@@ -395,8 +397,28 @@ else
     {
         await _loginForm!.Validate(); if (!_loginValid) return;
         _busy = true; _loginError = null;
-        try { using var client = Client(); var response = await client.PostAsJsonAsync("api/v1/login", new { userName = _loginUser, password = _loginPassword }); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(); var result = await response.Content.ReadFromJsonAsync<LoginResult>(_json); _token = result?.AccessToken ?? throw new InvalidOperationException(); _mustChangePassword = result.MustChangePassword; if (!_mustChangePassword) { await CheckSetupStateAsync(); if (!_showSetupWizard) await LoadAllAsync(); } }
-        catch { _loginError = "Benutzername oder Passwort sind nicht korrekt."; }
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/login", new { userName = _loginUser, password = _loginPassword });
+            if (!response.IsSuccessStatusCode)
+            {
+                _loginError = response.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.Unauthorized => "Benutzername oder Passwort sind nicht korrekt.",
+                    System.Net.HttpStatusCode.TooManyRequests => "Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.",
+                    _ => $"Anmeldung fehlgeschlagen (HTTP {(int)response.StatusCode}). Prüfen Sie den Dienststatus oder das Serverprotokoll."
+                };
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<LoginResult>(_json);
+            _token = result?.AccessToken ?? throw new InvalidOperationException();
+            _mustChangePassword = result.MustChangePassword;
+            if (!_mustChangePassword) { await CheckSetupStateAsync(); if (!_showSetupWizard) await LoadAllAsync(); }
+        }
+        catch (HttpRequestException) { _loginError = "HomeCA ist nicht erreichbar. Prüfen Sie die Netzwerkverbindung und den Dienststatus."; }
+        catch { _loginError = "Die Anmeldung konnte nicht verarbeitet werden. Prüfen Sie das Serverprotokoll."; }
         finally { _busy = false; }
     }
     private void Logout() { _token = null; _loginPassword = null; _section = "overview"; _mustChangePassword = false; _currentPassword = ""; _newPassword = ""; _confirmPassword = ""; _changePasswordError = null; _changePasswordSuccess = null; ClearData(); Snackbar.Add("Sie wurden abgemeldet.", Severity.Info); }
@@ -502,7 +524,7 @@ else
         _busy = true;
         try
         {
-            using var client = new HttpClient { BaseAddress = new Uri($"{Navigation.BaseUri}") };
+            using var client = HomeCaInternalHttpClient.Create(new Uri(Navigation.BaseUri));
             var response = await client.GetAsync($"api/v1/trust-anchor/{Uri.EscapeDataString(format)}");
             if (!response.IsSuccessStatusCode) { Snackbar.Add("Keine aktive Root-CA gefunden. Bitte zuerst die PKI initialisieren.", Severity.Warning); return; }
             var bytes = await response.Content.ReadAsByteArrayAsync();
@@ -1020,10 +1042,12 @@ else
 
     // ── Trust installation scripts ──────────────────────────────────────────
     private string BaseUrl => Navigation.BaseUri.TrimEnd('/');
-    private string TrustScriptWindows => $"Invoke-WebRequest -Uri '{BaseUrl}/api/v1/trust-anchor/der' -OutFile \"$env:TEMP\\homeca-root-ca.cer\"\nInvoke-WebRequest -Uri '{BaseUrl}/api/v1/trust-anchor/intermediate/der' -OutFile \"$env:TEMP\\homeca-issuing-ca.cer\"\ncertutil -addstore -f \"Root\" \"$env:TEMP\\homeca-root-ca.cer\"\ncertutil -addstore -f \"CA\" \"$env:TEMP\\homeca-issuing-ca.cer\"\nRemove-Item \"$env:TEMP\\homeca-root-ca.cer\", \"$env:TEMP\\homeca-issuing-ca.cer\"";
-    private string TrustScriptLinux => $"curl -o /tmp/homeca-root-ca.crt {BaseUrl}/api/v1/trust-anchor/pem\ncurl -o /tmp/homeca-issuing-ca.crt {BaseUrl}/api/v1/trust-anchor/intermediate/pem\nsudo cp /tmp/homeca-root-ca.crt /usr/local/share/ca-certificates/homeca-root-ca.crt\nsudo cp /tmp/homeca-issuing-ca.crt /usr/local/share/ca-certificates/homeca-issuing-ca.crt\nsudo update-ca-certificates";
-    private string TrustScriptMacOs => $"curl -o /tmp/homeca-root-ca.pem {BaseUrl}/api/v1/trust-anchor/pem\ncurl -o /tmp/homeca-issuing-ca.pem {BaseUrl}/api/v1/trust-anchor/intermediate/pem\nsudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/homeca-root-ca.pem\nsudo security add-certificates -k /Library/Keychains/System.keychain /tmp/homeca-issuing-ca.pem";
-    private string TrustScriptFirefox => "{\n  \"policies\": { \"Certificates\": { \"ImportEnterpriseRoots\": true,\n    \"Install\": [\"" + BaseUrl + "/api/v1/trust-anchor/pem\", \"" + BaseUrl + "/api/v1/trust-anchor/intermediate/pem\"] } }\n}";
+    private string TrustScriptWindows => $"Invoke-WebRequest -Uri '{BaseUrl}/api/v1/trust-anchor/der' -OutFile \"$env:TEMP\\homeca-root-ca.cer\"\ncertutil -addstore -f \"Root\" \"$env:TEMP\\homeca-root-ca.cer\"\nRemove-Item \"$env:TEMP\\homeca-root-ca.cer\"";
+    private string TrustScriptLinux => $"curl -fsSL -o /tmp/homeca-root-ca.crt {BaseUrl}/api/v1/trust-anchor/pem\nsudo install -m 0644 /tmp/homeca-root-ca.crt /usr/local/share/ca-certificates/homeca-root-ca.crt\nsudo update-ca-certificates";
+    private string TrustScriptProxmox => $"curl -fsSL {BaseUrl}/api/v1/trust-anchor/pem | sudo tee /usr/local/share/ca-certificates/homeca-root-ca.crt > /dev/null\nsudo update-ca-certificates";
+    private string TrustScriptHaProxy => $"sudo install -d -m 0755 /etc/haproxy/ca\ncurl -fsSL {BaseUrl}/api/v1/trust-anchor/pem | sudo tee /etc/haproxy/ca/homeca-root-ca.pem > /dev/null\n# In haproxy.cfg beim TLS-Backend ergänzen:\n# server app1 app1.home.lab:443 ssl verify required ca-file /etc/haproxy/ca/homeca-root-ca.pem\nsudo systemctl reload haproxy";
+    private string TrustScriptMacOs => $"curl -fsSL -o /tmp/homeca-root-ca.pem {BaseUrl}/api/v1/trust-anchor/pem\nsudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/homeca-root-ca.pem";
+    private string TrustScriptFirefox => "{\n  \"policies\": { \"Certificates\": { \"ImportEnterpriseRoots\": true,\n    \"Install\": [\"" + BaseUrl + "/api/v1/trust-anchor/pem\"] } }\n}";
     private async Task CopyToClipboard(string text) { await JS.InvokeVoidAsync("homeca.copyToClipboard", text); Snackbar.Add(L.TrustInstallCopied, Severity.Success); }
 
     // ── SSH deployment scripts ──────────────────────────────────────────────

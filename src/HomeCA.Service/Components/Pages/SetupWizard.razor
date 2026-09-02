@@ -216,7 +216,7 @@
 
     private HttpClient Client()
     {
-        var client = new HttpClient { BaseAddress = new Uri(Navigation.BaseUri) };
+        var client = HomeCaInternalHttpClient.Create(new Uri(Navigation.BaseUri));
         if (!string.IsNullOrEmpty(Token))
             client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Token);
         return client;

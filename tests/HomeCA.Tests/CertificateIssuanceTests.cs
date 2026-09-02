@@ -3,6 +3,7 @@ using HomeCA.Service.Deployments;
 using HomeCA.Service.Profiles;
 using HomeCA.Service.Revocation;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Security.Cryptography.X509Certificates;
 
 namespace HomeCA.Tests;
 
@@ -160,6 +161,25 @@ public sealed class CertificateIssuanceTests : IDisposable
         // Should contain at least 3 certificates (leaf + issuing + root) plus the key
         var certCount = bundle.Split("BEGIN CERTIFICATE").Length - 1;
         Assert.True(certCount >= 3, $"Expected at least 3 certificates in bundle, found {certCount}");
+    }
+
+    [Fact]
+    public async Task PfxExport_Contains_Leaf_And_IssuingCertificate_But_Not_Root()
+    {
+        var (_, certificates) = await SetupAsync();
+        var result = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["pfx.example.com"], []), CancellationToken.None);
+        var certificatePath = Path.Combine(_fixture.RootPath, "certificates", result.Id, "certificate.pfx");
+        var chainPath = Path.Combine(result.ExportPath, "chain.pem");
+
+        using var leaf = CertificatePfxExporter.LoadLeafForExport(certificatePath);
+        var exportedPfx = CertificatePfxExporter.ExportWithIssuingCertificate(leaf, chainPath, "test-password");
+        var exportedPfxPath = Path.Combine(_fixture.RootPath, "exported.pfx");
+        File.WriteAllBytes(exportedPfxPath, exportedPfx);
+        var exportedCertificates = CertificatePfxExporter.LoadExportableCollection(exportedPfxPath, "test-password");
+
+        Assert.Equal(2, exportedCertificates.Count);
+        Assert.Contains(exportedCertificates, certificate => certificate.HasPrivateKey);
+        Assert.Contains(exportedCertificates, certificate => string.Equals(certificate.Subject, leaf.Issuer, StringComparison.OrdinalIgnoreCase));
     }
 
     public void Dispose() => _fixture.Dispose();

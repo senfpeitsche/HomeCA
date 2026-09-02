@@ -65,6 +65,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
 
+ConfigureTlsCertificateChain(builder);
+
 var app = builder.Build();
 
 // ── Load persisted PublicUrl from /etc/homeca/public-url.conf if available ──
@@ -157,11 +159,14 @@ app.MapPost("/api/v1/setup", async (SetupRequest request, HttpContext context, L
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["credentials"] = ["Username is required and password must be at least 16 characters."] });
     return await administration.SetupAsync(request, ct) ? Results.NoContent() : Results.Conflict();
 });
-app.MapPost("/api/v1/login", async (LoginRequest request, HttpContext context, LocalAdministrationService administration, LoginRateLimiter rateLimiter, CancellationToken ct) =>
+app.MapPost("/api/v1/login", async (LoginRequest request, HttpContext context, LocalAdministrationService administration, LoginRateLimiter rateLimiter, ILogger<Program> logger, CancellationToken ct) =>
 {
     var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     if (rateLimiter.IsBlocked(ip))
+    {
+        logger.LogWarning("Login attempt rejected because the rate limit is active for {RemoteIpAddress}", ip);
         return Results.Problem("Too many failed login attempts. Try again later.", statusCode: 429);
+    }
     var loginResponse = await administration.LoginAsync(request, ct);
     if (loginResponse is null) { rateLimiter.RecordFailure(ip); return Results.Unauthorized(); }
     rateLimiter.RecordSuccess(ip);
@@ -825,8 +830,9 @@ api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest 
 {
     var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
     if (!File.Exists(pfxPath)) return Results.NotFound();
-    using var certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
-    var bytes = certificate.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12, request.Password);
+    using var certificate = CertificatePfxExporter.LoadLeafForExport(pfxPath);
+    var chainPath = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
+    var bytes = CertificatePfxExporter.ExportWithIssuingCertificate(certificate, chainPath, request.Password);
     var name = CertificateDownloadName(storage, id);
     return Results.File(bytes, "application/x-pkcs12", $"{name}.pfx");
 });
@@ -1148,6 +1154,54 @@ static ProcessResult RunProcess(string fileName, string arguments, string? stdin
     var error = process.StandardError.ReadToEnd();
     process.WaitForExit(TimeSpan.FromSeconds(30));
     return new ProcessResult(process.ExitCode == 0, output.Trim(), error.Trim());
+}
+
+static void ConfigureTlsCertificateChain(WebApplicationBuilder builder)
+{
+    var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+    if (string.IsNullOrWhiteSpace(urls) || !urls.Contains("https://", StringComparison.OrdinalIgnoreCase)) return;
+
+    const string tlsConfigPath = "/etc/homeca/tls.json";
+    if (!File.Exists(tlsConfigPath)) return;
+
+    try
+    {
+        var tlsConfig = System.Text.Json.JsonSerializer.Deserialize<TlsConfigDto>(File.ReadAllText(tlsConfigPath), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (string.IsNullOrWhiteSpace(tlsConfig?.PfxPath) || !File.Exists(tlsConfig.PfxPath)) return;
+
+        var certificateDirectory = Path.GetDirectoryName(tlsConfig.PfxPath);
+        var certificatesDirectory = certificateDirectory is null ? null : Path.GetDirectoryName(certificateDirectory);
+        var storageRoot = certificatesDirectory is null ? null : Path.GetDirectoryName(certificatesDirectory);
+        if (certificateDirectory is null || storageRoot is null) return;
+
+        var certificateId = Path.GetFileName(certificateDirectory);
+        var chainPath = Path.Combine(storageRoot, "exports", certificateId, "chain.pem");
+        if (!File.Exists(chainPath)) return;
+
+        var serverCertificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(tlsConfig.PfxPath, password: null);
+        var exportedChain = new System.Security.Cryptography.X509Certificates.X509Certificate2Collection();
+        exportedChain.ImportFromPemFile(chainPath);
+        var issuingCertificate = exportedChain.FirstOrDefault(certificate =>
+            string.Equals(certificate.Subject, serverCertificate.Issuer, StringComparison.OrdinalIgnoreCase));
+        if (issuingCertificate is null) return;
+
+        // Kestrel's certificate path alone loads only the leaf certificate. Supply
+        // the leaf and its issuer explicitly; the root CA must not be sent.
+        var serverChain = new System.Security.Cryptography.X509Certificates.X509Certificate2Collection
+        {
+            serverCertificate,
+            issuingCertificate
+        };
+        builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(endpoint => endpoint.UseHttps(https =>
+        {
+            https.ServerCertificate = serverCertificate;
+            https.ServerCertificateChain = serverChain;
+        })));
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine($"HomeCA could not configure the TLS certificate chain: {exception.Message}");
+    }
 }
 
 record ProcessResult(bool Success, string Output, string Error);

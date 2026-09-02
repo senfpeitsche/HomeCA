@@ -55,6 +55,9 @@ html, body { background: var(--homeca-canvas); color: var(--homeca-ink); }
 .script-preview-static .mud-icon-button { position: absolute; top: .35rem; right: .35rem; color: var(--homeca-forest); }
 .script-preview-static .mud-icon-button:hover { background: rgba(18, 51, 46, .1); }
 .script-preview-static .mud-icon-button:focus-visible { outline: 2px solid var(--homeca-forest); outline-offset: 2px; }
+.trust-anchor-table { margin-top: .5rem; }
+.trust-anchor-table td:last-child { white-space: nowrap; }
+.trust-install-guides { margin-top: .5rem; }
 .empty-panel { max-width: 42rem; }
 .page-loader { margin: -3rem -4.5rem 1.5rem; }
 .mud-button-filled-primary { background-color: var(--homeca-forest) !important; }
