@@ -12,9 +12,18 @@ public sealed class BearerTokenFilter(LocalAdministrationService administration)
             .ToString()
             .Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
 
-        if (string.IsNullOrWhiteSpace(token) || !await administration.IsSessionValidAsync(token, context.HttpContext.RequestAborted))
+        var session = await administration.ValidateSessionAsync(token, context.HttpContext.RequestAborted);
+        if (!session.IsValid)
         {
             return Results.Unauthorized();
+        }
+
+        // The default administrator password is only safe long enough to establish a
+        // session and replace it. Do not allow that session to operate the CA.
+        if (session.MustChangePassword
+            && !context.HttpContext.Request.Path.Equals("/api/v1/change-password", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
         return await next(context);

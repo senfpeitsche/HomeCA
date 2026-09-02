@@ -108,17 +108,23 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
         finally { _gate.Release(); }
     }
 
-    public async Task<bool> IsSessionValidAsync(string? token, CancellationToken cancellationToken)
+    /// <summary>Validates a session and exposes whether it is restricted to a mandatory password change.</summary>
+    public async Task<SessionValidation> ValidateSessionAsync(string? token, CancellationToken cancellationToken)
     {
 #if DEBUG
-        if (_environment.IsDevelopment() && string.Equals(token, "homeca-debug", StringComparison.Ordinal)) return true;
+        if (_environment.IsDevelopment() && string.Equals(token, "homeca-debug", StringComparison.Ordinal)) return new(true, false);
 #endif
-        if (string.IsNullOrWhiteSpace(token)) return false;
+        if (string.IsNullOrWhiteSpace(token)) return new(false, false);
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var sessions = await ReadJsonAsync<List<SessionRecord>>(_sessionPath, cancellationToken) ?? [];
-            return sessions.Any(session => session.ExpiresAt > DateTimeOffset.UtcNow && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(session.TokenHash), Convert.FromHexString(TokenHash(token))));
+            var tokenHash = TokenHash(token);
+            var isValid = sessions.Any(session => session.ExpiresAt > DateTimeOffset.UtcNow && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(session.TokenHash), Convert.FromHexString(tokenHash)));
+            if (!isValid) return new(false, false);
+
+            var administrator = await ReadJsonAsync<AdministratorRecord>(_adminPath, cancellationToken);
+            return administrator is null ? new(false, false) : new(true, administrator.MustChangePassword);
         }
         finally { _gate.Release(); }
     }
@@ -165,6 +171,7 @@ public sealed record SetupRequest(string UserName, string Password);
 public sealed record LoginRequest(string UserName, string Password);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public sealed record LoginResponse(string AccessToken, int ExpiresInSeconds, bool MustChangePassword);
+public sealed record SessionValidation(bool IsValid, bool MustChangePassword);
 internal sealed record AdministratorRecord(string UserName, string PasswordHash, DateTimeOffset CreatedAt, bool MustChangePassword = false);
 internal sealed record SessionRecord(string TokenHash, string UserName, DateTimeOffset ExpiresAt);
 public sealed record AuditEvent(DateTimeOffset OccurredAt, string Action, string Subject);
