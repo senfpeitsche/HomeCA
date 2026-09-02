@@ -285,7 +285,7 @@ Das OPNsense-Plugin `os-acme-client` nutzt intern `acme.sh`, einen vollwertigen 
 | **ACME CA** | **Custom CA URL** auswählen |
 | **Custom CA URL** | `http://homeca.lab.example.com:5080/acme/directory` |
 
-Die Felder **Key Identifier** und **HMAC Key** bleiben leer — HomeCA benötigt kein External Account Binding (EAB).
+Für einen ACME-Client, dessen Quellnetz nicht in der HomeCA-Allowlist steht, werden **Key Identifier** und **HMAC Key** aus den EAB-Zugangsdaten von HomeCA eingetragen. Ist das Clientnetz allowlisted, bleiben beide Felder leer.
 
 3. Auf **Save** klicken.
 4. In der Kontoliste die **Register**-Aktion (Kreispfeil-Symbol) auf der neuen Zeile ausführen. Die Registrierung ist ein separater Schritt — erst wenn sie erfolgreich war, können Zertifikate mit diesem Konto ausgestellt werden.
@@ -383,6 +383,34 @@ Für Clients im Netz siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md).
 ---
 
 ## 4. Tipps zur Betriebsführung
+
+### ACME-Client-Allowlist und EAB
+
+HomeCA kombiniert zwei sichere und einfache Zugangswege fuer den RFC-8555-Endpunkt:
+
+- Ein Client aus einem allowlisteten IP-Netz darf sein ACME-Konto ohne weitere Zugangsdaten anlegen.
+- Jeder andere Client muss beim Anlegen des Kontos **External Account Binding (EAB)** mit `HS256` verwenden. Das EAB-Geheimnis wird nur beim Erzeugen oder Rotieren angezeigt.
+
+Die Einstellung ist ueber die authentifizierte Verwaltungs-API erreichbar:
+
+```bash
+# Aktuelle Policy ansehen
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://homeca.lab.example.com:5080/api/v1/acme/access-policy
+
+# Direkte ACME-Clientnetze erlauben (Adresse oder CIDR)
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"allowlistedClientNetworks":["192.168.10.25","192.168.20.0/24"]}' \
+  http://homeca.lab.example.com:5080/api/v1/acme/access-policy
+
+# EAB-Zugangsdaten einmalig erzeugen bzw. rotieren
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://homeca.lab.example.com:5080/api/v1/acme/access-policy/eab/rotate
+```
+
+Trage die Antwort `keyId` und `hmacKey` direkt im ACME-Client ein und behandle den HMAC-Key wie ein Kennwort. Eine Rotation macht den bisherigen EAB-Key sofort ungueltig.
+
+Die Allowlist wertet bewusst die IP der direkten TCP-Verbindung aus, nicht ungesicherte Forwarded-Header. Steht HomeCA hinter einem Reverse Proxy, sollte dessen IP **nicht** pauschal allowlistet werden: Sonst wuerden alle vom Proxy kommenden Clients EAB umgehen. In diesem Aufbau EAB verwenden oder die Zugangskontrolle am Proxy entsprechend restriktiv gestalten.
 
 - **Ablaufwarnungen:** `GET /api/v1/warnings/expiring` liefert Zertifikate, die innerhalb von 30 Tagen ablaufen. Integriere diesen Endpunkt in ein tägliches Monitoring.
 - **Backup:** Nach jeder ACME-Einrichtung ein verifiziertes Backup erzeugen, siehe [OPERATIONS.md](OPERATIONS.md).

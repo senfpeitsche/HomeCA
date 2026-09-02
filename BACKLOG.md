@@ -8,7 +8,7 @@ Folgende Punkte sind bewusst nicht Teil des einfachen ersten Betriebsmodus.
 
 ## Sicherheit und Zugriff
 
-- Konfigurierbare interne ACME-Policy je Zone: **alles erlaubt** oder DNS-/Muster-Allowlist; spaeter optional EAB und mTLS.
+- Optionale mTLS-Clientauthentisierung fuer den RFC-8555-Endpunkt.
 - Optionaler Listener-/Netzwerkparameter fuer localhost-, konkrete Interface- oder LAN-Bindung inklusive Installationsassistent und Firewall-Hinweisen.
 - Gehaerteter PKI-Modus mit Offline-Root-CA und gefuehrter Intermediate-Signierung bzw. -Rotation.
 - Mehrere Administratoren, Rollen und optionale vorgeschaltete MFA/SSO-Integration.

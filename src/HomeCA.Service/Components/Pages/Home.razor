@@ -240,6 +240,8 @@ else
     private List<Rfc8555AccountDto> _rfc8555Accounts = [];
     private List<Rfc8555OrderDto> _rfc8555Orders = [];
     private List<ExternalAcmeCertDto> _externalCerts = [];
+    private AcmeAccessPolicyDto _acmeAccessPolicy = new([], "", true);
+    private string _acmeAllowlistedNetworks = "", _eabKeyId = "", _eabHmacKey = "";
     private string? _deleteRfc8555AccountId, _deleteRfc8555OrderId, _deleteAcmeAccountId, _deleteAcmeOrderId;
     private List<SshCertificateItem> _sshCertificates = [];
     private string? _editingIssuerId, _deleteIssuerId;
@@ -474,7 +476,7 @@ else
     private async Task LoadAllAsync()
     {
         if (string.IsNullOrEmpty(_token)) return; _loading = true; _pageError = null;
-        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _renewalNotifications = await Get<RenewalNotificationSettings>(client,"api/v1/renewal-notifications") ?? _renewalNotifications; SyncRenewalNotificationForm(); _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _rfc8555Accounts = await Get<List<Rfc8555AccountDto>>(client,"api/v1/acme/rfc8555-accounts") ?? []; _rfc8555Orders = await Get<List<Rfc8555OrderDto>>(client,"api/v1/acme/rfc8555-orders") ?? []; _externalCerts = await Get<List<ExternalAcmeCertDto>>(client,"api/v1/acme/external-certificates") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; _sshCertificates = await Get<List<SshCertificateItem>>(client,"api/v1/ssh-certificates") ?? []; _backups = await Get<List<BackupListItem>>(client,"api/v1/backups") ?? []; SyncProfileSelection(); }
+        try { using var client = Client(); _certificates = await Get<List<Certificate>>(client,"api/v1/certificates") ?? []; _authorities = await Get<List<Authority>>(client,"api/v1/authorities") ?? []; _domains = await Get<List<Domain>>(client,"api/v1/domains") ?? []; _connectors = await Get<List<Connector>>(client,"api/v1/connector-instances") ?? []; _profiles = await Get<List<TargetProfileDto>>(client,"api/v1/profiles") ?? []; _plans = await Get<List<RenewalPlan>>(client,"api/v1/renewal-plans") ?? []; _renewalNotifications = await Get<RenewalNotificationSettings>(client,"api/v1/renewal-notifications") ?? _renewalNotifications; SyncRenewalNotificationForm(); _issuers = await Get<List<ExternalIssuer>>(client,"api/v1/acme/external-issuers") ?? []; _acmeAccounts = await Get<List<AcmeAccountFull>>(client,"api/v1/acme/accounts") ?? []; _acmeOrders = await Get<List<AcmeOrderFull>>(client,"api/v1/acme/orders") ?? []; _rfc8555Accounts = await Get<List<Rfc8555AccountDto>>(client,"api/v1/acme/rfc8555-accounts") ?? []; _rfc8555Orders = await Get<List<Rfc8555OrderDto>>(client,"api/v1/acme/rfc8555-orders") ?? []; _acmeAccessPolicy = await Get<AcmeAccessPolicyDto>(client,"api/v1/acme/access-policy") ?? _acmeAccessPolicy; _acmeAllowlistedNetworks = string.Join(Environment.NewLine, _acmeAccessPolicy.AllowlistedClientNetworks); _externalCerts = await Get<List<ExternalAcmeCertDto>>(client,"api/v1/acme/external-certificates") ?? []; _warnings = await Get<List<ExpiryWarning>>(client,"api/v1/warnings/expiring") ?? []; _revocations = await Get<List<Revocation>>(client,"api/v1/revocations") ?? []; _sshCertificates = await Get<List<SshCertificateItem>>(client,"api/v1/ssh-certificates") ?? []; _backups = await Get<List<BackupListItem>>(client,"api/v1/backups") ?? []; SyncProfileSelection(); }
         catch { _pageError = "Die Verwaltungsdaten konnten nicht geladen werden. Prüfen Sie die Verbindung oder melden Sie sich erneut an."; }
         finally { _loading = false; await CheckForUpdateAsync(); }
     }
@@ -711,6 +713,39 @@ else
         if (_deletePlanId != id) { _deletePlanId = id; Snackbar.Add("Klicken Sie erneut auf Löschen, um den Erneuerungsplan zu entfernen.", Severity.Warning); return; }
         _busy = true;
         try { using var client = Client(); var response = await client.DeleteAsync($"api/v1/renewal-plans/{Uri.EscapeDataString(id)}"); if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response)); _deletePlanId = null; Snackbar.Add("Erneuerungsplan gelöscht.", Severity.Success); await LoadAllAsync(); }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task SaveAcmeAccessPolicy()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var networks = _acmeAllowlistedNetworks.Split([',', ';', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var response = await client.PutAsJsonAsync("api/v1/acme/access-policy", new { allowlistedClientNetworks = networks });
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            _acmeAccessPolicy = await response.Content.ReadFromJsonAsync<AcmeAccessPolicyDto>(_json) ?? _acmeAccessPolicy;
+            _acmeAllowlistedNetworks = string.Join(Environment.NewLine, _acmeAccessPolicy.AllowlistedClientNetworks);
+            Snackbar.Add("ACME-Client-Allowlist gespeichert.", Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private async Task RotateAcmeEab()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync("api/v1/acme/access-policy/eab/rotate", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadApiError(response));
+            var credentials = await response.Content.ReadFromJsonAsync<AcmeEabCredentialsDto>(_json) ?? throw new InvalidOperationException("EAB-Zugangsdaten fehlen in der Serverantwort.");
+            _eabKeyId = credentials.KeyId;
+            _eabHmacKey = credentials.HmacKey;
+            _acmeAccessPolicy = _acmeAccessPolicy with { EabKeyId = credentials.KeyId };
+            Snackbar.Add("Neue EAB-Zugangsdaten erzeugt. Den HMAC-Key jetzt in den ACME-Client übertragen.", Severity.Warning);
+        }
         catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
         finally { _busy = false; }
     }
@@ -1417,6 +1452,17 @@ else
     private RenderFragment AcmeContent => @<text>
         <MudText Typo="Typo.overline" Class="section-kicker">@L.AcmeKicker</MudText><MudText Typo="Typo.h3" Class="page-title">@L.AcmeTitle</MudText>
         <div class="metric-grid"><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">RFC 8555-Konten</MudText><MudText Typo="Typo.h3">@_rfc8555Accounts.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">RFC 8555-Aufträge</MudText><MudText Typo="Typo.h3">@_rfc8555Orders.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">Externe Aussteller</MudText><MudText Typo="Typo.h3">@_issuers.Count</MudText></MudPaper><MudPaper Class="metric-card" Elevation="0"><MudText Typo="Typo.overline">Externe Zertifikate</MudText><MudText Typo="Typo.h3">@_externalCerts.Count</MudText></MudPaper></div>
+        <MudPaper Class="panel" Elevation="0">
+            <MudText Typo="Typo.h5">Zugang für Standard-ACME-Clients</MudText>
+            <MudText Class="mud-text-secondary mb-3">Client-Netze in der Allowlist können RFC-8555-Konten ohne EAB anlegen. Alle anderen Clients benötigen EAB. Trage nur direkte Client-IP-Adressen oder CIDR-Netze ein, niemals pauschal die IP eines Reverse Proxys.</MudText>
+            <MudTextField @bind-Value="_acmeAllowlistedNetworks" Label="Allowlist für ACME-Clientnetze" Lines="3" HelperText="Eine IP-Adresse oder ein CIDR-Netz pro Zeile, z. B. 192.168.10.25 oder 192.168.20.0/24." />
+            <div class="d-flex gap-2 flex-wrap"><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAcmeAccessPolicy">Allowlist speichern</MudButton><MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="RotateAcmeEab">EAB-Zugangsdaten erzeugen / rotieren</MudButton></div>
+            <MudText Typo="Typo.caption" Class="d-block mt-3">Aktuelle EAB-Key-ID: <code>@(string.IsNullOrEmpty(_acmeAccessPolicy.EabKeyId) ? "wird beim ersten Abruf erzeugt" : _acmeAccessPolicy.EabKeyId)</code></MudText>
+            @if (!string.IsNullOrEmpty(_eabHmacKey))
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-3">Diese EAB-Zugangsdaten werden nur jetzt angezeigt. Kopiere sie direkt in den ACME-Client; eine Rotation macht den bisherigen HMAC-Key ungültig.<br /><b>Key-ID:</b> <code>@_eabKeyId</code><br /><b>HMAC-Key:</b> <code>@_eabHmacKey</code></MudAlert>
+            }
+        </MudPaper>
         <MudGrid>
             <MudItem xs="12" lg="6"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Externe ACME-Aussteller</MudText><MudText Class="mud-text-secondary mb-3">Für öffentlich vertrauenswürdige Zertifikate mit DNS-01-Challenge.</MudText>@IssuerForm</MudPaper></MudItem>
             <MudItem xs="12" lg="6"><MudPaper Class="panel" Elevation="0"><MudText Typo="Typo.h5">Vereinfachte ACME-API</MudText><MudText Class="mud-text-secondary mb-3">Optionale Steuerelemente für curl, Skripte und Fehlersuche. Standard-ACME-Clients verwenden RFC 8555.</MudText>@AcmeForm</MudPaper></MudItem>
@@ -1436,5 +1482,7 @@ else
     </text>;
 
     private record RenewalNotificationSettings(bool Enabled, string Provider, IReadOnlyList<string> Recipients, string FromAddress, string SmtpHost, int SmtpPort, string SmtpUserName, bool HasSmtpPassword, string M365TenantId, string M365ClientId, bool HasM365ClientSecret, string M365SenderMailbox);
+    private record AcmeAccessPolicyDto(IReadOnlyList<string> AllowlistedClientNetworks, string EabKeyId, bool EabRequiredForNonAllowlistedClients);
+    private record AcmeEabCredentialsDto(string KeyId, string HmacKey);
     private record LoginResult(string AccessToken, bool MustChangePassword); private record Instance(bool IsInitialized); private record Certificate(string Id,string Subject,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,string ExportPath); private record CertificateDetailsDto(string Id,string Subject,string Issuer,string SerialNumber,string Sha256Fingerprint,DateTime ValidFrom,DateTime ExpiresAt,string KeyAlgorithm,int KeySize,string Usage,List<string> DnsNames,List<string> IpAddresses,List<string> EnhancedKeyUsages,string ExportPath); private record Authority(string Id,string Name,string Type,string Subject,DateTime ExpiresAt,string? ParentId,bool IsActive,bool IsRevoked,int CrlValidityDays); private record Domain(string Name,bool InternalIssuanceEnabled,string? ConnectorId,DateTimeOffset CreatedAt); private record Connector(string Id,string Name,string Type,DateTimeOffset CreatedAt); private sealed class TargetProfileDto { public string Id { get; set; } = ""; public string Version { get; set; } = ""; public string DisplayName { get; set; } = ""; public string Purpose { get; set; } = ""; public string KeyAlgorithm { get; set; } = ""; public List<string> ExportFormats { get; set; } = []; public ProfileValidationDto? Validation { get; set; } = new(); public string Documentation { get; set; } = ""; public string RenewalScriptTemplate { get; set; } = ""; } private sealed class ProfileValidationDto { public bool RequiresDnsName { get; set; } public bool AllowsIpAddress { get; set; } = true; public int MaximumValidityDays { get; set; } = 730; } private record RenewalPlan(string Id,string CertificateId,int RenewBeforeDays,bool Enabled,DateTimeOffset CreatedAt); private record ExternalIssuer(string Id,string Name,string DirectoryUrl,string ConnectorId,DateTimeOffset CreatedAt); private record ExpiryWarning(string Subject,DateTime ExpiresAt,int DaysRemaining); private record Revocation(string SerialNumber,string Reason,DateTimeOffset RevokedAt); private record AcmeAccount(string Id); private record AcmeOrder(string Id); private record AcmeAccountFull(string Id,string Contact,DateTimeOffset CreatedAt); private record AcmeOrderFull(string Id,string AccountId,IReadOnlyList<string> Identifiers,string Status,DateTimeOffset CreatedAt,string? CertificateId); private record Rfc8555AccountDto(string Id,string Thumbprint,string[] Contact,string Status,DateTimeOffset CreatedAt); private record Rfc8555IdentifierDto(string Type,string Value); private record Rfc8555OrderDto(string Id,string AccountId,IReadOnlyList<Rfc8555IdentifierDto> Identifiers,string Status,DateTimeOffset CreatedAt,DateTimeOffset Expires,string? CertificateId); private record Rfc8555ChallengeDetailsDto(string Id,string Type,string Status,DateTimeOffset? ValidatedAt); private record Rfc8555AuthorizationDetailsDto(string Id,Rfc8555IdentifierDto Identifier,string Status,DateTimeOffset Expires,IReadOnlyList<Rfc8555ChallengeDetailsDto> Challenges); private record Rfc8555OrderDetailsDto(string Id,string AccountId,IReadOnlyList<Rfc8555IdentifierDto> Identifiers,string Status,DateTimeOffset CreatedAt,DateTimeOffset Expires,string? CertificateId,string? Error,IReadOnlyList<Rfc8555AuthorizationDetailsDto> Authorizations); private record Rfc8555AccountOrderDto(string Id,string Status,DateTimeOffset CreatedAt); private record Rfc8555AccountDetailsDto(string Id,string Thumbprint,string[] Contact,string Status,DateTimeOffset CreatedAt,IReadOnlyList<Rfc8555AccountOrderDto> Orders); private record ExternalAcmeCertDto(string Id,IReadOnlyList<string> DnsNames,string IssuerName,DateTimeOffset CreatedAt); private record Backup(string FileName); private record BackupListItem(string FileName, long Size, DateTimeOffset CreatedAt); private record UpdateCheckDto(string CurrentVersion, string? LatestVersion, bool UpdateAvailable, string? ReleaseUrl); private record ConnectorCheckResult(bool Connected, List<string> Zones, string? Message); private record ApiProblem(string? Detail, Dictionary<string, string[]>? Errors); private record SshIssueResultDto(string Id, string Authority, string CertificatePath, string Certificate); private record SshCertificateItem(string Id, string Kind, string Identity, string Principals, DateTime IssuedAt, string? ValidUntil); private record SshCaKeyDto(string Authority, string PublicKey);
 }

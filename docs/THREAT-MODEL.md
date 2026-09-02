@@ -18,7 +18,7 @@ Im einfachen Modus liegen Root-CA und Issuing-CA online im geschuetzten HomeCA-D
 ## Was nicht automatisch geloest wird
 
 - Ein kompromittierter HomeCA-Host, ein gestohlener Admin-Zugang oder ein ungeschuetztes Backup kann die gesamte PKI betreffen.
-- Eine interne ACME-Ausstellungszone ist ein Vertrauensbereich. In der Einstellung **alles erlaubt** kann jeder Client, der den ACME-Endpunkt erreichen darf, Zertifikate fuer diese Zone erhalten. Eine Allowlist begrenzt dies auf die hinterlegten Namen bzw. Muster, ersetzt aber keine Netzwerkzugriffskontrolle.
+- Eine interne ACME-Ausstellungszone ist ein Vertrauensbereich. Der RFC-8555-Endpunkt akzeptiert neue Konten nur von allowlisteten Clientnetzen oder mit EAB. Eine Allowlist ersetzt jedoch keine Netzwerkzugriffskontrolle; hinter einem Reverse Proxy muss die Quell-IP-Grenze besonders bewusst gesetzt werden.
 - CRLs helfen nur bei Clients und Diensten, die den Abruf und die Auswertung auch unterstuetzen.
 - HomeCA sichert keine privaten Schluessel, nachdem ein Deployment-Paket auf ein Zielsystem kopiert wurde.
 
@@ -29,9 +29,8 @@ Im einfachen Modus liegen Root-CA und Issuing-CA online im geschuetzten HomeCA-D
 3. Root-CA-Fingerabdruck ausserhalb der Download-Verbindung pruefen, etwa in der HomeCA-Konsole, im Passwortmanager oder ueber einen zweiten Admin-Kanal. Den Fingerabdruck nicht ausschliesslich von derselben URL beziehen wie das Zertifikat.
 4. Datenverzeichnis, Backup-Verzeichnis und Backup-Schluessel nur fuer `homeca` bzw. root lesbar machen. Deployment-Pakete enthalten private Schluessel.
 5. DNS-API-Tokens mit kleinstmoeglichen Rechten erstellen und nach einem vermuteten Leak sofort rotieren.
-6. Fuer jede interne Ausstellungszone bewusst entscheiden: **alles erlaubt** fuer ein vollstaendig vertrauenswuerdiges Netz oder **Allowlist** fuer feste, bekannte Dienste.
+6. Fuer jeden RFC-8555-Client bewusst entscheiden: sein direktes Netz allowlisten oder EAB-Zugangsdaten verwenden. EAB ist der sichere Standard fuer Clients hinter einem Reverse Proxy.
 
 ## Spaetere Haertung
 
 Ein spaeterer geharteter Modus darf eine Offline-Root-CA vorsehen: Die Root wird nur zur Erstellung oder Rotation einer Issuing-CA entsperrt; der laufende HomeCA-Dienst verwendet ausschliesslich die Issuing-CA. Das erhoeht den Schutz, bringt aber einen manuellen, dokumentierten Rotationsprozess mit sich.
-
