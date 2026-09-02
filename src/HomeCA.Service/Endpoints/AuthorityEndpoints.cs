@@ -44,9 +44,16 @@ namespace HomeCA.Service.Endpoints;
             try { var authority = await authorities.UpdateAsync(id, request, ct); return authority is null ? Results.NotFound() : Results.Ok(authority); }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.Conflict(new { detail = ex.Message }); }
         });
-        api.MapPost("/authorities/{id}/revoke", async (string id, CertificateAuthorityService authorities, CancellationToken ct) =>
+        api.MapPost("/authorities/{id}/revoke", async (string id, CertificateAuthorityService authorities, CrlService crl, CancellationToken ct) =>
         {
-            try { var authority = await authorities.RevokeAsync(id, ct); return authority is null ? Results.NotFound() : Results.Ok(authority); }
+            try
+            {
+                var authority = await authorities.RevokeAsync(id, ct);
+                if (authority is null) return Results.NotFound();
+                if (authority.Type == "intermediate" && authority.ParentId is not null)
+                    await crl.GenerateAsync(authority.ParentId, ct);
+                return Results.Ok(authority);
+            }
             catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
         });
         api.MapDelete("/authorities/{id}", async (string id, CertificateAuthorityService authorities, CancellationToken ct) =>

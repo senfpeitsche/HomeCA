@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text;
+using System.Formats.Asn1;
 using HomeCA.Service.Infrastructure;
 
 namespace HomeCA.Service.Pki;
@@ -45,6 +46,28 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             ?? throw new InvalidOperationException("The issuing CA is unavailable.");
         var parent = all.SingleOrDefault(x => x.Id == issuer.ParentId) ?? throw new InvalidOperationException("The issuing CA has no parent CA.");
         return new IssuingAuthorityPaths(issuer.Id, PathFor(issuer.Id), PathFor(parent.Id), issuer.CrlValidityDays);
+    }
+
+    /// <summary>Returns an authority capable of signing its own CRL, including inactive issuers.
+    /// Inactive issuers may still have valid certificates whose CRL must remain current.</summary>
+    public async Task<CrlAuthorityPaths> GetCrlAuthorityAsync(string id, CancellationToken ct)
+    {
+        var authority = (await ReadAsync(ct)).SingleOrDefault(x => x.Id == id)
+            ?? throw new InvalidOperationException("The certificate authority is unavailable.");
+        return new CrlAuthorityPaths(authority.Id, authority.Type, PathFor(authority.Id), authority.CrlValidityDays);
+    }
+
+    /// <summary>Returns the revoked intermediate certificates directly issued by a root CA.</summary>
+    public async Task<IReadOnlyList<RevokedIntermediateCertificate>> GetRevokedIntermediatesAsync(string rootId, CancellationToken ct)
+    {
+        var all = await ReadAsync(ct);
+        return all.Where(x => x.Type == "intermediate" && x.ParentId == rootId && x.IsRevoked)
+            .Select(x =>
+            {
+                using var certificate = Load(x);
+                return new RevokedIntermediateCertificate(certificate.SerialNumber, x.RevokedAt ?? x.CreatedAt);
+            })
+            .ToList();
     }
 
     public async Task<string?> FindIssuingIdBySubjectAsync(string subject, CancellationToken ct) =>
@@ -116,13 +139,14 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             {
                 parent = all.SingleOrDefault(x => x.Id == request.ParentId) ?? throw new ArgumentException("The selected parent CA does not exist.");
                 if (!parent.IsActive || parent.IsRevoked) throw new InvalidOperationException("The selected parent CA is not active.");
-                using var parentCertificate = Load(parent);
-                if (parentCertificate.NotAfter <= DateTime.UtcNow.AddDays(request.ValidityDays))
+                using var parentCertificateForValidation = Load(parent);
+                if (parentCertificateForValidation.NotAfter <= DateTime.UtcNow.AddDays(request.ValidityDays))
                     throw new ArgumentException("The intermediate CA must expire before its parent CA.");
             }
             var id = Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(Path.Combine(_root, id));
-            using var certificate = CreateCertificate(request, parent is null ? null : Load(parent));
+            using var parentCertificate = parent is null ? null : Load(parent);
+            using var certificate = CreateCertificate(request, parentCertificate, parent?.Id);
             await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12), ct);
             var item = new AuthorityState(id, request.Name.Trim(), request.Type, request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, isDefaultIssuing);
             all.Add(item); await WriteAsync(all, ct);
@@ -150,7 +174,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
 
             var id = Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(Path.Combine(_root, id));
-            using var certificate = CreateCertificate(new(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays), parentCertificate);
+            using var certificate = CreateCertificate(new(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays), parentCertificate, request.ParentId);
             await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12), ct);
             var replacement = new AuthorityState(id, request.Name.Trim(), "intermediate", request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, true);
             var currentIndex = all.FindIndex(x => x.Id == current.Id);
@@ -190,7 +214,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             var all = await ReadAsync(ct); var index = all.FindIndex(x => x.Id == id);
             if (index < 0) return null;
             if (all.Any(x => x.ParentId == id && !x.IsRevoked)) throw new InvalidOperationException("Revoke or delete subordinate CAs first.");
-            all[index] = all[index] with { IsActive = false, IsRevoked = true };
+            all[index] = all[index] with { IsActive = false, IsRevoked = true, RevokedAt = DateTimeOffset.UtcNow };
             await WriteAsync(all, ct); return ToItem(all[index]);
         }
         finally { _gate.Release(); }
@@ -266,7 +290,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         if (string.IsNullOrWhiteSpace(x.Name) || string.IsNullOrWhiteSpace(x.Subject) || x.Type is not ("root" or "intermediate") || x.KeyAlgorithm is not ("ECC" or "RSA")) throw new ArgumentException("Name, subject, type and key algorithm are invalid.");
         if (x.ValidityDays is < 1 or > 7300 || x.CrlValidityDays is < 1 or > 365) throw new ArgumentOutOfRangeException(nameof(x.ValidityDays));
     }
-    private static X509Certificate2 CreateCertificate(CreateAuthorityRequest x, X509Certificate2? parent)
+    private X509Certificate2 CreateCertificate(CreateAuthorityRequest x, X509Certificate2? parent, string? parentId)
     {
         using var ecc = x.KeyAlgorithm == "ECC" ? ECDsa.Create(ECCurve.NamedCurves.nistP256) : null;
         using var rsa = x.KeyAlgorithm == "RSA" ? RSA.Create(3072) : null;
@@ -274,12 +298,27 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, parent is null, parent is null ? 1 : 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign | X509KeyUsageFlags.DigitalSignature, true));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
+        var publicUrl = storage.PublicUrl?.TrimEnd('/');
+        if (parent is not null && parentId is not null && !string.IsNullOrWhiteSpace(publicUrl))
+            request.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{parentId}"));
         var from = DateTimeOffset.UtcNow.AddMinutes(-5); var until = DateTimeOffset.UtcNow.AddDays(x.ValidityDays);
         if (parent is null) return request.CreateSelfSigned(from, until);
         using var issued = request.Create(parent, from, until, RandomNumberGenerator.GetBytes(16));
         return ecc is not null ? issued.CopyWithPrivateKey(ecc) : issued.CopyWithPrivateKey(rsa!);
     }
-    private sealed record AuthorityState(string Id, string Name, string Type, string Subject, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, bool IsActive, bool IsRevoked, DateTimeOffset CreatedAt, DateTime ExpiresAt, bool IsDefaultIssuing = false);
+    private static X509Extension BuildCdpExtension(string url)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        using (writer.PushSequence())
+        using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
+        using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
+        {
+            writer.WriteCharacterString(UniversalTagNumber.IA5String, url, new Asn1Tag(TagClass.ContextSpecific, 6));
+        }
+        return new X509Extension("2.5.29.31", writer.Encode(), false);
+    }
+    private sealed record AuthorityState(string Id, string Name, string Type, string Subject, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, bool IsActive, bool IsRevoked, DateTimeOffset CreatedAt, DateTime ExpiresAt, bool IsDefaultIssuing = false, DateTimeOffset? RevokedAt = null);
 }
 
 public sealed record CreateAuthorityRequest(string Name, string Subject, string Type, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays);
@@ -287,6 +326,8 @@ public sealed record UpdateAuthorityRequest(string Name, bool IsActive, int CrlV
 public sealed record RotateIntermediateRequest(string Name, string Subject, string ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays);
 public sealed record IntermediateRotationResult(CertificateAuthorityInventoryItem PreviousAuthority, CertificateAuthorityInventoryItem ReplacementAuthority, int DependentCertificateCount, DateTime? LatestDependentCertificateExpiry);
 public sealed record IssuingAuthorityPaths(string Id, string IssuingPath, string RootPath, int CrlValidityDays);
+public sealed record CrlAuthorityPaths(string Id, string Type, string AuthorityPath, int CrlValidityDays);
+public sealed record RevokedIntermediateCertificate(string SerialNumber, DateTimeOffset RevokedAt);
 public sealed record AuthorityCertificateExport(string FileName, string ContentType, byte[] Content);
 public sealed record AuthorityInventory(string RootSubject, DateTime RootExpiresAt, string TlsIssuingSubject, DateTime TlsIssuingExpiresAt, string SshHostAuthority, string SshUserAuthority);
 public sealed record CertificateAuthorityInventoryItem(string Id, string Name, string Type, string Subject, DateTime ExpiresAt, string? ParentId, bool IsActive, bool IsRevoked, int CrlValidityDays, bool IsDefaultIssuing = false);

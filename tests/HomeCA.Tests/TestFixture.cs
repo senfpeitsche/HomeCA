@@ -27,7 +27,8 @@ public sealed class TestFixture : IDisposable
         {
             RootPath = RootPath,
             BackupPath = BackupPath,
-            BackupKeyPath = BackupKeyPath
+            BackupKeyPath = BackupKeyPath,
+            PublicUrl = "http://localhost:5080"
         });
         return new HomeCaStorage(options, NullLogger<HomeCaStorage>.Instance);
     }

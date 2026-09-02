@@ -45,6 +45,11 @@ public sealed class RenewalBackgroundService(
         var certificates = scope.ServiceProvider.GetRequiredService<CertificateIssuanceService>();
         var storage = scope.ServiceProvider.GetRequiredService<HomeCaStorage>();
         var notifications = scope.ServiceProvider.GetRequiredService<RenewalMailNotificationService>();
+        var crl = scope.ServiceProvider.GetRequiredService<CrlService>();
+
+        var renewedCrls = await crl.RenewExpiringAsync(cancellationToken);
+        if (renewedCrls > 0)
+            logger.LogInformation("Renewed {Count} missing or expiring CRL(s)", renewedCrls);
 
         var allPlans = await plans.ListAsync(cancellationToken);
         var enabledPlans = allPlans.Where(plan => plan.Enabled).ToList();
