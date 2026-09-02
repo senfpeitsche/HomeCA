@@ -158,7 +158,8 @@ NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/homeca /var/backups/homeca /etc/homeca
+# The service may create only its TLS drop-in via the constrained sudoers rule.
+ReadWritePaths=/var/lib/homeca /var/backups/homeca /etc/homeca /etc/systemd/system/homeca.service.d
 
 [Install]
 WantedBy=multi-user.target

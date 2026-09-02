@@ -662,8 +662,8 @@ api.MapPost("/system/activate-tls", async (SetupStateService setupState, HomeCaS
         return Results.Conflict(new { detail = $"Zertifikatsdatei nicht gefunden: {tlsConfig.PfxPath}" });
 
     // Write the systemd override that switches Kestrel to HTTPS.
-    // The service runs under ProtectSystem=strict, so /etc/systemd/system
-    // is always read-only — we must use sudo for all writes there.
+    // The unit grants write access only to its drop-in directory. The constrained
+    // sudoers rule below limits the service to creating this specific file.
     const string overrideDir = "/etc/systemd/system/homeca.service.d";
     const string overridePath = "/etc/systemd/system/homeca.service.d/tls.conf";
 
