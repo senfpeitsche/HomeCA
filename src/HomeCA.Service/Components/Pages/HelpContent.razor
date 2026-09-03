@@ -403,7 +403,7 @@
                 <tr><td>Custom CA URL</td><td><code>http://HOMECA:5080/acme/directory</code></td></tr>
             </tbody>
         </MudSimpleTable>
-        <MudText><strong>Key Identifier</strong> und <strong>HMAC Key</strong> leer lassen — HomeCA braucht kein EAB.</MudText>
+        <MudText>Ist die direkte OPNsense-IP bzw. ihr Netz in HomeCA allowlistet, bleiben <strong>Key Identifier</strong> und <strong>HMAC Key</strong> leer. Andernfalls zuerst in <strong>ACME > Zugang für Standard-ACME-Clients</strong> einen eigenen EAB-Zugang, z. B. <code>opnsense-fw</code>, erstellen und dessen <strong>Key-ID</strong> und <strong>HMAC-Key</strong> hier eintragen.</MudText>
         <MudText Class="mt-2">Speichern, dann die <strong>Register</strong>-Aktion (Kreispfeil-Symbol) in der Kontoliste ausführen.</MudText>
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">Die URL muss auf <code>/acme/directory</code> enden — nicht <code>/api/v1/acme/directory</code> (das ist die vereinfachte API, die acme.sh nicht versteht).</MudAlert>
 
@@ -444,7 +444,11 @@
         <MudText Typo="Typo.h6" Class="mt-4 mb-2">1.7 Root-CA importieren</MudText>
         <MudText>Unter <strong>System > Trust > Authorities > + Add</strong> — Method: <strong>Import an existing Certificate Authority</strong> — das HomeCA Root-CA-PEM einfügen. Download: <code>GET /api/v1/trust-anchor/pem</code></MudText>
 
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. Weitere ACME-Clients</MudText>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">2. EAB für nicht allowlistete Clients</MudText>
+        <MudText>Für jeden ACME-Client außerhalb der Allowlist unter <strong>ACME > Zugang für Standard-ACME-Clients</strong> einen separaten EAB-Zugang anlegen. HomeCA zeigt die zugehörige <strong>Key-ID</strong> und den <strong>HMAC-Key</strong> nur beim Erstellen an.</MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">Ein EAB-Zugang registriert genau ein ACME-Konto. Verwende für OPNsense, acme.sh, Traefik und weitere Systeme jeweils eigene Zugangsdaten. Bei einem Verlust nur den betroffenen Zugang sperren und einen neuen erstellen.</MudAlert>
+
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Weitere ACME-Clients</MudText>
         <MudText Class="mud-text-secondary mb-3">Alle RFC 8555-kompatiblen Clients funktionieren mit der HomeCA Directory-URL. Da Challenges automatisch bestätigt werden, ist die Wahl des Challenge-Typs irrelevant.</MudText>
 
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
@@ -453,8 +457,8 @@
                 <MudText Class="mud-text-secondary mt-2">Certbot erwartet einen Challenge-Typ, obwohl HomeCA ihn nicht prüft. <code>--preferred-challenges http</code> ist die einfachste Wahl. Für Standalone-Modus (ohne bestehenden Webserver): <code>--standalone</code> statt <code>--webroot</code>.</MudText>
             </MudExpansionPanel>
             <MudExpansionPanel Text="acme.sh">
-                <CodePreview Text="@_acmeAcmeSh" Lines="4" />
-                <MudText Class="mud-text-secondary mt-2"><code>--webroot</code> legt die Challenge-Datei im angegebenen Verzeichnis ab. Da HomeCA die Challenge nicht abruft, kann ein beliebiges Verzeichnis verwendet werden. Alternativ <code>--standalone</code>.</MudText>
+                <CodePreview Text="@_acmeAcmeSh" Lines="9" />
+                <MudText Class="mud-text-secondary mt-2">Die Konto-Registrierung mit EAB ist nur nötig, wenn der Client nicht allowlistet ist. <code>--webroot</code> legt die Challenge-Datei im angegebenen Verzeichnis ab. Da HomeCA die Challenge nicht abruft, kann ein beliebiges Verzeichnis verwendet werden. Alternativ <code>--standalone</code>.</MudText>
             </MudExpansionPanel>
             <MudExpansionPanel Text="Caddy">
                 <CodePreview Text="@_acmeCaddy" Lines="8" />
@@ -467,19 +471,19 @@
             </MudExpansionPanel>
         </MudExpansionPanels>
 
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">3. Ausstellungszone anlegen</MudText>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Ausstellungszone anlegen</MudText>
         <MudText>Alle DNS-Namen in ACME-Anfragen müssen unter einer aktiven Ausstellungszone liegen. Zonen werden unter <strong>Einstellungen > Domains</strong> angelegt oder per API:</MudText>
         <CodePreview Text="@_acmeZone" Lines="4" />
         <MudText Class="mud-text-secondary">Beispiel: Zone <code>lab.example.com</code> erlaubt Zertifikate für <code>lab.example.com</code>, <code>gw.lab.example.com</code>, <code>nas.lab.example.com</code>, etc.</MudText>
 
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">4. Externe ACME-Aussteller</MudText>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">5. Externe ACME-Aussteller</MudText>
         <MudText>Für öffentlich vertrauenswürdige Zertifikate (Let's Encrypt, ZeroSSL, etc.) kann HomeCA als verwalteter ACME-Client mit DNS-01-Challenges agieren.</MudText>
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">4.1 DNS-Connector einrichten</MudText>
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">5.1 DNS-Connector einrichten</MudText>
         <MudText>Unter <strong>Einstellungen</strong> eine Connector-Instanz anlegen. Unterstützte Typen: <code>technitium</code> und <code>hetzner</code>.</MudText>
         <CodePreview Text="@_acmeConnector" Lines="6" />
 
-        <MudText Typo="Typo.h6" Class="mt-3 mb-2">4.2 Externen Aussteller registrieren</MudText>
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">5.2 Externen Aussteller registrieren</MudText>
         <CodePreview Text="@_acmeIssuer" Lines="5" />
         <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
             <thead><tr><th>CA</th><th>Directory-URL</th></tr></thead>
@@ -492,7 +496,7 @@
             </tbody>
         </MudSimpleTable>
 
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">5. Vereinfachte API (curl/Skripte)</MudText>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">6. Vereinfachte API (curl/Skripte)</MudText>
         <MudText Class="mud-text-secondary mb-3">Neben dem RFC 8555-Server bietet HomeCA eine vereinfachte REST-API unter <code>/api/v1/acme/</code> mit Bearer-Token-Authentifizierung. Diese ist für direkte curl-Aufrufe und eigene Skripte gedacht — nicht für Standard-ACME-Clients.</MudText>
 
         <MudExpansionPanels MultiExpansion="true" Elevation="0">
@@ -515,11 +519,11 @@
             </MudExpansionPanel>
         </MudExpansionPanels>
 
-        <MudText Typo="Typo.h5" Class="mt-6 mb-2">6. Fehlerbehebung</MudText>
+        <MudText Typo="Typo.h5" Class="mt-6 mb-2">7. Fehlerbehebung</MudText>
         <MudSimpleTable Dense="true" Bordered="true" Class="my-3">
             <thead><tr><th>Problem</th><th>Lösung</th></tr></thead>
             <tbody>
-                <tr><td>Konto-Registrierung schlägt fehl</td><td>URL prüfen — muss <code>/acme/directory</code> sein, nicht <code>/api/v1/acme/directory</code>. HomeCA muss vom Client erreichbar sein.</td></tr>
+                <tr><td>Konto-Registrierung schlägt fehl</td><td>URL prüfen — muss <code>/acme/directory</code> sein, nicht <code>/api/v1/acme/directory</code>. Ist der Client nicht allowlistet, ein unbenutztes, eigenes EAB-Paar mit korrekter Key-ID und HMAC-Key verwenden.</td></tr>
                 <tr><td>„domain validation failed"</td><td>DNS-Name muss unter einer aktiven Ausstellungszone liegen. HomeCA-Logs prüfen: <code>journalctl -u homeca -f</code></td></tr>
                 <tr><td>„Signing failed" / OpenSSL-Fehler</td><td>PEM-Datei prüfen — zwischen den Zertifikatsblöcken muss ein Zeilenumbruch sein.</td></tr>
                 <tr><td>Erneuerung funktioniert, aber Dienst zeigt altes Zertifikat</td><td>Automation in OPNsense fehlt — siehe Schritt 1.4.</td></tr>
@@ -779,6 +783,12 @@
           -d app.lab.example.com
         """;
     private const string _acmeAcmeSh = """
+        # Einmalig: ACME-Konto mit einem individuellen EAB-Zugang registrieren
+        acme.sh --register-account \
+          --server http://HOMECA:5080/acme/directory \
+          --eab-kid "$EAB_KID" --eab-hmac-key "$EAB_HMAC_KEY" \
+          -m admin@lab.example.com
+
         # Zertifikat mit acme.sh ausstellen
         acme.sh --issue \
           --server http://HOMECA:5080/acme/directory \

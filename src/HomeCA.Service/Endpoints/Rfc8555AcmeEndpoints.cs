@@ -104,13 +104,15 @@ namespace HomeCA.Service.Endpoints;
                     // Existing accounts have already passed their admission check. A new
                     // account is admitted either from the configured client-network
                     // allowlist or through RFC 8555 External Account Binding (EAB).
+                    string? eabKeyId = null;
                     if (existing is null)
                     {
                         var binding = System.Text.Json.Nodes.JsonNode.Parse(jws.Payload)?.AsObject()?["externalAccountBinding"]?.AsObject();
-                        await accessPolicy.ValidateNewAccountAsync(ctx.Connection.RemoteIpAddress, binding, jws.Jwk, expectedUrl, ct);
+                        eabKeyId = await accessPolicy.AuthorizeNewAccountAsync(ctx.Connection.RemoteIpAddress, binding, jws.Jwk, expectedUrl, ct);
                     }
-        
+
                     var account = await acme.NewAccountAsync(jws.Jwk, contact, ct);
+                    if (eabKeyId is not null) await accessPolicy.AssociateEabWithAccountAsync(eabKeyId, account.Id, ct);
                     var accountUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{account.Id}";
                     AddAcmeHeaders(ctx, acme, accountUrl);
                     logger.LogInformation("ACME newAccount: registered/found account {AccountId}, url={Url}", account.Id, accountUrl);

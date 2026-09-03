@@ -389,7 +389,9 @@ Für Clients im Netz siehe [TRUST-INSTALLATION.md](TRUST-INSTALLATION.md).
 HomeCA kombiniert zwei sichere und einfache Zugangswege fuer den RFC-8555-Endpunkt:
 
 - Ein Client aus einem allowlisteten IP-Netz darf sein ACME-Konto ohne weitere Zugangsdaten anlegen.
-- Jeder andere Client muss beim Anlegen des Kontos **External Account Binding (EAB)** mit `HS256` verwenden. Das EAB-Geheimnis wird nur beim Erzeugen oder Rotieren angezeigt.
+- Jeder andere Client muss beim Anlegen des Kontos **External Account Binding (EAB)** mit `HS256` verwenden. Lege dafür in der ACME-Verwaltung pro Client einen eigenen, beschrifteten EAB-Zugang an, etwa `opnsense-fw`, `traefik-prod` oder `nas`.
+
+Ein EAB-Zugang enthält eine eigene `keyId` und einen eigenen `hmacKey`. Der HMAC-Key wird nur beim Anlegen angezeigt und kann genau ein ACME-Konto registrieren. Nach der Registrierung verknüpft HomeCA den Zugang mit diesem Konto. Bei Verlust oder Außerbetriebnahme den einzelnen Zugang sperren und bei Bedarf einen neuen für den Client anlegen; andere ACME-Clients bleiben dabei unberührt.
 
 Die Einstellung ist ueber die authentifizierte Verwaltungs-API erreichbar:
 
@@ -403,12 +405,13 @@ curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/j
   -d '{"allowlistedClientNetworks":["192.168.10.25","192.168.20.0/24"]}' \
   http://homeca.lab.example.com:5080/api/v1/acme/access-policy
 
-# EAB-Zugangsdaten einmalig erzeugen bzw. rotieren
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  http://homeca.lab.example.com:5080/api/v1/acme/access-policy/eab/rotate
+# EAB-Zugang für einen einzelnen Client anlegen
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"opnsense-fw"}' \
+  http://homeca.lab.example.com:5080/api/v1/acme/access-policy/eab-credentials
 ```
 
-Trage die Antwort `keyId` und `hmacKey` direkt im ACME-Client ein und behandle den HMAC-Key wie ein Kennwort. Eine Rotation macht den bisherigen EAB-Key sofort ungueltig.
+Trage die Antwort `keyId` und `hmacKey` direkt im vorgesehenen ACME-Client ein und behandle den HMAC-Key wie ein Kennwort. Der Zugriff lässt sich später über `DELETE /api/v1/acme/access-policy/eab-credentials/<keyId>` einzeln sperren.
 
 Die Allowlist wertet bewusst die IP der direkten TCP-Verbindung aus, nicht ungesicherte Forwarded-Header. Steht HomeCA hinter einem Reverse Proxy, sollte dessen IP **nicht** pauschal allowlistet werden: Sonst wuerden alle vom Proxy kommenden Clients EAB umgehen. In diesem Aufbau EAB verwenden oder die Zugangskontrolle am Proxy entsprechend restriktiv gestalten.
 

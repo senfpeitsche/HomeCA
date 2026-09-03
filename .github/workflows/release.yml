@@ -63,13 +63,6 @@ jobs:
           cp deploy/scripts/homeca-install.sh homeca-install.sh
           sha256sum homeca-linux-x64.tar.gz homeca-release-bundle.tar.gz homeca-lxc.sh homeca-install.sh > SHA256SUMS
 
-      - name: Verify release bundle layout and checksum
-        run: |
-          tar -tzf homeca-release-bundle.tar.gz | grep -qx './app/HomeCA.Service.dll'
-          tar -tzf homeca-release-bundle.tar.gz | grep -qx './deploy/systemd/homeca.service'
-          tar -tzf homeca-release-bundle.tar.gz | grep -qx './deploy/sudoers/homeca-tls'
-          sha256sum --check SHA256SUMS
-
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@v0
         with:

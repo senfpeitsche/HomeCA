@@ -17,7 +17,7 @@ public sealed class AcmeAccessPolicyTests : IDisposable
         var policy = new AcmeAccessPolicyRegistry(_fixture.CreateStorage());
         await policy.UpdateAsync(new UpdateAcmeAccessPolicyRequest(["192.168.10.42"]), CancellationToken.None);
 
-        await policy.ValidateNewAccountAsync(IPAddress.Parse("192.168.10.42"), null, AccountJwk(), "https://pki.example/acme/new-acct", CancellationToken.None);
+        await policy.AuthorizeNewAccountAsync(IPAddress.Parse("192.168.10.42"), null, AccountJwk(), "https://pki.example/acme/new-acct", CancellationToken.None);
     }
 
     [Fact]
@@ -25,20 +25,58 @@ public sealed class AcmeAccessPolicyTests : IDisposable
     {
         var policy = new AcmeAccessPolicyRegistry(_fixture.CreateStorage());
 
-        var exception = await Assert.ThrowsAsync<AcmeProblemException>(() => policy.ValidateNewAccountAsync(IPAddress.Parse("192.168.10.42"), null, AccountJwk(), "https://pki.example/acme/new-acct", CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<AcmeProblemException>(() => policy.AuthorizeNewAccountAsync(IPAddress.Parse("192.168.10.42"), null, AccountJwk(), "https://pki.example/acme/new-acct", CancellationToken.None));
 
         Assert.Equal("externalAccountRequired", exception.ProblemType);
     }
 
     [Fact]
-    public async Task NonAllowlistedClient_WithValidEab_CanRegister()
+    public async Task NonAllowlistedClient_WithValidEab_CanRegisterOnlyOneAccount()
     {
         var policy = new AcmeAccessPolicyRegistry(_fixture.CreateStorage());
-        var credentials = await policy.RotateEabAsync(CancellationToken.None);
+        var credentials = await policy.CreateEabAsync(new CreateAcmeEabCredentialRequest("opnsense-fw"), CancellationToken.None);
         var jwk = AccountJwk();
         const string url = "https://pki.example/acme/new-acct";
 
-        await policy.ValidateNewAccountAsync(IPAddress.Parse("192.168.10.42"), CreateEabBinding(credentials, jwk, url), jwk, url, CancellationToken.None);
+        var keyId = await policy.AuthorizeNewAccountAsync(IPAddress.Parse("192.168.10.42"), CreateEabBinding(credentials, jwk, url), jwk, url, CancellationToken.None);
+        Assert.Equal(credentials.KeyId, keyId);
+        await policy.AssociateEabWithAccountAsync(keyId!, "acme-account-1", CancellationToken.None);
+        var accessPolicy = await policy.GetAsync(CancellationToken.None);
+        var credential = Assert.Single(accessPolicy.EabCredentials);
+        Assert.Equal("opnsense-fw", credential.Name);
+        Assert.Equal("acme-account-1", credential.AccountId);
+        Assert.NotNull(credential.UsedAt);
+
+        var exception = await Assert.ThrowsAsync<AcmeProblemException>(() => policy.AuthorizeNewAccountAsync(IPAddress.Parse("192.168.10.42"), CreateEabBinding(credentials, AccountJwk(), url), AccountJwk(), url, CancellationToken.None));
+        Assert.Equal("unauthorized", exception.ProblemType);
+    }
+
+    [Fact]
+    public async Task RevokedEab_CannotRegisterAnAccount()
+    {
+        var policy = new AcmeAccessPolicyRegistry(_fixture.CreateStorage());
+        var credentials = await policy.CreateEabAsync(new CreateAcmeEabCredentialRequest("nas"), CancellationToken.None);
+        await policy.RevokeEabAsync(credentials.KeyId, CancellationToken.None);
+        var jwk = AccountJwk();
+
+        var exception = await Assert.ThrowsAsync<AcmeProblemException>(() => policy.AuthorizeNewAccountAsync(IPAddress.Parse("192.168.10.42"), CreateEabBinding(credentials, jwk, "https://pki.example/acme/new-acct"), jwk, "https://pki.example/acme/new-acct", CancellationToken.None));
+        Assert.Equal("unauthorized", exception.ProblemType);
+    }
+
+    [Fact]
+    public async Task LegacyGlobalEab_IsMigratedToANamedCredential()
+    {
+        var storage = _fixture.CreateStorage();
+        var stateDirectory = Path.Combine(_fixture.RootPath, "state");
+        Directory.CreateDirectory(stateDirectory);
+        await File.WriteAllTextAsync(Path.Combine(stateDirectory, "acme-access-policy.json"), """{"AllowlistedClientNetworks":[],"EabKeyId":"legacy-kid","EabHmacKey":"legacy-secret"}""");
+
+        var policy = new AcmeAccessPolicyRegistry(storage);
+        var accessPolicy = await policy.GetAsync(CancellationToken.None);
+
+        var credential = Assert.Single(accessPolicy.EabCredentials);
+        Assert.Equal("legacy-kid", credential.KeyId);
+        Assert.Equal("Legacy EAB credential", credential.Name);
     }
 
     private static JsonObject AccountJwk() => new()

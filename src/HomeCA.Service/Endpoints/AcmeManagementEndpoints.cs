@@ -80,14 +80,19 @@ namespace HomeCA.Service.Endpoints;
         });
         
         // RFC 8555 admission: allowlisted client networks may create accounts without
-        // EAB; every other client needs the EAB credential returned only on rotation.
+        // EAB; every other client needs an individually issued EAB credential.
         api.MapGet("/acme/access-policy", async (AcmeAccessPolicyRegistry policy, CancellationToken ct) => Results.Ok(await policy.GetAsync(ct)));
         api.MapPut("/acme/access-policy", async (UpdateAcmeAccessPolicyRequest request, AcmeAccessPolicyRegistry policy, CancellationToken ct) =>
         {
             try { return Results.Ok(await policy.UpdateAsync(request, ct)); }
             catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["allowlistedClientNetworks"] = [exception.Message] }); }
         });
-        api.MapPost("/acme/access-policy/eab/rotate", async (AcmeAccessPolicyRegistry policy, CancellationToken ct) => Results.Ok(await policy.RotateEabAsync(ct)));
+        api.MapPost("/acme/access-policy/eab-credentials", async (CreateAcmeEabCredentialRequest request, AcmeAccessPolicyRegistry policy, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await policy.CreateEabAsync(request, ct)); }
+            catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [exception.Message] }); }
+        });
+        api.MapDelete("/acme/access-policy/eab-credentials/{keyId}", async (string keyId, AcmeAccessPolicyRegistry policy, CancellationToken ct) => await policy.RevokeEabAsync(keyId, ct) ? Results.NoContent() : Results.NotFound());
         
         // Renewal plans
     }
