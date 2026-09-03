@@ -336,6 +336,9 @@ public sealed class Rfc8555AcmeService
 
     public async Task<Rfc8555Order?> GetOrderAsync(string orderId, CancellationToken ct)
     {
+        await _gate.WaitAsync(ct);
+        try
+        {
         var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
         var order = orders.FirstOrDefault(o => o.Id == orderId);
         if (order is null) return null;
@@ -353,6 +356,8 @@ public sealed class Rfc8555AcmeService
             }
         }
         return order;
+        }
+        finally { _gate.Release(); }
     }
 
     public async Task<IReadOnlyList<Rfc8555Order>> ListOrdersAsync(CancellationToken ct) =>
@@ -655,6 +660,13 @@ public sealed class Rfc8555AcmeService
         if (!File.Exists(path)) return default;
         await using var stream = File.OpenRead(path);
         return await JsonSerializer.DeserializeAsync<T>(stream, cancellationToken: ct);
+    }
+
+    private async Task<T?> ReadLockedAsync<T>(string path, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try { return await ReadAsync<T>(path, ct); }
+        finally { _gate.Release(); }
     }
 
     private static async Task WriteAsync<T>(string path, T value, CancellationToken ct)
