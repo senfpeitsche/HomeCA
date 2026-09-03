@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-format:
+    name: Build, test, and format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore HomeCA.slnx
+
+      - name: Build
+        run: dotnet build HomeCA.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test HomeCA.slnx --configuration Release --no-build --no-restore
