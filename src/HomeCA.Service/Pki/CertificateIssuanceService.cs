@@ -12,28 +12,12 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
 {
     private readonly string _certificateRoot = Path.Combine(storage.RootPath, "certificates");
     private readonly string _exportRoot = Path.Combine(storage.RootPath, "exports");
+    private readonly string _inventoryPath = Path.Combine(storage.RootPath, "certificates", "inventory.json");
+    private readonly SemaphoreSlim _inventoryGate = new(1, 1);
 
-    public Task<IReadOnlyList<CertificateInventoryItem>> ListAsync(CancellationToken cancellationToken, string? search = null, int skip = 0, int take = 100)
+    public async Task<IReadOnlyList<CertificateInventoryItem>> ListAsync(CancellationToken cancellationToken, string? search = null, int skip = 0, int take = 100)
     {
-        if (!Directory.Exists(_certificateRoot)) return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>([]);
-
-        var items = new List<CertificateInventoryItem>();
-        foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
-        {
-            var id = Path.GetFileName(directory);
-            var pfxPath = Path.Combine(directory, "certificate.pfx");
-            if (!File.Exists(pfxPath)) continue;
-
-            try
-            {
-                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
-                items.Add(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, id)));
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to load certificate {CertificateId} from {Path}, skipping", id, pfxPath);
-            }
-        }
+        var items = await LoadInventoryAsync(cancellationToken);
 
         var query = items.OrderBy(item => item.ExpiresAt).AsEnumerable();
 
@@ -46,7 +30,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         }
 
         var result = query.Skip(skip).Take(Math.Clamp(take, 1, 500)).ToList();
-        return Task.FromResult<IReadOnlyList<CertificateInventoryItem>>(result);
+        return result;
     }
 
     /// <summary>Returns detailed certificate metadata including SANs, extensions, fingerprint and issuer chain.</summary>
@@ -205,9 +189,37 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         }
 
         await deployments.CreateAsync(exportPath, id, request.TargetProfileId, cancellationToken);
+        await AddToInventoryAsync(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", exportPath), cancellationToken);
         logger.LogInformation("Issued certificate {CertificateId} for {Subject}, valid until {ExpiresAt:yyyy-MM-dd}", id, subject, notAfter);
         return new IssueResult(id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath);
     }
+
+    private async Task<List<CertificateInventoryItem>> LoadInventoryAsync(CancellationToken ct)
+    {
+        await _inventoryGate.WaitAsync(ct);
+        try
+        {
+            if (File.Exists(_inventoryPath)) return await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(File.OpenRead(_inventoryPath), cancellationToken: ct) ?? [];
+            if (!Directory.Exists(_certificateRoot)) return [];
+            var items = new List<CertificateInventoryItem>();
+            foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
+            {
+                var pfxPath = Path.Combine(directory, "certificate.pfx"); if (!File.Exists(pfxPath)) continue;
+                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+                items.Add(new(Path.GetFileName(directory), certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, Path.GetFileName(directory))));
+            }
+            await WriteInventoryAsync(items, ct); return items;
+        }
+        finally { _inventoryGate.Release(); }
+    }
+    private async Task AddToInventoryAsync(CertificateInventoryItem item, CancellationToken ct)
+    {
+        var items = await LoadInventoryAsync(ct); await _inventoryGate.WaitAsync(ct);
+        try { items.RemoveAll(x => x.Id == item.Id); items.Add(item); await WriteInventoryAsync(items, ct); }
+        finally { _inventoryGate.Release(); }
+    }
+    private async Task WriteInventoryAsync(List<CertificateInventoryItem> items, CancellationToken ct)
+    { var tmp = _inventoryPath + ".tmp"; await using (var stream = File.Create(tmp)) await JsonSerializer.SerializeAsync(stream, items, cancellationToken: ct); File.Move(tmp, _inventoryPath, true); }
 
     /// <summary>Builds an X.509 CRL Distribution Points extension (OID 2.5.29.31) containing a single HTTP URI.</summary>
     private static X509Extension BuildCdpExtension(string url)

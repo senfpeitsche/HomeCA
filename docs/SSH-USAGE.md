@@ -195,12 +195,28 @@ curl -s http://127.0.0.1:5080/api/v1/ssh-certificates/<id>/content \
   -o webserver-cert.pub
 ```
 
-### 3.6 SSH-Zertifikat löschen
+### 3.6 SSH-Zertifikat widerrufen und KRL verteilen
 
 ```bash
 curl -s -X DELETE http://127.0.0.1:5080/api/v1/ssh-certificates/<id> \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+Der Widerruf ergänzt die passende Key Revocation List (KRL); die Zertifikatsakte bleibt für Audit-Zwecke erhalten. Lade die KRL auf die prüfenden Systeme und binde sie ein:
+
+```bash
+# User-Zertifikate: auf dem SSH-Server
+curl -fsS -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/ssh-ca-keys/user/krl \
+  -o /etc/ssh/homeca-user-revoked.krl
+echo 'RevokedHostKeys /etc/ssh/homeca-user-revoked.krl' | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl reload sshd
+
+# Host-Zertifikate: auf den Clients
+curl -fsS -H "Authorization: Bearer $TOKEN" http://HOMECA:5080/api/v1/ssh-ca-keys/host/krl \
+  -o ~/.ssh/homeca-host-revoked.krl
+```
+
+Automatisiere die Aktualisierung per Konfigurationsmanagement oder Timer. Eine KRL wirkt nur dort, wo sie lokal geprüft wird.
 
 ### 3.7 SSH-CA-Public-Keys abrufen
 
