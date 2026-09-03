@@ -125,6 +125,11 @@ namespace HomeCA.Service.Endpoints;
             var key = await certificates.GetCaPublicKeyAsync(kind, ct);
             return key is null ? Results.NotFound(new { detail = "SSH CA key not found. Initialize certificate authorities first." }) : Results.Ok(key);
         });
+        api.MapGet("/ssh-ca-keys/{kind}/krl", async (string kind, SshCertificateService certificates, CancellationToken ct) =>
+        {
+            var krl = await certificates.GetKrlAsync(kind, ct);
+            return krl is null ? Results.NotFound() : Results.File(krl, "application/octet-stream", $"homeca-{kind}-revoked.krl");
+        });
         
         // Domains
     }

@@ -7,6 +7,7 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
 {
     private readonly string _authorityRoot = Path.Combine(storage.RootPath, "authorities");
     private readonly string _certificateRoot = Path.Combine(storage.RootPath, "certificates", "ssh");
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
     public Task<List<SshCertificateInventoryItem>> ListAsync(CancellationToken cancellationToken)
     {
@@ -53,15 +54,26 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
         return Task.FromResult<string?>(File.ReadAllText(certPath));
     }
 
-    public Task<bool> DeleteAsync(string id, CancellationToken cancellationToken)
+    public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken)
     {
         var certPath = Path.Combine(_certificateRoot, $"{id}-cert.pub");
-        var pubPath = Path.Combine(_certificateRoot, $"{id}.pub");
-        if (!File.Exists(certPath)) return Task.FromResult(false);
-        File.Delete(certPath);
-        if (File.Exists(pubPath)) File.Delete(pubPath);
-        logger.LogInformation("Deleted SSH certificate {CertificateId}", id);
-        return Task.FromResult(true);
+        if (!File.Exists(certPath)) return false;
+        var kind = ParseCertificateField(certPath, "Type")?.Contains("host", StringComparison.OrdinalIgnoreCase) == true ? "ssh-host" : "ssh-user";
+        var krlPath = Path.Combine(_authorityRoot, kind, "revoked.krl");
+        var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardError = true, UseShellExecute = false };
+        start.ArgumentList.Add("-k"); start.ArgumentList.Add("-f"); start.ArgumentList.Add(krlPath); start.ArgumentList.Add("-s"); start.ArgumentList.Add(Path.Combine(_authorityRoot, kind, "ca.pub")); start.ArgumentList.Add(certPath);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Unable to start ssh-keygen.");
+        await process.WaitForExitAsync(cancellationToken);
+        if (process.ExitCode != 0) throw new InvalidOperationException(await process.StandardError.ReadToEndAsync(cancellationToken));
+        logger.LogInformation("Revoked SSH certificate {CertificateId} in {KrlPath}", id, krlPath);
+        return true;
+    }
+
+    public async Task<byte[]?> GetKrlAsync(string kind, CancellationToken cancellationToken)
+    {
+        var authority = kind.Equals("host", StringComparison.OrdinalIgnoreCase) ? "ssh-host" : "ssh-user";
+        var path = Path.Combine(_authorityRoot, authority, "revoked.krl");
+        return File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
     }
 
     private static string? ParseCertificateField(string certFile, string fieldName)
@@ -102,11 +114,13 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
         var id = Guid.NewGuid().ToString("N");
         var publicKeyPath = Path.Combine(_certificateRoot, $"{id}.pub");
 
+        await _gate.WaitAsync(cancellationToken);
         try
         {
             await File.WriteAllTextAsync(publicKeyPath, request.PublicKey, cancellationToken);
             var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardError = true, UseShellExecute = false };
             start.ArgumentList.Add("-q"); start.ArgumentList.Add("-s"); start.ArgumentList.Add(caKey);
+            start.ArgumentList.Add("-z"); start.ArgumentList.Add((await NextSerialAsync(authority, cancellationToken)).ToString(System.Globalization.CultureInfo.InvariantCulture));
             start.ArgumentList.Add("-I"); start.ArgumentList.Add(request.Identity);
             start.ArgumentList.Add("-n"); start.ArgumentList.Add(string.Join(',', request.Principals));
             start.ArgumentList.Add("-V"); start.ArgumentList.Add($"+{request.ValidityDays}d");
@@ -131,6 +145,15 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
             logger.LogError(ex, "Failed to issue SSH certificate for {Identity}", request.Identity);
             throw;
         }
+        finally { _gate.Release(); }
+    }
+
+    private async Task<long> NextSerialAsync(string authority, CancellationToken ct)
+    {
+        var path = Path.Combine(_authorityRoot, authority, "next-serial.txt");
+        var current = File.Exists(path) && long.TryParse(await File.ReadAllTextAsync(path, ct), out var value) ? value : 1;
+        await File.WriteAllTextAsync(path, (current + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), ct);
+        return current;
     }
 }
 
