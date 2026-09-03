@@ -115,11 +115,12 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
         if (_environment.IsDevelopment() && string.Equals(token, "homeca-debug", StringComparison.Ordinal)) return new(true, false);
 #endif
         if (string.IsNullOrWhiteSpace(token)) return new(false, false);
+        if (!IsValidToken(token)) return new(false, false);
+        var tokenHash = TokenHash(token);
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var sessions = await ReadJsonAsync<List<SessionRecord>>(_sessionPath, cancellationToken) ?? [];
-            var tokenHash = TokenHash(token);
             var isValid = sessions.Any(session => session.ExpiresAt > DateTimeOffset.UtcNow && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(session.TokenHash), Convert.FromHexString(tokenHash)));
             if (!isValid) return new(false, false);
 
@@ -153,6 +154,15 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
     }
 
     private static string TokenHash(string token) => Convert.ToHexString(SHA256.HashData(Convert.FromHexString(token)));
+    private static bool IsValidToken(string token)
+    {
+        if (token.Length != 64) return false;
+        foreach (var character in token)
+        {
+            if (character is not (>= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F')) return false;
+        }
+        return true;
+    }
     private static async Task<T?> ReadJsonAsync<T>(string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path)) return default;

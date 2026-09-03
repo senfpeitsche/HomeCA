@@ -1,4 +1,7 @@
 using HomeCA.Service.Security;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HomeCA.Tests;
 
@@ -72,5 +75,25 @@ public sealed class SecurityTests
         limiter.RecordSuccess(ip);
 
         Assert.False(limiter.IsBlocked(ip));
+    }
+
+    [Fact]
+    public async Task ValidateSession_Rejects_Malformed_BearerToken_Without_Throwing()
+    {
+        using var fixture = new TestFixture();
+        var service = new LocalAdministrationService(
+            fixture.CreateStorage(), new TestHostEnvironment(), NullLogger<LocalAdministrationService>.Instance);
+
+        var session = await service.ValidateSessionAsync("xyz!", CancellationToken.None);
+
+        Assert.False(session.IsValid);
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Production;
+        public string ApplicationName { get; set; } = "HomeCA.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }
