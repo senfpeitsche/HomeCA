@@ -1,6 +1,7 @@
 using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using HomeCA.Service.Infrastructure;
 using HomeCA.Service.Deployments;
 using HomeCA.Service.Revocation;
@@ -199,7 +200,11 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         await _inventoryGate.WaitAsync(ct);
         try
         {
-            if (File.Exists(_inventoryPath)) return await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(File.OpenRead(_inventoryPath), cancellationToken: ct) ?? [];
+            if (File.Exists(_inventoryPath))
+            {
+                await using var stream = File.OpenRead(_inventoryPath);
+                return await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(stream, cancellationToken: ct) ?? [];
+            }
             if (!Directory.Exists(_certificateRoot)) return [];
             var items = new List<CertificateInventoryItem>();
             foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
