@@ -74,6 +74,18 @@ public sealed class CertificateAuthorityTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_Intermediate_Includes_AuthorityKeyIdentifier()
+    {
+        var storage = _fixture.CreateStorage();
+        var service = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+        var root = await service.CreateAsync(new CreateAuthorityRequest("Root", "CN=Root", "root", null, 365, "ECC", 7), CancellationToken.None);
+        var issuing = await service.CreateAsync(new CreateAuthorityRequest("Issuing", "CN=Issuing", "intermediate", root.Id, 180, "ECC", 7), CancellationToken.None);
+
+        using var certificate = service.LoadAuthorityCertificate(Path.Combine(storage.RootPath, "authorities", issuing.Id, "authority.pfx"));
+        Assert.NotNull(certificate.Extensions["2.5.29.35"]);
+    }
+
+    [Fact]
     public async Task Initialize_Stores_CA_PrivateKeys_In_PasswordProtected_Pfx()
     {
         var storage = _fixture.CreateStorage();

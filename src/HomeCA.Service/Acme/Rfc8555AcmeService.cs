@@ -541,6 +541,7 @@ public sealed class Rfc8555AcmeService
             san.AddDnsName(name);
         certRequest.CertificateExtensions.Add(san.Build());
         certRequest.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(pubKey, false));
+        certRequest.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
 
         var publicUrl = _options.Value.PublicUrl?.TrimEnd('/');
         if (!string.IsNullOrEmpty(publicUrl))

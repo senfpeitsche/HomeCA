@@ -41,6 +41,8 @@ public sealed class CertificateIssuanceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(result.ExportPath, "chain.pem")));
         Assert.True(File.Exists(Path.Combine(result.ExportPath, "fullchain.pem")));
         Assert.True(File.Exists(Path.Combine(result.ExportPath, "bundle.pem")));
+        using var certificate = X509CertificateLoader.LoadPkcs12FromFile(Path.Combine(_fixture.RootPath, "certificates", result.Id, "certificate.pfx"), null);
+        Assert.NotNull(certificate.Extensions["2.5.29.35"]);
     }
 
     [Fact]

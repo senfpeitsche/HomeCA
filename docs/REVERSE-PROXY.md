@@ -13,7 +13,7 @@ HomeCA niemals direkt aus dem Internet veroeffentlichen. Fernadministration erfo
 - Ein DNS-Name, etwa `pki.home.arpa`, zeigt auf den Reverse Proxy.
 - Das Root-Zertifikat ist auf dem Admin-Client installiert, bevor HomeCA sein eigenes TLS-Zertifikat verwendet.
 - `Storage:PublicUrl` zeigt auf die tatsaechliche HTTPS-Adresse, damit CRL-Links erreichbar bleiben.
-- Der Proxy uebermittelt den urspruenglichen Host und das Protokoll; keine Verwaltungsroute darf anonym nach aussen freigegeben werden.
+- Der Proxy laeuft auf demselben Host wie HomeCA und uebermittelt `X-Forwarded-For` sowie `X-Forwarded-Proto`; keine Verwaltungsroute darf anonym nach aussen freigegeben werden. HomeCA vertraut diesen Headern ausschliesslich von `127.0.0.1` bzw. `::1`.
 
 ## Caddy-Beispiel
 
@@ -22,7 +22,7 @@ pki.home.arpa {
     tls /etc/caddy/certs/pki-fullchain.pem /etc/caddy/certs/pki-key.pem
     @allowed remote_ip 192.168.10.0/24 192.168.20.0/24
     handle @allowed {
-        reverse_proxy http://homeca:5080
+        reverse_proxy http://127.0.0.1:5080
     }
     respond "Forbidden" 403
 }
@@ -42,7 +42,7 @@ server {
     deny all;
 
     location / {
-        proxy_pass http://homeca:5080;
+        proxy_pass http://127.0.0.1:5080;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -57,4 +57,3 @@ server {
 3. Anmeldung, Root-Download, CRL-Download und eine ACME-Ausstellung testen.
 4. Nach jeder Zertifikatsrotation die ausgelieferte Kette mit `openssl s_client -connect pki.home.arpa:443 -showcerts` pruefen.
 5. Proxy-Konfiguration und Firewall-Regeln zusammen mit dem HomeCA-Backup dokumentieren.
-

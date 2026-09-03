@@ -21,9 +21,11 @@ namespace HomeCA.Service.Endpoints;
         {
             string AcmeBaseUrl(HttpRequest req)
             {
-                var scheme = req.Scheme;
-                var host = req.Host.ToString();
-                return $"{scheme}://{host}";
+                var storage = req.HttpContext.RequestServices.GetRequiredService<HomeCaStorage>();
+                if (!Uri.TryCreate(storage.PublicUrl, UriKind.Absolute, out var publicUrl)
+                    || publicUrl.Scheme is not ("http" or "https"))
+                    throw new InvalidOperationException("Storage:PublicUrl must be configured as an absolute HTTP(S) URL before using ACME.");
+                return publicUrl.AbsoluteUri.TrimEnd('/');
             }
         
             IResult AcmeProblemResult(AcmeProblemException ex) => Results.Json(

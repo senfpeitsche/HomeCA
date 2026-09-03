@@ -168,6 +168,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         }
         certificateRequest.CertificateExtensions.Add(san.Build());
         certificateRequest.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(certificateRequest.PublicKey, false));
+        certificateRequest.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
         var publicUrl = options.Value.PublicUrl?.TrimEnd('/');
         if (!string.IsNullOrEmpty(publicUrl))
         {

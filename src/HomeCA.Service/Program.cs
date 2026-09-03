@@ -13,6 +13,8 @@ using HomeCA.Service.Components;
 using HomeCA.Service.Endpoints;
 using System.Reflection;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,6 +68,17 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    // Only a reverse proxy running on the HomeCA host may establish a client IP.
+    // Do not trust forwarding headers received directly from the network.
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.KnownProxies.Add(IPAddress.Loopback);
+    options.KnownProxies.Add(IPAddress.IPv6Loopback);
+});
 
 ConfigureTlsCertificateChain(builder);
 
@@ -85,6 +98,7 @@ var app = builder.Build();
     }
 }
 
+app.UseForwardedHeaders();
 app.UseStaticFiles();
 app.UseAntiforgery();
 

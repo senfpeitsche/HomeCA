@@ -317,6 +317,8 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, parent is null, parent is null ? 1 : 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign | X509KeyUsageFlags.DigitalSignature, true));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
+        if (parent is not null)
+            request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(parent, true, false));
         var publicUrl = storage.PublicUrl?.TrimEnd('/');
         if (parent is not null && parentId is not null && !string.IsNullOrWhiteSpace(publicUrl))
             request.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{parentId}"));
