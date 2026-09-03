@@ -77,6 +77,7 @@ All state is file-based (JSON + PFX/PEM files) under a configurable root path. N
     "RootPath": "/var/lib/homeca",
     "BackupPath": "/var/backups/homeca",
     "BackupKeyPath": "/etc/homeca/backup.key",
+    "CaKeyPath": "/etc/homeca/ca.key",
     "PublicUrl": "http://homeca.int.example.org:5080"
   }
 }

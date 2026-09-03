@@ -24,7 +24,7 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
         try
         {
             var authority = await authorities.GetCrlAuthorityAsync(authorityId, cancellationToken);
-            using var issuer = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(authority.AuthorityPath);
+            using var issuer = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(authority.AuthorityPath, storage.GetCaPfxPassword());
             using var ecdsa = issuer.GetECDsaPrivateKey();
             using var rsa = ecdsa is null ? issuer.GetRSAPrivateKey() : null;
             if (ecdsa is null && rsa is null)

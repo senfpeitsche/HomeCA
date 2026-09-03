@@ -10,15 +10,18 @@ public sealed class TestFixture : IDisposable
     public string RootPath { get; } = Path.Combine(Path.GetTempPath(), $"homeca-test-{Guid.NewGuid():N}");
     public string BackupPath { get; }
     public string BackupKeyPath { get; }
+    public string CaKeyPath { get; }
 
     public TestFixture()
     {
         BackupPath = Path.Combine(RootPath, "backups");
         BackupKeyPath = Path.Combine(RootPath, "backup.key");
+        CaKeyPath = Path.Combine(RootPath, "ca.key");
         Directory.CreateDirectory(RootPath);
         Directory.CreateDirectory(BackupPath);
         // Create a 32-byte backup key
         File.WriteAllBytes(BackupKeyPath, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        File.WriteAllBytes(CaKeyPath, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     }
 
     public HomeCaStorage CreateStorage()
@@ -28,6 +31,7 @@ public sealed class TestFixture : IDisposable
             RootPath = RootPath,
             BackupPath = BackupPath,
             BackupKeyPath = BackupKeyPath,
+            CaKeyPath = CaKeyPath,
             PublicUrl = "http://localhost:5080"
         });
         return new HomeCaStorage(options, NullLogger<HomeCaStorage>.Instance);
@@ -38,6 +42,7 @@ public sealed class TestFixture : IDisposable
         RootPath = RootPath,
         BackupPath = BackupPath,
         BackupKeyPath = BackupKeyPath,
+        CaKeyPath = CaKeyPath,
         PublicUrl = "http://localhost:5080"
     });
 

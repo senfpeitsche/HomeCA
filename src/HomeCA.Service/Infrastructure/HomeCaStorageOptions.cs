@@ -15,6 +15,9 @@ public sealed class HomeCaStorageOptions
     [Required]
     public string BackupKeyPath { get; init; } = "/etc/homeca/backup.key";
 
+    [Required]
+    public string CaKeyPath { get; init; } = "/etc/homeca/ca.key";
+
     /// <summary>Public base URL of the HomeCA instance, used for CRL Distribution Points in issued certificates. Example: http://homeca.int.example.org:5080</summary>
     public string? PublicUrl { get; set; }
 }

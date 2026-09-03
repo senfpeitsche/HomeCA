@@ -147,7 +147,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             Directory.CreateDirectory(Path.Combine(_root, id));
             using var parentCertificate = parent is null ? null : Load(parent);
             using var certificate = CreateCertificate(request, parentCertificate, parent?.Id);
-            await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12), ct);
+            await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12, storage.GetCaPfxPassword()), ct);
             var item = new AuthorityState(id, request.Name.Trim(), request.Type, request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, isDefaultIssuing);
             all.Add(item); await WriteAsync(all, ct);
             logger.LogInformation("Created {Type} certificate authority {AuthorityId}", request.Type, id);
@@ -175,7 +175,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             var id = Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(Path.Combine(_root, id));
             using var certificate = CreateCertificate(new(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays), parentCertificate, request.ParentId);
-            await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12), ct);
+            await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12, storage.GetCaPfxPassword()), ct);
             var replacement = new AuthorityState(id, request.Name.Trim(), "intermediate", request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, true);
             var currentIndex = all.FindIndex(x => x.Id == current.Id);
             all[currentIndex] = current with { IsActive = false, IsDefaultIssuing = false };
@@ -246,7 +246,8 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             using var root = X509CertificateLoader.LoadPkcs12FromFile(legacyRoot, null);
             using var issuer = X509CertificateLoader.LoadPkcs12FromFile(legacyIssuer, null);
             Directory.CreateDirectory(Path.Combine(_root, "root")); Directory.CreateDirectory(Path.Combine(_root, "tls-issuing"));
-            File.Copy(legacyRoot, PathFor("root"), true); File.Copy(legacyIssuer, PathFor("tls-issuing"), true);
+            File.WriteAllBytes(PathFor("root"), root.Export(X509ContentType.Pkcs12, storage.GetCaPfxPassword()));
+            File.WriteAllBytes(PathFor("tls-issuing"), issuer.Export(X509ContentType.Pkcs12, storage.GetCaPfxPassword()));
             var migrated = new List<AuthorityState> { new("root", "Root CA", "root", root.Subject, null, (int)(root.NotAfter - DateTime.UtcNow).TotalDays, "ECC", 30, true, false, DateTimeOffset.UtcNow, root.NotAfter), new("tls-issuing", "TLS Issuing CA", "intermediate", issuer.Subject, "root", (int)(issuer.NotAfter - DateTime.UtcNow).TotalDays, "ECC", 7, true, false, DateTimeOffset.UtcNow, issuer.NotAfter, true) };
             await WriteAsync(migrated, ct); return migrated;
         }
@@ -260,7 +261,25 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             await JsonSerializer.SerializeAsync(stream, all, cancellationToken: ct);
         File.Move(temporaryPath, _statePath, true);
     }
-    private X509Certificate2 Load(AuthorityState state) => X509CertificateLoader.LoadPkcs12FromFile(PathFor(state.Id), null);
+    public X509Certificate2 LoadAuthorityCertificate(string authorityPath)
+    {
+        var password = storage.GetCaPfxPassword();
+        try
+        {
+            return X509CertificateLoader.LoadPkcs12FromFile(authorityPath, password);
+        }
+        catch (CryptographicException)
+        {
+            // Upgrade legacy, passwordless CA PFX files in place once the CA key is configured.
+            using var legacy = X509CertificateLoader.LoadPkcs12FromFile(authorityPath, null);
+            if (!legacy.HasPrivateKey) throw;
+            File.WriteAllBytes(authorityPath, legacy.Export(X509ContentType.Pkcs12, password));
+            logger.LogWarning("Migrated legacy passwordless CA PFX at {AuthorityPath} to encrypted storage", authorityPath);
+            return X509CertificateLoader.LoadPkcs12FromFile(authorityPath, password);
+        }
+    }
+
+    private X509Certificate2 Load(AuthorityState state) => LoadAuthorityCertificate(PathFor(state.Id));
     private bool HasIssuedCertificates(AuthorityState authority)
     {
         var certificates = Path.Combine(storage.RootPath, "certificates");

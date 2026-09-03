@@ -23,14 +23,24 @@ public sealed class HomeCaStorage
 
     public string RootPath => _options.RootPath;
     public string BackupKeyPath => _options.BackupKeyPath;
+    public string CaKeyPath => _options.CaKeyPath;
     public string? PublicUrl => _options.PublicUrl;
 
     public string ResolveBackupPath(string fileName) => Path.Combine(_options.BackupPath, fileName);
+
+    /// <summary>Returns a stable PFX password derived from the separately stored CA key.</summary>
+    public string GetCaPfxPassword()
+    {
+        var key = File.ReadAllBytes(_options.CaKeyPath);
+        if (key.Length != 32) throw new InvalidOperationException("The CA key must contain exactly 32 bytes.");
+        return Convert.ToBase64String(key);
+    }
 
     public object Describe() => new
     {
         rootPath = _options.RootPath,
         backupPath = _options.BackupPath,
+        caKeyPath = _options.CaKeyPath,
         publicUrl = _options.PublicUrl,
         directories = ManagedDirectories,
         stateStore = Path.Combine(_options.RootPath, "state", "homeca-state.json"),

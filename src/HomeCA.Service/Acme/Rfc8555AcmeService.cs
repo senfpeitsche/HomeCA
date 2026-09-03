@@ -517,7 +517,7 @@ public sealed class Rfc8555AcmeService
     private async Task<string> IssueCertificateFromCsrAsync(CertificateRequest csr, IReadOnlyList<string> dnsNames, CancellationToken ct)
     {
         var authorityPaths = await _authorities.GetDefaultIssuingAsync(ct);
-        using var issuer = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.IssuingPath, null);
+        using var issuer = _authorities.LoadAuthorityCertificate(authorityPaths.IssuingPath);
 
         var subject = dnsNames.First();
 
@@ -571,7 +571,7 @@ public sealed class Rfc8555AcmeService
         var certPem = cert.ExportCertificatePem();
         File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
 
-        using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
+        using var root = _authorities.LoadAuthorityCertificate(authorityPaths.RootPath);
         var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
         File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
         File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem);

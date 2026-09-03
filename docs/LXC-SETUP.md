@@ -105,7 +105,7 @@ Installiere vorher die Root-CA auf dem verwendeten Browser oder Betriebssystem; 
 
 ## Backup-Schlüssel
 
-Bei der Installation wird automatisch ein AES-256-Verschlüsselungsschlüssel unter `/etc/homeca/backup.key` erzeugt. **Bewahre eine Kopie dieses Schlüssels außerhalb des Containers auf.** Ohne ihn sind HCAB1-Backups nicht wiederherstellbar.
+Bei der Installation werden zwei getrennte 32-Byte-Schlüssel erzeugt: `/etc/homeca/backup.key` für Backups und `/etc/homeca/ca.key` zum Schutz der CA-PFX-Dateien. **Bewahre eine Kopie beider Schlüssel außerhalb des Containers auf.** Ohne den Backup-Schlüssel sind HCAB1-Backups nicht wiederherstellbar; ohne den CA-Schlüssel können die CA-Private-Keys nicht geladen werden.
 
 ```bash
 # Schlüssel aus dem Container kopieren (auf dem Proxmox-Host)
@@ -156,6 +156,9 @@ umask 077
 head -c 32 /dev/urandom > /etc/homeca/backup.key
 chown homeca:homeca /etc/homeca/backup.key
 chmod 0600 /etc/homeca/backup.key
+head -c 32 /dev/urandom > /etc/homeca/ca.key
+chown homeca:homeca /etc/homeca/ca.key
+chmod 0600 /etc/homeca/ca.key
 ```
 
 ### 4. systemd-Dienst aktivieren

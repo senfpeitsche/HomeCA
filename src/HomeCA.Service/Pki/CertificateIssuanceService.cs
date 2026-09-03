@@ -146,7 +146,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
 
         var authorityPaths = await authorities.GetDefaultIssuingAsync(cancellationToken);
 
-        using var issuer = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.IssuingPath, null);
+        using var issuer = authorities.LoadAuthorityCertificate(authorityPaths.IssuingPath);
         var requestedNotAfter = DateTimeOffset.UtcNow.AddDays(request.ValidityDays);
         if (issuer.NotAfter <= requestedNotAfter)
             throw new InvalidOperationException($"The issuing CA expires on {issuer.NotAfter:yyyy-MM-dd}; rotate it or choose a shorter certificate validity.");
@@ -197,7 +197,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
             var keyPem = ecc is not null ? ecc.ExportPkcs8PrivateKeyPem() : rsa!.ExportPkcs8PrivateKeyPem();
             File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
             File.WriteAllText(Path.Combine(exportPath, "key.pem"), keyPem);
-            using var root = X509CertificateLoader.LoadPkcs12FromFile(authorityPaths.RootPath, null);
+            using var root = authorities.LoadAuthorityCertificate(authorityPaths.RootPath);
             var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
             File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
             File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem);

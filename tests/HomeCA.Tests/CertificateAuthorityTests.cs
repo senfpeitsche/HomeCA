@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using HomeCA.Service.Pki;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -69,6 +71,21 @@ public sealed class CertificateAuthorityTests : IDisposable
 
         Assert.Equal("intermediate", issuing.Type);
         Assert.Equal(root.Id, issuing.ParentId);
+    }
+
+    [Fact]
+    public async Task Initialize_Stores_CA_PrivateKeys_In_PasswordProtected_Pfx()
+    {
+        var storage = _fixture.CreateStorage();
+        var service = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+
+        await service.InitializeAsync(CancellationToken.None);
+        var root = (await service.ListAsync(CancellationToken.None)).Single(authority => authority.Type == "root");
+        var pfxPath = Path.Combine(storage.RootPath, "authorities", root.Id, "authority.pfx");
+
+        Assert.ThrowsAny<CryptographicException>(() => X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null));
+        using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, storage.GetCaPfxPassword());
+        Assert.True(certificate.HasPrivateKey);
     }
 
     [Fact]

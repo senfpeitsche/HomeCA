@@ -23,7 +23,7 @@ public sealed class CrlServiceTests : IDisposable
         var root = all.Single(authority => authority.Type == "root");
         var intermediate = all.Single(authority => authority.Type == "intermediate");
         var intermediatePath = Path.Combine(storage.RootPath, "authorities", intermediate.Id, "authority.pfx");
-        using var intermediateCertificate = X509CertificateLoader.LoadPkcs12FromFile(intermediatePath, null);
+        using var intermediateCertificate = X509CertificateLoader.LoadPkcs12FromFile(intermediatePath, storage.GetCaPfxPassword());
         Assert.Contains(intermediateCertificate.Extensions.Cast<X509Extension>(), extension => extension.Oid?.Value == "2.5.29.31");
 
         await authorities.RevokeAsync(intermediate.Id, CancellationToken.None);

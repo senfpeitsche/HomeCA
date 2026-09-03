@@ -113,6 +113,20 @@ else
   msg_ok "Backup key already exists"
 fi
 
+# ── CA private-key protection key ────────────────────────────────────
+if [[ ! -f "${CONFIG_DIR}/ca.key" ]]; then
+  msg_info "Generating CA private-key protection key …"
+  umask 077
+  head -c 32 /dev/urandom > "${CONFIG_DIR}/ca.key"
+  chown homeca:homeca "${CONFIG_DIR}/ca.key"
+  chmod 0600 "${CONFIG_DIR}/ca.key"
+  msg_ok "CA key generated — store a copy outside this container!"
+else
+  chown homeca:homeca "${CONFIG_DIR}/ca.key"
+  chmod 0600 "${CONFIG_DIR}/ca.key"
+  msg_ok "CA private-key protection key already exists"
+fi
+
 # ── Download and verify the versioned release bundle ────────────────
 RESOLVED_TAG=$(resolve_release_tag)
 RELEASE_DIR=$(mktemp -d /tmp/homeca-release.XXXXXX)
@@ -173,4 +187,5 @@ echo -e " ${YW}Service:${CL}      systemctl status homeca"
 echo -e " ${YW}Logs:${CL}         journalctl -u homeca -f"
 echo -e " ${YW}Local URL:${CL}    http://127.0.0.1:5080"
 echo -e " ${YW}Backup key:${CL}   ${CONFIG_DIR}/backup.key  ${RD}(save a copy!)${CL}"
+echo -e " ${YW}CA key:${CL}       ${CONFIG_DIR}/ca.key      ${RD}(save a copy!)${CL}"
 echo ""
