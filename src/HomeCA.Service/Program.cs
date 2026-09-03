@@ -41,7 +41,6 @@ builder.Services.AddSingleton<IDnsConnector, TechnitiumDnsConnector>();
 builder.Services.AddSingleton<IDnsConnector, HetznerDnsConnector>();
 builder.Services.AddSingleton<ConnectorCatalog>();
 builder.Services.AddSingleton<ConnectorRegistry>();
-builder.Services.AddSingleton<InternalAcmeService>();
 builder.Services.AddSingleton<AcmeAccessPolicyRegistry>();
 builder.Services.AddSingleton<ExternalAcmeIssuerRegistry>();
 builder.Services.AddSingleton<ExternalAcmeService>();

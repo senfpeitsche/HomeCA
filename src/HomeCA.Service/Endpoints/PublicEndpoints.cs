@@ -99,8 +99,6 @@ namespace HomeCA.Service.Endpoints;
         
         // ── Unauthenticated ACME client endpoints ───────────────────────────────────
         
-        endpoints.MapGet("/api/v1/acme/directory", async (InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.GetDirectoryAsync(ct)));
-        endpoints.MapPost("/api/v1/acme/accounts", async (RegisterAcmeAccountRequest request, InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.RegisterAccountAsync(request, ct)));
         endpoints.MapGet("/api/v1/connectors", (ConnectorCatalog catalog) => Results.Ok(catalog.Types));
     }
 

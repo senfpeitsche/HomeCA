@@ -18,15 +18,6 @@ namespace HomeCA.Service.Endpoints;
     {
         var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>();
         
-        api.MapGet("/acme/accounts", async (InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.ListAccountsAsync(ct)));
-        api.MapGet("/acme/orders", async (InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.ListOrdersAsync(ct)));
-        api.MapPost("/acme/orders", async (AcmeOrderRequest request, InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.CreateOrderAsync(request.AccountId, request.Identifiers, ct)));
-        api.MapGet("/acme/orders/{orderId}", async (string orderId, InternalAcmeService acme, CancellationToken ct) =>
-        {
-            var order = await acme.GetOrderAsync(orderId, ct);
-            return order is null ? Results.NotFound() : Results.Ok(order);
-        });
-        api.MapPost("/acme/orders/{orderId}/finalize", async (string orderId, FinalizeAcmeOrderRequest request, InternalAcmeService acme, CancellationToken ct) => Results.Ok(await acme.FinalizeOrderAsync(orderId, request, ct)));
         api.MapGet("/acme/external-issuers", async (ExternalAcmeIssuerRegistry issuers, CancellationToken ct) => Results.Ok(await issuers.ListAsync(ct)));
         api.MapPost("/acme/external-issuers", async (CreateExternalAcmeIssuerRequest request, ExternalAcmeIssuerRegistry issuers, CancellationToken ct) => Results.Ok(await issuers.AddAsync(request, ct)));
         api.MapPut("/acme/external-issuers/{id}", async (string id, CreateExternalAcmeIssuerRequest request, ExternalAcmeIssuerRegistry issuers, CancellationToken ct) =>
@@ -42,8 +33,6 @@ namespace HomeCA.Service.Endpoints;
             catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
         });
         api.MapGet("/acme/external-certificates", async (ExternalAcmeService externalAcme, CancellationToken ct) => Results.Ok(await externalAcme.ListCertificatesAsync(ct)));
-        api.MapDelete("/acme/accounts/{id}", async (string id, InternalAcmeService acme, CancellationToken ct) => await acme.DeleteAccountAsync(id, ct) ? Results.NoContent() : Results.NotFound());
-        api.MapDelete("/acme/orders/{orderId}", async (string orderId, InternalAcmeService acme, CancellationToken ct) => await acme.DeleteOrderAsync(orderId, ct) ? Results.NoContent() : Results.NotFound());
         
         // RFC 8555 ACME management (authenticated)
         api.MapGet("/acme/rfc8555-accounts", async (Rfc8555AcmeService acme, CancellationToken ct) => Results.Ok(await acme.ListAccountsAsync(ct)));
