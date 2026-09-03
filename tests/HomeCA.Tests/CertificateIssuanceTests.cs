@@ -82,6 +82,25 @@ public sealed class CertificateIssuanceTests : IDisposable
     }
 
     [Fact]
+    public async Task Revoke_Retains_Certificate_And_Export_Records_For_Audit()
+    {
+        var (authorities, certificates) = await SetupAsync();
+        var issued = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["retained.example.com"], []), CancellationToken.None);
+        var certificatePath = Path.Combine(_fixture.RootPath, "certificates", issued.Id, "certificate.pfx");
+        var exportPath = Path.Combine(issued.ExportPath, "certificate.pem");
+
+        var revoked = await certificates.RevokeAsync(issued.Id, "keyCompromise", CancellationToken.None);
+
+        Assert.True(revoked);
+        Assert.True(File.Exists(certificatePath));
+        Assert.True(File.Exists(exportPath));
+        Assert.NotNull(await certificates.GetDetailsAsync(issued.Id, CancellationToken.None));
+        var issuing = (await authorities.ListAsync(CancellationToken.None)).Single(authority => authority.Type == "intermediate");
+        await authorities.RevokeAsync(issuing.Id, CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => authorities.DeleteAsync(issuing.Id, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Issue_Rejects_Empty_SANs()
     {
         var (_, certificates) = await SetupAsync();

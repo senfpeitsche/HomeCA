@@ -571,7 +571,7 @@
           }'
         """;
     private const string _tlsApiRevoke = """
-        curl -s -X DELETE "http://HOMECA:5080/api/v1/certificates/<id>?reason=keyCompromise" \
+        curl -s -X POST "http://HOMECA:5080/api/v1/certificates/<id>/revoke?reason=keyCompromise" \
           -H "Authorization: Bearer $TOKEN"
         """;
     private const string _tlsDeployProxmox = """

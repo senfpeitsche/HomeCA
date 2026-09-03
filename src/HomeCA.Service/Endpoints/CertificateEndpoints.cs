@@ -40,10 +40,10 @@ namespace HomeCA.Service.Endpoints;
                 throw;
             }
         });
-        api.MapDelete("/certificates/{id}", async (string id, HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
+        api.MapPost("/certificates/{id}/revoke", async (string id, HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
         {
             var reason = httpRequest.Query["reason"].FirstOrDefault() ?? "unspecified";
-            return await certificates.RevokeAndDeleteAsync(id, reason, ct) ? Results.NoContent() : Results.NotFound();
+            return await certificates.RevokeAsync(id, reason, ct) ? Results.NoContent() : Results.NotFound();
         });
         api.MapGet("/certificates/{id}/export/pem", async (string id, HomeCaStorage storage) =>
         {

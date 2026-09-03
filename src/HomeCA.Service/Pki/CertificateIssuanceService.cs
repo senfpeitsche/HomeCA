@@ -102,8 +102,8 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
             usage, dnsNames, ipAddresses, ekuList, Path.Combine(_exportRoot, id)));
     }
 
-    /// <summary>Revokes a certificate (adds it to the CRL) and deletes its files from disk.</summary>
-    public async Task<bool> RevokeAndDeleteAsync(string id, string reason, CancellationToken cancellationToken)
+    /// <summary>Revokes a certificate and retains its certificate and export records for audit and forensic use.</summary>
+    public async Task<bool> RevokeAsync(string id, string reason, CancellationToken cancellationToken)
     {
         var pfxPath = Path.Combine(_certificateRoot, id, "certificate.pfx");
         if (!File.Exists(pfxPath)) return false;
@@ -125,13 +125,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
             logger.LogWarning(ex, "CRL regeneration failed after revoking certificate {CertificateId}; the revocation record is persisted and will be included in the next CRL generation", id);
         }
 
-        var certificateDirectory = Path.Combine(_certificateRoot, id);
-        if (Directory.Exists(certificateDirectory)) Directory.Delete(certificateDirectory, true);
-
-        var exportDirectory = Path.Combine(_exportRoot, id);
-        if (Directory.Exists(exportDirectory)) Directory.Delete(exportDirectory, true);
-
-        logger.LogInformation("Deleted certificate {CertificateId} files after revocation", id);
+        logger.LogInformation("Revoked certificate {CertificateId}; certificate and export records were retained for audit", id);
         return true;
     }
 

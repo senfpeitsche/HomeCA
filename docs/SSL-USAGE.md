@@ -403,13 +403,13 @@ Die Verteilung auf die Zielsysteme liegt beim Betreiber. Das `install.ps1`-Skrip
 
 ### Über die Weboberfläche
 
-Im Zertifikatsinventar auf **Widerrufen** klicken und mit einem zweiten Klick bestätigen. Das Zertifikat wird automatisch in die Sperrliste aufgenommen, die CRL wird neu generiert, und die Zertifikatsdateien werden gelöscht.
+Im Zertifikatsinventar auf **Widerrufen** klicken und mit einem zweiten Klick bestätigen. Das Zertifikat wird automatisch in die Sperrliste aufgenommen und die CRL wird neu generiert. Die Zertifikatsakte und Exporte bleiben für Audit und Forensik erhalten.
 
 ### Über die API
 
 ```bash
-curl -s -X DELETE \
-  "http://127.0.0.1:5080/api/v1/certificates/<id>?reason=keyCompromise" \
+curl -s -X POST \
+  "http://127.0.0.1:5080/api/v1/certificates/<id>/revoke?reason=keyCompromise" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
