@@ -17,6 +17,7 @@ Environment=Storage__RootPath=/var/lib/homeca
 Environment=Storage__BackupPath=/var/backups/homeca
 Environment=Storage__BackupKeyPath=/etc/homeca/backup.key
 Environment=Storage__CaKeyPath=/etc/homeca/ca.key
+Environment=Storage__ConfigurationPath=/etc/homeca
 # TLS activation from the web UI uses narrowly scoped, passwordless sudo rules.
 # NoNewPrivileges would prevent sudo from performing that permitted escalation.
 NoNewPrivileges=false

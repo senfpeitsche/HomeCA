@@ -11,12 +11,14 @@ public sealed class TestFixture : IDisposable
     public string BackupPath { get; }
     public string BackupKeyPath { get; }
     public string CaKeyPath { get; }
+    public string ConfigurationPath { get; }
 
     public TestFixture()
     {
         BackupPath = Path.Combine(RootPath, "backups");
         BackupKeyPath = Path.Combine(RootPath, "backup.key");
         CaKeyPath = Path.Combine(RootPath, "ca.key");
+        ConfigurationPath = Path.Combine(RootPath, "config");
         Directory.CreateDirectory(RootPath);
         Directory.CreateDirectory(BackupPath);
         // Create a 32-byte backup key
@@ -32,6 +34,7 @@ public sealed class TestFixture : IDisposable
             BackupPath = BackupPath,
             BackupKeyPath = BackupKeyPath,
             CaKeyPath = CaKeyPath,
+            ConfigurationPath = ConfigurationPath,
             PublicUrl = "http://localhost:5080"
         });
         return new HomeCaStorage(options, NullLogger<HomeCaStorage>.Instance);
@@ -43,6 +46,7 @@ public sealed class TestFixture : IDisposable
         BackupPath = BackupPath,
         BackupKeyPath = BackupKeyPath,
         CaKeyPath = CaKeyPath,
+        ConfigurationPath = ConfigurationPath,
         PublicUrl = "http://localhost:5080"
     });
 

@@ -78,12 +78,15 @@ All state is file-based (JSON + PFX/PEM files) under a configurable root path. N
     "BackupPath": "/var/backups/homeca",
     "BackupKeyPath": "/etc/homeca/backup.key",
     "CaKeyPath": "/etc/homeca/ca.key",
+    "ConfigurationPath": "/etc/homeca",
     "PublicUrl": "http://homeca.int.example.org:5080"
   }
 }
 ```
 
 `PublicUrl` is used to embed CRL Distribution Points in issued certificates. Set this to the URL where your HomeCA instance is reachable on your network.
+
+`ConfigurationPath` enthält veränderbare Laufzeitkonfiguration wie `tls.json` und die gespeicherte `PublicUrl`. Für lokale Entwicklung kann ein relativer, plattformneutraler Pfad verwendet werden; die systemd-Unit setzt ihn in der Linux-Installation auf `/etc/homeca`.
 
 ## Data Layout
 

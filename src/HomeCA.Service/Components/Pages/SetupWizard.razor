@@ -1,6 +1,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject UiStrings L
+@inject HomeCaInternalHttpClient InternalHttpClient
 
 <main class="login-shell">
     <MudPaper Class="login-card" Elevation="0" Style="max-width: 640px;">
@@ -216,7 +217,7 @@
 
     private HttpClient Client()
     {
-        var client = HomeCaInternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
         if (!string.IsNullOrEmpty(Token))
             client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Token);
         return client;

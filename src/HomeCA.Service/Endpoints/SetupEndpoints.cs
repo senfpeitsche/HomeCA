@@ -32,15 +32,15 @@ namespace HomeCA.Service.Endpoints;
             return Results.Ok(new { phase = state.SetupPhase.ToString().ToLowerInvariant(), isComplete = true });
         });
         
-        api.MapPost("/setup/configure", async (ConfigureInstanceRequest request, SetupStateService setupState, IOptions<HomeCaStorageOptions> storageOptions, ILogger<global::Program> logger, CancellationToken ct) =>
+        api.MapPost("/setup/configure", async (ConfigureInstanceRequest request, SetupStateService setupState, HomeCaStorage storage, IOptions<HomeCaStorageOptions> storageOptions, ILogger<global::Program> logger, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.Hostname))
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["hostname"] = ["Hostname is required."] });
         
             var publicUrl = $"http://{request.Hostname}:{request.Port ?? 5080}";
         
-            // Persist PublicUrl so it survives restarts — write to /etc/homeca/
-            var configPath = "/etc/homeca/public-url.conf";
+            // Persist PublicUrl so it survives restarts.
+            var configPath = storage.GetConfigurationFilePath("public-url.conf");
             try
             {
                 await File.WriteAllTextAsync(configPath, publicUrl, ct);
@@ -91,9 +91,7 @@ namespace HomeCA.Service.Endpoints;
                     publicUrl = $"https://{request.Hostname}:5443",
                     hostname = request.Hostname
                 };
-                var tlsConfigPath = Path.Combine(Path.GetDirectoryName(storage.RootPath)!, "..", "etc", "homeca", "tls.json");
-                // Normalize: /etc/homeca/tls.json
-                tlsConfigPath = "/etc/homeca/tls.json";
+                var tlsConfigPath = storage.GetConfigurationFilePath("tls.json");
                 await File.WriteAllTextAsync(tlsConfigPath, System.Text.Json.JsonSerializer.Serialize(tlsConfig, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), ct);
         
                 // Advance setup state
@@ -124,9 +122,9 @@ namespace HomeCA.Service.Endpoints;
         api.MapPost("/system/activate-tls", async (SetupStateService setupState, HomeCaStorage storage, IHostApplicationLifetime lifetime, ILogger<global::Program> logger, CancellationToken ct) =>
         {
             // Verify that TLS configuration has been generated
-            const string tlsConfigPath = "/etc/homeca/tls.json";
+            var tlsConfigPath = storage.GetConfigurationFilePath("tls.json");
             if (!File.Exists(tlsConfigPath))
-                return Results.Conflict(new { detail = "TLS-Konfiguration nicht gefunden. Bitte zuerst ein TLS-Zertifikat ausstellen." });
+                return Results.Conflict(new { detail = "TLS configuration was not found. Issue a TLS certificate first." });
         
             string tlsJson;
             try
@@ -136,15 +134,15 @@ namespace HomeCA.Service.Endpoints;
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to read TLS configuration from {Path}", tlsConfigPath);
-                return Results.Problem("TLS-Konfigurationsdatei konnte nicht gelesen werden.");
+                return Results.Problem("The TLS configuration file could not be read.");
             }
         
             var tlsConfig = System.Text.Json.JsonSerializer.Deserialize<TlsConfigDto>(tlsJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (tlsConfig is null || string.IsNullOrWhiteSpace(tlsConfig.HttpsUrl) || string.IsNullOrWhiteSpace(tlsConfig.PfxPath))
-                return Results.Conflict(new { detail = "TLS-Konfiguration ist ungültig." });
+                return Results.Conflict(new { detail = "The TLS configuration is invalid." });
         
             if (!File.Exists(tlsConfig.PfxPath))
-                return Results.Conflict(new { detail = $"Zertifikatsdatei nicht gefunden: {tlsConfig.PfxPath}" });
+                return Results.Conflict(new { detail = $"Certificate file was not found: {tlsConfig.PfxPath}" });
         
             // Write the systemd override that switches Kestrel to HTTPS.
             // The unit grants write access only to its drop-in directory. The constrained
@@ -154,7 +152,7 @@ namespace HomeCA.Service.Endpoints;
         
             var mkdirResult = RunProcess("sudo", $"mkdir -p {overrideDir}");
             if (!mkdirResult.Success)
-                return Results.Problem($"Systemd-Override-Verzeichnis konnte nicht erstellt werden: {mkdirResult.Error}");
+                return Results.Problem($"The systemd override directory could not be created: {mkdirResult.Error}");
         
             var overrideLines = new[]
             {
@@ -167,7 +165,7 @@ namespace HomeCA.Service.Endpoints;
             var overrideContent = string.Join('\n', overrideLines);
             var teeResult = RunProcess("sudo", $"tee {overridePath}", overrideContent);
             if (!teeResult.Success)
-                return Results.Problem($"Systemd-Override konnte nicht geschrieben werden: {teeResult.Error}");
+                return Results.Problem($"The systemd override could not be written: {teeResult.Error}");
         
             logger.LogInformation("Wrote systemd TLS override to {Path} via sudo", overridePath);
         
@@ -176,7 +174,7 @@ namespace HomeCA.Service.Endpoints;
             if (!reload.Success)
             {
                 logger.LogError("systemctl daemon-reload failed: {Error}", reload.Error);
-                return Results.Problem($"systemctl daemon-reload fehlgeschlagen: {reload.Error}");
+                return Results.Problem($"systemctl daemon-reload failed: {reload.Error}");
             }
         
             logger.LogInformation("TLS activation complete — restarting service via systemctl");
@@ -205,7 +203,7 @@ namespace HomeCA.Service.Endpoints;
         {
             var token = context.Request.Headers.Authorization.ToString().Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 12)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["Das neue Passwort muss mindestens 12 Zeichen lang sein."] });
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["The new password must be at least 12 characters long."] });
             if (!await administration.ChangePasswordAsync(token, request, ct)) return Results.Unauthorized();
             await setupState.AdvanceAsync(SetupPhase.Initial, ct);
             return Results.NoContent();

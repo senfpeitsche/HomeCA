@@ -25,6 +25,7 @@ builder.Services
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddSingleton<HomeCaStorage>();
+builder.Services.AddSingleton<HomeCaInternalHttpClient>();
 builder.Services.AddSingleton<SetupStateService>();
 builder.Services.AddSingleton<LocalAdministrationService>();
 builder.Services.AddSingleton<CertificateAuthorityService>();
@@ -83,16 +84,16 @@ ConfigureTlsCertificateChain(builder);
 
 var app = builder.Build();
 
-// ── Load persisted PublicUrl from /etc/homeca/public-url.conf if available ──
+// ── Load the persisted public URL, if available ─────────────────────────────
 {
-    const string publicUrlPath = "/etc/homeca/public-url.conf";
+    var storage = app.Services.GetRequiredService<HomeCaStorage>();
+    var publicUrlPath = storage.GetConfigurationFilePath("public-url.conf");
     if (File.Exists(publicUrlPath))
     {
         var savedUrl = File.ReadAllText(publicUrlPath).Trim();
         if (!string.IsNullOrEmpty(savedUrl))
         {
-            var opts = app.Services.GetRequiredService<IOptions<HomeCaStorageOptions>>();
-            opts.Value.PublicUrl = savedUrl;
+            app.Services.GetRequiredService<IOptions<HomeCaStorageOptions>>().Value.PublicUrl = savedUrl;
         }
     }
 }
@@ -136,7 +137,9 @@ static void ConfigureTlsCertificateChain(WebApplicationBuilder builder)
     var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
     if (string.IsNullOrWhiteSpace(urls) || !urls.Contains("https://", StringComparison.OrdinalIgnoreCase)) return;
 
-    const string tlsConfigPath = "/etc/homeca/tls.json";
+    var configurationPath = builder.Configuration.GetValue<string>($"{HomeCaStorageOptions.SectionName}:ConfigurationPath")
+        ?? HomeCaStorageOptions.DefaultConfigurationPath;
+    var tlsConfigPath = HomeCaStorageOptions.GetConfigurationFilePath(configurationPath, "tls.json");
     if (!File.Exists(tlsConfigPath)) return;
 
     try

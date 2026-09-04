@@ -24,7 +24,10 @@ public sealed class HomeCaStorage
     public string RootPath => _options.RootPath;
     public string BackupKeyPath => _options.BackupKeyPath;
     public string CaKeyPath => _options.CaKeyPath;
+    public string ConfigurationPath => Path.GetFullPath(_options.ConfigurationPath);
     public string? PublicUrl => _options.PublicUrl;
+
+    public string GetConfigurationFilePath(string fileName) => HomeCaStorageOptions.GetConfigurationFilePath(_options.ConfigurationPath, fileName);
 
     public string ResolveBackupPath(string fileName) => Path.Combine(_options.BackupPath, fileName);
 
@@ -41,6 +44,7 @@ public sealed class HomeCaStorage
         rootPath = _options.RootPath,
         backupPath = _options.BackupPath,
         caKeyPath = _options.CaKeyPath,
+        configurationPath = ConfigurationPath,
         publicUrl = _options.PublicUrl,
         directories = ManagedDirectories,
         stateStore = Path.Combine(_options.RootPath, "state", "homeca-state.json"),
@@ -106,6 +110,7 @@ public sealed class HomeCaStorage
     private void EnsureLayout()
     {
         Directory.CreateDirectory(_options.RootPath);
+        Directory.CreateDirectory(ConfigurationPath);
         foreach (var directory in ManagedDirectories)
         {
             Directory.CreateDirectory(Path.Combine(_options.RootPath, directory));

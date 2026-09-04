@@ -38,7 +38,7 @@ namespace HomeCA.Service.Endpoints;
         {
             try { await notifications.SendTestAsync(ct); return Results.NoContent(); }
             catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
-            catch (Exception exception) when (exception is not OperationCanceledException) { return Results.Problem("The test e-mail could not be sent. Check the delivery settings and server logs.", statusCode: 502); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { return Results.Problem("The test email could not be sent. Check the delivery settings and server logs.", statusCode: 502); }
         });
         
         // Operations

@@ -4,6 +4,7 @@
 @inject IHostEnvironment Host
 @inject IJSRuntime JS
 @inject UiStrings L
+@inject HomeCaInternalHttpClient InternalHttpClient
 
 <PageTitle>HomeCA</PageTitle>
 
@@ -403,7 +404,7 @@ else
 
     private HttpClient Client()
     {
-        var client = HomeCaInternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
         if (!string.IsNullOrEmpty(_token)) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
         return client;
     }
@@ -540,7 +541,7 @@ else
         _busy = true;
         try
         {
-            using var client = HomeCaInternalHttpClient.Create(new Uri(Navigation.BaseUri));
+            using var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
             var response = await client.GetAsync($"api/v1/trust-anchor/{Uri.EscapeDataString(format)}");
             if (!response.IsSuccessStatusCode) { Snackbar.Add("Keine aktive Root-CA gefunden. Bitte zuerst die PKI initialisieren.", Severity.Warning); return; }
             var bytes = await response.Content.ReadAsByteArrayAsync();
