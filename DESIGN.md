@@ -1,11 +1,11 @@
 ---
 version: alpha
 colors:
-  forest: "#12332e"
-  canvas: "#edf1ef"
-  surface: "#ffffff"
-  signal: "#e0d96e"
-  ink: "#17212b"
+  primary: "#594AE2"
+  canvas: "#F8FAFC"
+  surface: "#FFFFFF"
+  ink: "#1E293B"
+  muted: "#64748B"
 typography:
   display:
     fontFamily: "Georgia, serif"
@@ -17,37 +17,37 @@ spacing:
   page: "52px"
 components:
   panel:
-    border: "1px solid #dce5e0"
+    border: "1px solid #E2E8F0"
 ---
 
 ## Overview
 
-HomeCA is a focused local-administration surface for homelab operators. The signature is the deep-forest service shell with the pale verification accent; it should feel like an instrument panel, not a cloud dashboard.
+HomeCA is a focused local-administration surface for homelab operators. It follows MudBlazor's familiar application shell with a quiet slate workspace and a restrained indigo primary action; it should feel like a dependable local administration tool, not a branded cloud dashboard.
 
 ## Colors
 
-Forest anchors navigation and trust context. Signal is reserved for an explicit issuance or renewal action. White is a document-like workspace for certificates and CAs.
+Indigo marks the primary action and active navigation. Slate carries secondary information and chrome. Success uses blue rather than green; warnings, errors and information retain distinct semantic tones. The light and dark palettes preserve this hierarchy.
 
 ## Typography
 
-Georgia is reserved for page hierarchy and CA identity; the system sans face carries dense operational data.
+The system sans face carries both page hierarchy and dense operational data, following MudBlazor defaults for familiar scanning and controls.
 
 ## Layout
 
-The desktop shell has a persistent navigation rail; on narrow screens it becomes a horizontal route list. Tables own their horizontal overflow.
+The desktop shell has a MudBlazor app bar and responsive navigation rail; on narrow screens it follows the component's drawer behavior. Tables own their horizontal overflow.
 
 ## Elevation & Depth
 
-Panels are flat, separated by a quiet border. The issuance dialog alone uses a dimmed backdrop.
+Panels are flat, separated by MudBlazor's quiet divider. Dialogs use the shared component backdrop.
 
 ## Shapes
 
-Use the compact five-pixel radius to avoid decorative softness.
+Use MudBlazor's compact four-pixel radius consistently.
 
 ## Components
 
-Every action is a native button. Status is communicated by text and semantic color. Forms keep errors inline.
+Use MudBlazor components and their default control hierarchy. The global theme toggle switches the whole shell between accessible light and dark palettes. Status is communicated by text and semantic color. Forms keep errors inline.
 
 ## Do's and Don'ts
 
-Do keep sensitive data out of persistent browser storage. Do not use bright accents except for committed actions or warnings.
+Do keep sensitive data out of persistent browser storage. Do not use green in the interface; use the defined blue success tone instead.
