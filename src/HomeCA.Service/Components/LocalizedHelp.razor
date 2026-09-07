@@ -1,0 +1,53 @@
+@using HomeCA.Service.Localization
+@inject IHostEnvironment Environment
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+@if (_html is null)
+{
+    <MudProgressCircular Indeterminate="true" Size="Size.Small" aria-label="@Text["LoadingHelp"]" />
+}
+else if (_html.Length == 0)
+{
+    <MudAlert Severity="Severity.Warning">@Text["HelpUnavailable"]</MudAlert>
+}
+else
+{
+    @if (_usedFallback)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@Text["HelpFallbackNotice"]</MudAlert>
+    }
+    <article class="help-content">@((MarkupString)_html)</article>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Topic { get; set; } = string.Empty;
+
+    private string? _html;
+    private bool _usedFallback;
+    private bool _copyButtonsAttached;
+
+    protected override void OnParametersSet()
+    {
+        var locale = LocaleCatalog.NormalizeOrDefault(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+        var localizedArticle = ReadArticle(locale, Topic);
+        var article = localizedArticle ?? ReadArticle(LocaleCatalog.DefaultCulture, Topic);
+        _usedFallback = article is not null && locale != LocaleCatalog.DefaultCulture && localizedArticle is null;
+        _html = article is null ? string.Empty : SafeMarkdown.Render(article);
+        _copyButtonsAttached = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_html is null || _html.Length == 0 || _copyButtonsAttached) return;
+        await JS.InvokeVoidAsync("homeca.addHelpCopyButtons", Text["CopyCode"].Value);
+        _copyButtonsAttached = true;
+    }
+
+    private string? ReadArticle(string locale, string topic)
+    {
+        if (!LocaleCatalog.HelpTopics.Contains(topic, StringComparer.Ordinal)) return null;
+        var path = Path.Combine(Environment.ContentRootPath, "Help", locale, $"{topic}.md");
+        return File.Exists(path) ? File.ReadAllText(path) : null;
+    }
+}

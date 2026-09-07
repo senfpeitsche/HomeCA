@@ -1,26 +1,26 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
-@inject UiStrings L
 @inject HomeCaInternalHttpClient InternalHttpClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
 
 <main class="login-shell">
     <MudPaper Class="login-card" Elevation="0" Style="max-width: 640px;">
-        <MudText Typo="Typo.overline" Class="signal-text">ERSTEINRICHTUNG</MudText>
-        <MudText Typo="Typo.h4" Class="service-title mb-2">HomeCA Setup-Assistent</MudText>
+        <MudText Typo="Typo.overline" Class="signal-text">@Text["SetupKicker"]</MudText>
+        <MudText Typo="Typo.h4" Class="service-title mb-2">@Text["SetupTitle"]</MudText>
         <MudText Class="mud-text-secondary mb-4">
-            Dieser Assistent konfiguriert deine lokale PKI in drei Schritten.
+            @Text["SetupDescription"]
         </MudText>
 
         @* Progress indicator *@
         <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mb-4">
             <MudTimelineItem Color="@StepColor(0)" Size="Size.Small">
-                <MudText Typo="Typo.body2" Style="@StepStyle(0)">1. Hostname und Domain</MudText>
+                <MudText Typo="Typo.body2" Style="@StepStyle(0)">@Text["SetupHostnameStep"]</MudText>
             </MudTimelineItem>
             <MudTimelineItem Color="@StepColor(1)" Size="Size.Small">
-                <MudText Typo="Typo.body2" Style="@StepStyle(1)">2. DNS-Connector (optional)</MudText>
+                <MudText Typo="Typo.body2" Style="@StepStyle(1)">@Text["SetupConnectorStep"]</MudText>
             </MudTimelineItem>
             <MudTimelineItem Color="@StepColor(2)" Size="Size.Small">
-                <MudText Typo="Typo.body2" Style="@StepStyle(2)">3. Zertifizierungsstellen erstellen</MudText>
+                <MudText Typo="Typo.body2" Style="@StepStyle(2)">@Text["SetupCaStep"]</MudText>
             </MudTimelineItem>
         </MudTimeline>
 
@@ -29,36 +29,34 @@
         @* ── Step 1: Hostname / PublicUrl ──────────────────────────────── *@
         @if (_step == 0)
         {
-            <MudText Typo="Typo.h6" Class="mb-2">Hostname und Domain festlegen</MudText>
+            <MudText Typo="Typo.h6" Class="mb-2">@Text["SetupHostnameTitle"]</MudText>
             <MudText Class="mud-text-secondary mb-3">
-                Unter welchem Namen ist dieser HomeCA-Container im Netzwerk erreichbar?
-                Der Hostname wird als CRL-Verteilungspunkt in alle ausgestellten Zertifikate eingetragen.
+                @Text["SetupHostnameDescription"]
             </MudText>
 
             <MudForm @ref="_hostnameForm" @bind-IsValid="_hostnameValid">
-                <MudTextField @bind-Value="_hostname" Label="Hostname / FQDN" Placeholder="homeca.home.local"
-                    Required="true" RequiredError="Hostname ist erforderlich"
+                <MudTextField @bind-Value="_hostname" Label="@Text["SetupHostnameLabel"]" Placeholder="homeca.home.local"
+                    Required="true" RequiredError="@Text["SetupHostnameRequired"]"
                     Validation="@(new Func<string, string?>(ValidateHostname))"
-                    Immediate="true" HelperText="DNS-Name, unter dem HomeCA erreichbar ist (z. B. homeca.home.local)" />
-                <MudNumericField T="int" @bind-Value="_port" Label="Port" Min="1" Max="65535"
-                    HelperText="Standard: 5080 (HTTP)" Class="mt-2" />
+                    Immediate="true" HelperText="@Text["SetupHostnameHelper"]" />
+                <MudNumericField T="int" @bind-Value="_port" Label="@Text["SetupPortLabel"]" Min="1" Max="65535"
+                    HelperText="@Text["SetupPortHelper"]" Class="mt-2" />
             </MudForm>
 
             @if (_hostnameConfigured)
             {
                 <MudAlert Severity="Severity.Success" Class="mt-3 mb-3">
-                    PublicUrl gesetzt: <strong>http://@_hostname:@_port</strong>
-                    — diese URL wird als CRL-Verteilungspunkt in Zertifikate eingetragen.
+                    @Text["SetupPublicUrlConfigured", _hostname, _port]
                 </MudAlert>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _step = 1)" FullWidth="true">
-                    Weiter: DNS-Connector
+                    @Text["SetupContinueConnector"]
                 </MudButton>
             }
             else
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
                     Disabled="@(!_hostnameValid || _busy)" OnClick="ConfigureHostnameAsync" FullWidth="true" Class="mt-3">
-                    @(_busy ? "Wird gespeichert …" : "Hostname übernehmen")
+                    @(_busy ? Text["SetupSaving"] : Text["SetupApplyHostname"])
                 </MudButton>
             }
         }
@@ -66,47 +64,46 @@
         @* ── Step 2: Optional DNS Connector ───────────────────────────── *@
         else if (_step == 1)
         {
-            <MudText Typo="Typo.h6" Class="mb-2">DNS-Connector einrichten (optional)</MudText>
+            <MudText Typo="Typo.h6" Class="mb-2">@Text["SetupConnectorTitle"]</MudText>
             <MudText Class="mud-text-secondary mb-3">
-                Ein DNS-Connector wird für automatische DNS-01-Challenges (ACME) und externe Zertifikate benötigt.
-                Für rein interne Zertifikate kannst du diesen Schritt überspringen.
+                @Text["SetupConnectorDescription"]
             </MudText>
 
             @if (!_showConnectorForm)
             {
                 <div class="d-flex gap-2">
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _showConnectorForm = true)">
-                        DNS-Connector jetzt einrichten
+                        @Text["SetupConnectorNow"]
                     </MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _step = 2)">
-                        Überspringen — später einrichten
+                        @Text["SetupConnectorSkipLater"]
                     </MudButton>
                 </div>
             }
             else
             {
-                <MudSelect T="string" Label="Connector-Typ" @bind-Value="_connectorType" Class="mb-2">
+                <MudSelect T="string" Label="@Text["SetupConnectorType"]" @bind-Value="_connectorType" Class="mb-2">
                     <MudSelectItem Value="@("technitium")">Technitium DNS</MudSelectItem>
                     <MudSelectItem Value="@("hetzner")">Hetzner DNS</MudSelectItem>
                 </MudSelect>
 
-                <MudTextField @bind-Value="_connectorName" Label="Name" Placeholder="Mein DNS-Server"
+                <MudTextField @bind-Value="_connectorName" Label="@Text["SetupConnectorName"]" Placeholder="@Text["SetupConnectorNamePlaceholder"]"
                     Required="true" Immediate="true" Class="mb-2" />
 
                 @if (_connectorType == "technitium")
                 {
-                    <MudTextField @bind-Value="_connectorEndpoint" Label="API-Endpoint"
+                    <MudTextField @bind-Value="_connectorEndpoint" Label="@Text["SetupApiEndpoint"]"
                         Placeholder="http://10.0.0.1:5380" Required="true" Immediate="true" Class="mb-2"
-                        HelperText="URL der Technitium-DNS-API" />
-                    <MudTextField @bind-Value="_connectorSecret" Label="API-Token"
+                        HelperText="@Text["SetupTechnitiumApiUrl"]" />
+                    <MudTextField @bind-Value="_connectorSecret" Label="@Text["SetupApiToken"]"
                         InputType="InputType.Password" Required="true" Immediate="true"
-                        HelperText="Technitium API-Token" />
+                        HelperText="@Text["SetupTechnitiumApiToken"]" />
                 }
                 else
                 {
-                    <MudTextField @bind-Value="_connectorSecret" Label="Hetzner DNS API-Token"
+                    <MudTextField @bind-Value="_connectorSecret" Label="@Text["SetupHetznerApiToken"]"
                         InputType="InputType.Password" Required="true" Immediate="true"
-                        HelperText="API-Token aus der Hetzner DNS Console" />
+                        HelperText="@Text["SetupHetznerApiTokenHelper"]" />
                 }
 
                 @if (!string.IsNullOrEmpty(_connectorError))
@@ -115,9 +112,9 @@
                 }
                 @if (_connectorCreated)
                 {
-                    <MudAlert Severity="Severity.Success" Class="mt-2 mb-3">DNS-Connector wurde gespeichert.</MudAlert>
+                    <MudAlert Severity="Severity.Success" Class="mt-2 mb-3">@Text["SetupConnectorSaved"]</MudAlert>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _step = 2)" FullWidth="true">
-                        Weiter: CA erstellen
+                        @Text["SetupContinueCa"]
                     </MudButton>
                 }
                 else
@@ -126,10 +123,10 @@
                         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                             Disabled="@(_busy || string.IsNullOrWhiteSpace(_connectorName) || string.IsNullOrWhiteSpace(_connectorSecret))"
                             OnClick="CreateConnectorAsync">
-                            @(_busy ? "Wird gespeichert …" : "Connector speichern")
+                            @(_busy ? Text["SetupSaving"] : Text["SetupConnectorSave"])
                         </MudButton>
                         <MudButton Variant="Variant.Text" OnClick="@(() => { _showConnectorForm = false; _step = 2; })">
-                            Überspringen
+                            @Text["SetupSkip"]
                         </MudButton>
                     </div>
                 }
@@ -139,36 +136,35 @@
         @* ── Step 3: Create CA ────────────────────────────────────────── *@
         else if (_step == 2)
         {
-            <MudText Typo="Typo.h6" Class="mb-2">Zertifizierungsstellen erstellen</MudText>
+            <MudText Typo="Typo.h6" Class="mb-2">@Text["SetupCaTitle"]</MudText>
             <MudText Class="mud-text-secondary mb-3">
-                HomeCA erstellt eine Root-CA (10 Jahre) und eine TLS-Issuing-CA (5 Jahre).
-                Danach können Zertifikate für dein Homelab ausgestellt werden.
+                @Text["SetupCaDescription"]
             </MudText>
 
             <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                CRL-URL in Zertifikaten: <strong>http://@_hostname:@_port/api/v1/crl/latest</strong>
+                @Text["SetupCrlUrl"] <strong>http://@_hostname:@_port/api/v1/crl/latest</strong>
             </MudAlert>
 
             @if (_caCreated)
             {
                 <MudAlert Severity="Severity.Success" Class="mb-3">
-                    Root-CA und TLS-Issuing-CA wurden erfolgreich erstellt. HomeCA ist einsatzbereit.
+                    @Text["SetupCaCreated"] @Text["SetupCaReady"]
                 </MudAlert>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="FinishAsync" Disabled="_busy" FullWidth="true">
-                    @(_busy ? "Wird geladen …" : "Zum Dashboard")
+                    @(_busy ? Text["SetupLoading"] : Text["SetupDashboard"])
                 </MudButton>
             }
             else
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="InitializeCaAsync" FullWidth="true">
-                    @(_busy ? "CA wird erstellt …" : "CA jetzt erstellen")
+                    @(_busy ? Text["SetupCreatingCa"] : Text["SetupCreateCa"])
                 </MudButton>
             }
         }
 
         <MudDivider Class="my-4" />
         <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small" OnClick="SkipWizardAsync" Disabled="_busy">
-            Assistent überspringen (nicht empfohlen)
+            @Text["SetupSkipAssistant"]
         </MudButton>
     </MudPaper>
 </main>
@@ -226,9 +222,9 @@
     private string? ValidateHostname(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        if (value.Contains(' ')) return "Hostname darf keine Leerzeichen enthalten.";
-        if (value.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return "Nur den Hostnamen eingeben, nicht die URL.";
-        if (!HostnamePattern.IsMatch(value)) return "Kein gültiger Hostname (z. B. homeca.home.local).";
+        if (value.Contains(' ')) return Text["SetupHostnameSpaces"];
+        if (value.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return Text["SetupHostnameNoUrl"];
+        if (!HostnamePattern.IsMatch(value)) return Text["SetupHostnameInvalid"];
         return null;
     }
 
@@ -245,11 +241,11 @@
             var response = await client.PostAsJsonAsync("api/v1/setup/configure", new { hostname = _hostname, port = _port });
             if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Hostname konnte nicht gespeichert werden.", Severity.Error);
+                Snackbar.Add(Text["SetupHostnameSaveFailed"], Severity.Error);
                 return;
             }
             _hostnameConfigured = true;
-            Snackbar.Add($"PublicUrl auf http://{_hostname}:{_port} gesetzt.", Severity.Success);
+            Snackbar.Add(Text["SetupPublicUrlSaved", _hostname, _port], Severity.Success);
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _busy = false; }
@@ -281,7 +277,7 @@
             }
 
             _connectorCreated = true;
-            Snackbar.Add("DNS-Connector gespeichert.", Severity.Success);
+            Snackbar.Add(Text["SetupConnectorCreated"], Severity.Success);
         }
         catch (Exception ex) { _connectorError = ex.Message; }
         finally { _busy = false; }
@@ -301,16 +297,16 @@
                 if (error.Contains("already configured", StringComparison.OrdinalIgnoreCase))
                 {
                     _caCreated = true;
-                    Snackbar.Add("Zertifizierungsstellen sind bereits eingerichtet.", Severity.Info);
+                    Snackbar.Add(Text["SetupAuthoritiesAlreadyConfigured"], Severity.Info);
                 }
                 else
                 {
-                    Snackbar.Add($"CA-Erstellung fehlgeschlagen: {error}", Severity.Error);
+                    Snackbar.Add(Text["SetupCaCreateFailed", error], Severity.Error);
                 }
                 return;
             }
             _caCreated = true;
-            Snackbar.Add("Root-CA und TLS-Issuing-CA wurden erstellt.", Severity.Success);
+            Snackbar.Add(Text["SetupCaCreatedNotification"], Severity.Success);
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _busy = false; }

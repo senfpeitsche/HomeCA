@@ -1,0 +1,857 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="LanguageSelectorLabel" xml:space="preserve">
+    <value>Select language</value>
+  </data>
+  <data name="HelpUnavailable" xml:space="preserve">
+    <value>This help article is not available yet.</value>
+  </data>
+  <data name="HelpFallbackNotice" xml:space="preserve">
+    <value>This article is shown in English because no translation is available.</value>
+  </data>
+  <data name="CopyCode" xml:space="preserve">
+    <value>Copy code</value>
+  </data>
+  <data name="EnableLightTheme" xml:space="preserve">
+    <value>Enable light theme</value>
+  </data>
+  <data name="EnableDarkTheme" xml:space="preserve">
+    <value>Enable dark theme</value>
+  </data>
+  <data name="PageNotFound" xml:space="preserve">
+    <value>Page not found</value>
+  </data>
+  <data name="SetupKicker" xml:space="preserve">
+    <value>INITIAL SETUP</value>
+  </data>
+  <data name="SetupTitle" xml:space="preserve">
+    <value>HomeCA Setup Assistant</value>
+  </data>
+  <data name="SetupHostnameStep" xml:space="preserve">
+    <value>1. Hostname and domain</value>
+  </data>
+  <data name="SetupConnectorStep" xml:space="preserve">
+    <value>2. DNS connector (optional)</value>
+  </data>
+  <data name="SetupCaStep" xml:space="preserve">
+    <value>3. Create certificate authorities</value>
+  </data>
+  <data name="SetupHostnameTitle" xml:space="preserve">
+    <value>Set hostname and domain</value>
+  </data>
+  <data name="SetupHostnameLabel" xml:space="preserve">
+    <value>Hostname / FQDN</value>
+  </data>
+  <data name="SetupHostnameRequired" xml:space="preserve">
+    <value>Hostname is required</value>
+  </data>
+  <data name="SetupPortLabel" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="SetupSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SetupSaving" xml:space="preserve">
+    <value>Saving …</value>
+  </data>
+  <data name="SetupSkip" xml:space="preserve">
+    <value>Skip</value>
+  </data>
+  <data name="SetupDescription" xml:space="preserve">
+    <value>This assistant configures your local PKI in three steps.</value>
+  </data>
+  <data name="SetupConnectorTitle" xml:space="preserve">
+    <value>Configure DNS connector (optional)</value>
+  </data>
+  <data name="SetupConnectorNow" xml:space="preserve">
+    <value>Configure DNS connector now</value>
+  </data>
+  <data name="SetupConnectorType" xml:space="preserve">
+    <value>Connector type</value>
+  </data>
+  <data name="SetupConnectorName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="SetupConnectorSaved" xml:space="preserve">
+    <value>DNS connector saved.</value>
+  </data>
+  <data name="SetupCaTitle" xml:space="preserve">
+    <value>Create certificate authorities</value>
+  </data>
+  <data name="SetupCaReady" xml:space="preserve">
+    <value>HomeCA is ready to use.</value>
+  </data>
+  <data name="SetupDashboard" xml:space="preserve">
+    <value>Go to dashboard</value>
+  </data>
+  <data name="SetupCreateCa" xml:space="preserve">
+    <value>Create CA now</value>
+  </data>
+  <data name="SetupHostnameSpaces" xml:space="preserve">
+    <value>Hostname must not contain spaces.</value>
+  </data>
+  <data name="SetupHostnameNoUrl" xml:space="preserve">
+    <value>Enter only the hostname, not the URL.</value>
+  </data>
+  <data name="SetupHostnameInvalid" xml:space="preserve">
+    <value>Invalid hostname (for example, homeca.home.local).</value>
+  </data>
+  <data name="SetupHostnameSaveFailed" xml:space="preserve">
+    <value>Hostname could not be saved.</value>
+  </data>
+  <data name="SetupConnectorSave" xml:space="preserve">
+    <value>Save connector</value>
+  </data>
+  <data name="SetupConnectorSkipLater" xml:space="preserve">
+    <value>Skip — configure later</value>
+  </data>
+  <data name="SetupConnectorDescription" xml:space="preserve">
+    <value>A DNS connector is needed for automatic DNS-01 challenges (ACME) and external certificates. You can skip this step for internal certificates.</value>
+  </data>
+  <data name="SetupContinueCa" xml:space="preserve">
+    <value>Continue: create CA</value>
+  </data>
+  <data name="SetupCaDescription" xml:space="preserve">
+    <value>HomeCA creates a Root CA (10 years) and a TLS Issuing CA (5 years). You can then issue certificates for your homelab.</value>
+  </data>
+  <data name="SetupCaCreated" xml:space="preserve">
+    <value>Root CA and TLS Issuing CA were created successfully.</value>
+  </data>
+  <data name="SetupSkipAssistant" xml:space="preserve">
+    <value>Skip assistant (not recommended)</value>
+  </data>
+  <data name="LoginSignalText" xml:space="preserve">
+    <value>LOCAL CERTIFICATE AUTHORITY</value>
+  </data>
+  <data name="LoginSubtitle" xml:space="preserve">
+    <value>Sign in to manage your local PKI.</value>
+  </data>
+  <data name="LoginUsername" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="LoginPassword" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="LoginButton" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="LoginBusy" xml:space="preserve">
+    <value>Signing in …</value>
+  </data>
+  <data name="LogoutButton" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="RefreshAriaLabel" xml:space="preserve">
+    <value>Refresh data</value>
+  </data>
+  <data name="ChangePasswordTitle" xml:space="preserve">
+    <value>Change Password</value>
+  </data>
+  <data name="ChangePasswordDescription" xml:space="preserve">
+    <value>The default password must be changed before first use.</value>
+  </data>
+  <data name="DefaultCredentialsHint" xml:space="preserve">
+    <value>First login: username admin, password admin</value>
+  </data>
+  <data name="CurrentPassword" xml:space="preserve">
+    <value>Current Password</value>
+  </data>
+  <data name="NewPassword" xml:space="preserve">
+    <value>New Password</value>
+  </data>
+  <data name="ConfirmNewPassword" xml:space="preserve">
+    <value>Confirm New Password</value>
+  </data>
+  <data name="ChangePasswordButton" xml:space="preserve">
+    <value>Change Password</value>
+  </data>
+  <data name="ChangePasswordBusy" xml:space="preserve">
+    <value>Changing password …</value>
+  </data>
+  <data name="ChangePasswordSuccess" xml:space="preserve">
+    <value>Password changed successfully. Please sign in with your new password.</value>
+  </data>
+  <data name="ChangePasswordError" xml:space="preserve">
+    <value>Password change failed. Check the current password.</value>
+  </data>
+  <data name="ChangePasswordMismatch" xml:space="preserve">
+    <value>Passwords do not match.</value>
+  </data>
+  <data name="ChangePasswordTooShort" xml:space="preserve">
+    <value>The new password must be at least 12 characters.</value>
+  </data>
+  <data name="TrustInstallTitle" xml:space="preserve">
+    <value>Install Certificate Chain on Devices</value>
+  </data>
+  <data name="TrustInstallDescription" xml:space="preserve">
+    <value>Copy the appropriate script and run it on the target device. It installs the HomeCA root CA.</value>
+  </data>
+  <data name="TrustInstallCopied" xml:space="preserve">
+    <value>Copied to clipboard.</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="NavCertificates" xml:space="preserve">
+    <value>Certificates</value>
+  </data>
+  <data name="NavAuthorities" xml:space="preserve">
+    <value>Certificate Authorities</value>
+  </data>
+  <data name="NavAutomation" xml:space="preserve">
+    <value>Automation</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="NavProfiles" xml:space="preserve">
+    <value>Profiles</value>
+  </data>
+  <data name="NavOperations" xml:space="preserve">
+    <value>Operations</value>
+  </data>
+  <data name="NavHelp" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <data name="NavAcme" xml:space="preserve">
+    <value>ACME</value>
+  </data>
+  <data name="AcmeKicker" xml:space="preserve">
+    <value>Automatic Certificate Management</value>
+  </data>
+  <data name="AcmeTitle" xml:space="preserve">
+    <value>ACME Management</value>
+  </data>
+  <data name="AcmeRfc8555Accounts" xml:space="preserve">
+    <value>RFC 8555 Accounts (OPNsense, acme.sh, Certbot)</value>
+  </data>
+  <data name="AcmeRfc8555Orders" xml:space="preserve">
+    <value>RFC 8555 Orders</value>
+  </data>
+  <data name="AcmeSimplifiedAccounts" xml:space="preserve">
+    <value>Simplified API Accounts (curl/scripts)</value>
+  </data>
+  <data name="AcmeSimplifiedOrders" xml:space="preserve">
+    <value>Simplified API Orders</value>
+  </data>
+  <data name="AcmeNoAccounts" xml:space="preserve">
+    <value>No ACME accounts registered yet.</value>
+  </data>
+  <data name="AcmeNoOrders" xml:space="preserve">
+    <value>No ACME orders yet.</value>
+  </data>
+  <data name="AcmeColumnContact" xml:space="preserve">
+    <value>Contact</value>
+  </data>
+  <data name="AcmeColumnThumbprint" xml:space="preserve">
+    <value>Key Thumbprint</value>
+  </data>
+  <data name="AcmeColumnCreated" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="AcmeColumnIdentifiers" xml:space="preserve">
+    <value>Identifiers</value>
+  </data>
+  <data name="AcmeColumnStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="AcmeColumnCertificate" xml:space="preserve">
+    <value>Certificate</value>
+  </data>
+  <data name="AcmeExternalIssuers" xml:space="preserve">
+    <value>External ACME Issuers</value>
+  </data>
+  <data name="AcmeExternalCertificates" xml:space="preserve">
+    <value>External ACME Certificates</value>
+  </data>
+  <data name="AcmeNoExternalCerts" xml:space="preserve">
+    <value>No external ACME certificates yet.</value>
+  </data>
+  <data name="HelpKicker" xml:space="preserve">
+    <value>Guides and Reference</value>
+  </data>
+  <data name="HelpTitle" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <data name="HelpDescription" xml:space="preserve">
+    <value>Step-by-step guides for TLS and SSH certificates, trust installation and ACME setup.</value>
+  </data>
+  <data name="HelpTabTls" xml:space="preserve">
+    <value>TLS Certificates</value>
+  </data>
+  <data name="HelpTabSsh" xml:space="preserve">
+    <value>SSH Certificates</value>
+  </data>
+  <data name="HelpTabTrust" xml:space="preserve">
+    <value>Trust Installation</value>
+  </data>
+  <data name="HelpTabAcme" xml:space="preserve">
+    <value>ACME Setup</value>
+  </data>
+  <data name="HelpTabCaRotation" xml:space="preserve">
+    <value>CA Rotation</value>
+  </data>
+  <data name="OverviewKicker" xml:space="preserve">
+    <value>Trust Foundation Status</value>
+  </data>
+  <data name="OverviewTitle" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="MetricCertificates" xml:space="preserve">
+    <value>Certificates</value>
+  </data>
+  <data name="MetricCAs" xml:space="preserve">
+    <value>CAs</value>
+  </data>
+  <data name="MetricRenewals" xml:space="preserve">
+    <value>Renewals</value>
+  </data>
+  <data name="TrustAnchorTitle" xml:space="preserve">
+    <value>Distribute Trust Anchor</value>
+  </data>
+  <data name="TrustAnchorDescription" xml:space="preserve">
+    <value>To trust certificates from this PKI, devices and browsers must install the Root CA certificate in their trust store. The following endpoints are available without authentication.</value>
+  </data>
+  <data name="TrustAnchorPem" xml:space="preserve">
+    <value>Root CA as PEM</value>
+  </data>
+  <data name="TrustAnchorDer" xml:space="preserve">
+    <value>Root CA as Windows CER</value>
+  </data>
+  <data name="LatestCertificates" xml:space="preserve">
+    <value>Latest Certificates</value>
+  </data>
+  <data name="CertificatesKicker" xml:space="preserve">
+    <value>X.509 and SSH</value>
+  </data>
+  <data name="CertificatesTitle" xml:space="preserve">
+    <value>Issue Certificates</value>
+  </data>
+  <data name="TabTls" xml:space="preserve">
+    <value>TLS and mTLS Certificate</value>
+  </data>
+  <data name="TabSsh" xml:space="preserve">
+    <value>SSH Certificate</value>
+  </data>
+  <data name="TabAcme" xml:space="preserve">
+    <value>Internal ACME</value>
+  </data>
+  <data name="CertificateInventory" xml:space="preserve">
+    <value>Certificate Inventory</value>
+  </data>
+  <data name="NoCertificatesYet" xml:space="preserve">
+    <value>No certificates issued yet.</value>
+  </data>
+  <data name="ColumnSubject" xml:space="preserve">
+    <value>Subject</value>
+  </data>
+  <data name="ColumnAlgorithm" xml:space="preserve">
+    <value>Algorithm</value>
+  </data>
+  <data name="ColumnExpiresAt" xml:space="preserve">
+    <value>Expires</value>
+  </data>
+  <data name="ColumnDownload" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="AuthoritiesKicker" xml:space="preserve">
+    <value>Trust Hierarchy and Revocation Lists</value>
+  </data>
+  <data name="AuthoritiesTitle" xml:space="preserve">
+    <value>Certificate Authorities</value>
+  </data>
+  <data name="CreateCa" xml:space="preserve">
+    <value>Create CA</value>
+  </data>
+  <data name="ManageCa" xml:space="preserve">
+    <value>Manage CA</value>
+  </data>
+  <data name="SaveChanges" xml:space="preserve">
+    <value>Save Changes</value>
+  </data>
+  <data name="CancelEdit" xml:space="preserve">
+    <value>Cancel Edit</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="ConfirmDelete" xml:space="preserve">
+    <value>Confirm Delete</value>
+  </data>
+  <data name="Revoke" xml:space="preserve">
+    <value>Revoke</value>
+  </data>
+  <data name="CaInventory" xml:space="preserve">
+    <value>CA Inventory</value>
+  </data>
+  <data name="NoRootCaYet" xml:space="preserve">
+    <value>Create a Root CA first.</value>
+  </data>
+  <data name="NewIntermediate" xml:space="preserve">
+    <value>New Intermediate CA</value>
+  </data>
+  <data name="PfxDialogTitle" xml:space="preserve">
+    <value>Set PFX Password</value>
+  </data>
+  <data name="PfxDialogDescription" xml:space="preserve">
+    <value>The PFX archive will be encrypted with this password. Use a strong password and only share it with the target system.</value>
+  </data>
+  <data name="PfxPasswordLabel" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="PfxConfirmLabel" xml:space="preserve">
+    <value>Confirm Password</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="OperationsKicker" xml:space="preserve">
+    <value>Revocation and Recovery</value>
+  </data>
+  <data name="OperationsTitle" xml:space="preserve">
+    <value>Operations</value>
+  </data>
+  <data name="GenerateCrl" xml:space="preserve">
+    <value>Generate CRL</value>
+  </data>
+  <data name="BackupTitle" xml:space="preserve">
+    <value>Encrypted Backup</value>
+  </data>
+  <data name="BackupDescription" xml:space="preserve">
+    <value>Creates an encrypted archive of the HomeCA data.</value>
+  </data>
+  <data name="CreateBackup" xml:space="preserve">
+    <value>Create Backup</value>
+  </data>
+  <data name="VerifyBackup" xml:space="preserve">
+    <value>verify</value>
+  </data>
+  <data name="Days" xml:space="preserve">
+    <value>days</value>
+  </data>
+  <data name="Active" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Inactive" xml:space="preserve">
+    <value>Inactive</value>
+  </data>
+  <data name="Revoked" xml:space="preserve">
+    <value>Revoked</value>
+  </data>
+  <data name="SetupHostnameDescription" xml:space="preserve"><value>Choose the name under which this HomeCA container is reachable on the network. The hostname is added to every issued certificate as the CRL distribution point.</value></data>
+  <data name="SetupHostnameHelper" xml:space="preserve"><value>DNS name under which HomeCA is reachable (for example, homeca.home.local)</value></data>
+  <data name="SetupPortHelper" xml:space="preserve"><value>Default: 5080 (HTTP)</value></data>
+  <data name="SetupPublicUrlConfigured" xml:space="preserve"><value>PublicUrl set to http://{0}:{1}; this URL is added to certificates as the CRL distribution point.</value></data>
+  <data name="SetupContinueConnector" xml:space="preserve"><value>Continue: DNS connector</value></data>
+  <data name="SetupApplyHostname" xml:space="preserve"><value>Apply hostname</value></data>
+  <data name="SetupConnectorNamePlaceholder" xml:space="preserve"><value>My DNS server</value></data>
+  <data name="SetupApiEndpoint" xml:space="preserve"><value>API endpoint</value></data>
+  <data name="SetupTechnitiumApiUrl" xml:space="preserve"><value>Technitium DNS API URL</value></data>
+  <data name="SetupApiToken" xml:space="preserve"><value>API token</value></data>
+  <data name="SetupTechnitiumApiToken" xml:space="preserve"><value>Technitium API token</value></data>
+  <data name="SetupHetznerApiToken" xml:space="preserve"><value>Hetzner DNS API token</value></data>
+  <data name="SetupHetznerApiTokenHelper" xml:space="preserve"><value>API token from the Hetzner DNS console</value></data>
+  <data name="SetupLoading" xml:space="preserve"><value>Loading …</value></data>
+  <data name="SetupCreatingCa" xml:space="preserve"><value>Creating CA …</value></data>
+  <data name="SetupCrlUrl" xml:space="preserve"><value>CRL URL in certificates:</value></data>
+  <data name="SetupPublicUrlSaved" xml:space="preserve"><value>PublicUrl set to http://{0}:{1}.</value></data>
+  <data name="SetupConnectorCreated" xml:space="preserve"><value>DNS connector saved.</value></data>
+  <data name="SetupAuthoritiesAlreadyConfigured" xml:space="preserve"><value>Certificate authorities are already configured.</value></data>
+  <data name="SetupCaCreateFailed" xml:space="preserve"><value>CA creation failed: {0}</value></data>
+  <data name="SetupCaCreatedNotification" xml:space="preserve"><value>Root CA and TLS Issuing CA were created.</value></data>
+  <data name="AppNameSuffix" xml:space="preserve"><value>LOCAL PKI</value></data>
+  <data name="UpdateAvailable" xml:space="preserve"><value>Version {0} available</value></data>
+  <data name="UpdateAvailableAria" xml:space="preserve"><value>Update available</value></data>
+  <data name="CertificateDetailsTitle" xml:space="preserve"><value>Certificate details</value></data>
+  <data name="Issuer" xml:space="preserve"><value>Issuer</value></data>
+  <data name="SerialNumber" xml:space="preserve"><value>Serial number</value></data>
+  <data name="Fingerprint" xml:space="preserve"><value>SHA-256 fingerprint</value></data>
+  <data name="ValidFrom" xml:space="preserve"><value>Valid from</value></data>
+  <data name="ValidUntil" xml:space="preserve"><value>Valid until</value></data>
+  <data name="Usage" xml:space="preserve"><value>Usage</value></data>
+  <data name="DnsNames" xml:space="preserve"><value>DNS names</value></data>
+  <data name="IpAddresses" xml:space="preserve"><value>IP addresses</value></data>
+  <data name="ExtendedKeyUsage" xml:space="preserve"><value>Extended key usage</value></data>
+  <data name="CertificateId" xml:space="preserve"><value>Certificate ID</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="SshCertificateInventory" xml:space="preserve"><value>SSH certificate inventory</value></data>
+  <data name="Identity" xml:space="preserve"><value>Identity</value></data>
+  <data name="Kind" xml:space="preserve"><value>Type</value></data>
+  <data name="IssuedAt" xml:space="preserve"><value>Issued</value></data>
+  <data name="Host" xml:space="preserve"><value>Host</value></data>
+  <data name="User" xml:space="preserve"><value>User</value></data>
+  <data name="Certificate" xml:space="preserve"><value>Certificate</value></data>
+  <data name="NoSshCertificatesYet" xml:space="preserve"><value>No SSH certificates issued yet.</value></data>
+  <data name="AutomationKicker" xml:space="preserve"><value>Prepare workflows</value></data>
+  <data name="AutomationTitle" xml:space="preserve"><value>Renewal automation</value></data>
+  <data name="DaysBeforeExpiry" xml:space="preserve"><value>Days before expiry</value></data>
+  <data name="SettingsKicker" xml:space="preserve"><value>External services and zones</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
+  <data name="ProfilesKicker" xml:space="preserve"><value>Target systems and export defaults</value></data>
+  <data name="ProfilesTitle" xml:space="preserve"><value>Profiles</value></data>
+  <data name="TargetProfiles" xml:space="preserve"><value>Target profiles</value></data>
+  <data name="NoTargetProfiles" xml:space="preserve"><value>No target profiles have been created yet.</value></data>
+  <data name="Revocations" xml:space="preserve"><value>Revocations</value></data>
+  <data name="Reason" xml:space="preserve"><value>Reason</value></data>
+  <data name="Date" xml:space="preserve"><value>Date</value></data>
+  <data name="SavedDnsConnectors" xml:space="preserve"><value>Saved DNS connectors</value></data>
+  <data name="CheckHetzner" xml:space="preserve"><value>Check Hetzner</value></data>
+  <data name="CheckTechnitium" xml:space="preserve"><value>Check Technitium</value></data>
+  <data name="TxtTest" xml:space="preserve"><value>TXT test</value></data>
+  <data name="SavedDomains" xml:space="preserve"><value>Saved domains</value></data>
+  <data name="IssuanceZone" xml:space="preserve"><value>Issuance zone</value></data>
+  <data name="Internal" xml:space="preserve"><value>Internal</value></data>
+  <data name="External" xml:space="preserve"><value>External</value></data>
+  <data name="TlsSettingsTitle" xml:space="preserve"><value>TLS for the HomeCA interface</value></data>
+  <data name="TlsSettingsDescription" xml:space="preserve"><value>HomeCA issues a TLS certificate for itself and is then available only over HTTPS (port 5443). The CA must already be configured.</value></data>
+  <data name="TlsRestartNotice" xml:space="preserve"><value>HomeCA is restarting and will shortly be available over HTTPS. This page redirects automatically.</value></data>
+  <data name="TlsHostAlternative" xml:space="preserve"><value>Alternatively, run this on the host:</value></data>
+  <data name="TlsActivating" xml:space="preserve"><value>Activating TLS …</value></data>
+  <data name="TlsActivateRestart" xml:space="preserve"><value>Activate TLS and restart now</value></data>
+  <data name="TlsHostnameHelper" xml:space="preserve"><value>DNS name for the TLS certificate</value></data>
+  <data name="TlsIpAddress" xml:space="preserve"><value>IP address (optional)</value></data>
+  <data name="TlsIpAddressHelper" xml:space="preserve"><value>Added as an additional SAN</value></data>
+  <data name="TlsSettingUp" xml:space="preserve"><value>Setting up TLS …</value></data>
+  <data name="TlsIssueActivate" xml:space="preserve"><value>Issue and activate TLS certificate</value></data>
+  <data name="SetupRepeatTitle" xml:space="preserve"><value>Initial setup</value></data>
+  <data name="SetupRepeatDescription" xml:space="preserve"><value>Run the setup assistant again to repeat hostname, DNS connector, or CA configuration.</value></data>
+  <data name="SetupRepeat" xml:space="preserve"><value>Repeat initial setup</value></data>
+  <data name="RotateIntermediate" xml:space="preserve"><value>Rotate intermediate CA</value></data>
+  <data name="CreateCaTitle" xml:space="preserve"><value>Create CA</value></data>
+  <data name="RotateIntermediateWarning" xml:space="preserve"><value>After saving, new certificates are issued immediately with the replacement CA. The previous intermediate is only disabled, not revoked.</value></data>
+  <data name="AuthorityType" xml:space="preserve"><value>Type</value></data>
+  <data name="ParentRootCa" xml:space="preserve"><value>Parent root CA</value></data>
+  <data name="ValidityDays" xml:space="preserve"><value>Validity (days)</value></data>
+  <data name="KeyAlgorithm" xml:space="preserve"><value>Key algorithm</value></data>
+  <data name="CrlValidityDays" xml:space="preserve"><value>CRL validity (days)</value></data>
+  <data name="ActiveForNewIssuance" xml:space="preserve"><value>Active for new issuance</value></data>
+  <data name="PerformRotation" xml:space="preserve"><value>Perform rotation</value></data>
+  <data name="LoginUnavailable" xml:space="preserve"><value>HomeCA is unavailable. Check the network connection and service status.</value></data>
+  <data name="LoginProcessingFailed" xml:space="preserve"><value>Sign-in could not be processed. Check the server log.</value></data>
+  <data name="SignedOut" xml:space="preserve"><value>You have been signed out.</value></data>
+  <data name="ManagementDataLoadFailed" xml:space="preserve"><value>Management data could not be loaded. Check the connection or sign in again.</value></data>
+  <data name="ChangesSaved" xml:space="preserve"><value>Changes saved.</value></data>
+  <data name="ActionFailed" xml:space="preserve"><value>The action could not be completed.</value></data>
+  <data name="AuthorityNameSubjectRequired" xml:space="preserve"><value>Name and subject are required.</value></data>
+  <data name="ParentRootCaRequired" xml:space="preserve"><value>Select the parent root CA.</value></data>
+  <data name="AuthoritySettingsSaved" xml:space="preserve"><value>CA settings saved.</value></data>
+  <data name="ConfirmAuthorityDelete" xml:space="preserve"><value>Click Delete again to permanently remove the CA.</value></data>
+  <data name="AuthorityDeleted" xml:space="preserve"><value>CA deleted.</value></data>
+  <data name="ConfirmCertificateRevoke" xml:space="preserve"><value>Click again to revoke the certificate. Its record remains available for audits.</value></data>
+  <data name="CertificateRevoked" xml:space="preserve"><value>Certificate revoked. The CRL was updated and the certificate record was retained.</value></data>
+  <data name="NoActiveRootCa" xml:space="preserve"><value>No active root CA found. Initialize the PKI first.</value></data>
+  <data name="PasswordRequired" xml:space="preserve"><value>A password is required.</value></data>
+  <data name="PfxDownloaded" xml:space="preserve"><value>PFX file downloaded.</value></data>
+  <data name="SelectTargetProfile" xml:space="preserve"><value>Select a target profile first.</value></data>
+  <data name="TargetProfileRequiresDns" xml:space="preserve"><value>This target profile requires at least one DNS name.</value></data>
+  <data name="TargetProfileDisallowsIp" xml:space="preserve"><value>This target profile does not allow IP SANs.</value></data>
+  <data name="TargetProfileValidityLimit" xml:space="preserve"><value>This target profile allows a maximum validity of {0} days.</value></data>
+  <data name="SshRequiredFields" xml:space="preserve"><value>Complete every required SSH certificate field.</value></data>
+  <data name="SshCertificateIssued" xml:space="preserve"><value>SSH certificate issued.</value></data>
+  <data name="ConfirmSshCertificateDelete" xml:space="preserve"><value>Click Delete again to remove the SSH certificate.</value></data>
+  <data name="SshCertificateDeleted" xml:space="preserve"><value>SSH certificate deleted.</value></data>
+  <data name="SelectCertificate" xml:space="preserve"><value>Select a certificate.</value></data>
+  <data name="RenewalPlanUpdated" xml:space="preserve"><value>Renewal plan updated.</value></data>
+  <data name="ConfirmRenewalPlanDelete" xml:space="preserve"><value>Click Delete again to remove the renewal plan.</value></data>
+  <data name="RenewalPlanDeleted" xml:space="preserve"><value>Renewal plan deleted.</value></data>
+  <data name="AcmeAllowlistSaved" xml:space="preserve"><value>ACME client allowlist saved.</value></data>
+  <data name="AcmeClientNameRequired" xml:space="preserve"><value>Enter a name for the ACME client.</value></data>
+  <data name="AcmeEabCredentialsMissing" xml:space="preserve"><value>EAB credentials are missing from the server response.</value></data>
+  <data name="AcmeEabCreated" xml:space="preserve"><value>EAB credential created. Transfer the HMAC key to the ACME client now.</value></data>
+  <data name="ConfirmAcmeEabRevoke" xml:space="preserve"><value>Click again to revoke this EAB credential.</value></data>
+  <data name="AcmeEabRevoked" xml:space="preserve"><value>EAB credential revoked.</value></data>
+  <data name="RenewalNotificationsSaved" xml:space="preserve"><value>Email notifications saved.</value></data>
+  <data name="RenewalNotificationTestSent" xml:space="preserve"><value>Test email sent.</value></data>
+  <data name="DomainRequired" xml:space="preserve"><value>A domain name is required.</value></data>
+  <data name="DomainUpdated" xml:space="preserve"><value>Domain updated.</value></data>
+  <data name="ProfileIdRequired" xml:space="preserve"><value>A profile ID is required.</value></data>
+  <data name="TargetProfileRequiredFields" xml:space="preserve"><value>Complete every required target-profile field.</value></data>
+  <data name="TargetProfileUpdated" xml:space="preserve"><value>Target profile updated.</value></data>
+  <data name="TargetProfileSaved" xml:space="preserve"><value>Target profile saved.</value></data>
+  <data name="ConfirmTargetProfileDelete" xml:space="preserve"><value>Click Delete again to remove the target profile.</value></data>
+  <data name="TargetProfileDeleted" xml:space="preserve"><value>Target profile deleted.</value></data>
+  <data name="NoConnector" xml:space="preserve"><value>None</value></data>
+  <data name="UnknownConnector" xml:space="preserve"><value>Unknown connector</value></data>
+  <data name="ConnectorNameTokenRequired" xml:space="preserve"><value>Name and API token are required.</value></data>
+  <data name="TechnitiumEndpointInvalid" xml:space="preserve"><value>The Technitium endpoint must be a complete URL, for example http://192.168.1.10:5380.</value></data>
+  <data name="ConnectorUpdated" xml:space="preserve"><value>Connector updated.</value></data>
+  <data name="ConnectorEditCredentialsHint" xml:space="preserve"><value>Enter the endpoint and access key again to update the connector.</value></data>
+  <data name="IssuerRequiredFields" xml:space="preserve"><value>Name, directory URL, and DNS connector are required.</value></data>
+  <data name="IssuerUpdated" xml:space="preserve"><value>Issuer updated.</value></data>
+  <data name="ConfirmIssuerDelete" xml:space="preserve"><value>Click Delete again to remove the issuer.</value></data>
+  <data name="IssuerDeleted" xml:space="preserve"><value>Issuer deleted.</value></data>
+  <data name="NoZonesFound" xml:space="preserve"><value>No zones found.</value></data>
+  <data name="ConnectorZones" xml:space="preserve"><value>Zones: {0}</value></data>
+  <data name="ConnectorConnected" xml:space="preserve"><value>Connection established. {0}</value></data>
+  <data name="ConnectorNotConnected" xml:space="preserve"><value>Connection not established. {0}</value></data>
+  <data name="ConnectorCheckFailed" xml:space="preserve"><value>Connection could not be checked. Verify the endpoint and credentials.</value></data>
+  <data name="SerialNumberRequired" xml:space="preserve"><value>A serial number is required.</value></data>
+  <data name="ConfirmConnectorDelete" xml:space="preserve"><value>Click Delete again to remove the connector.</value></data>
+  <data name="ConnectorDeleted" xml:space="preserve"><value>Connector deleted.</value></data>
+  <data name="ConfirmDomainDelete" xml:space="preserve"><value>Click Delete again to remove the domain.</value></data>
+  <data name="DomainDeleted" xml:space="preserve"><value>Domain deleted.</value></data>
+  <data name="TxtTestRequiresDomain" xml:space="preserve"><value>Create a domain first so the TXT test has a target zone.</value></data>
+  <data name="TxtRoundTripSucceeded" xml:space="preserve"><value>TXT round trip for {0} succeeded.</value></data>
+  <data name="TxtTestFailed" xml:space="preserve"><value>TXT test failed: {0}</value></data>
+  <data name="BackupCreated" xml:space="preserve"><value>Backup {0} created.</value></data>
+  <data name="BackupCreateFailed" xml:space="preserve"><value>Backup could not be created.</value></data>
+  <data name="BackupUploaded" xml:space="preserve"><value>Backup {0} uploaded.</value></data>
+  <data name="BackupUploadFailed" xml:space="preserve"><value>Backup upload failed: {0}</value></data>
+  <data name="BackupKeyDownloaded" xml:space="preserve"><value>Backup key downloaded.</value></data>
+  <data name="BackupKeyUploaded" xml:space="preserve"><value>Backup key uploaded.</value></data>
+  <data name="ConfirmBackupDelete" xml:space="preserve"><value>Click Delete again to remove the backup.</value></data>
+  <data name="BackupDeleted" xml:space="preserve"><value>Backup {0} deleted.</value></data>
+  <data name="ResetFailed" xml:space="preserve"><value>Reset failed.</value></data>
+  <data name="SetupWizardStarted" xml:space="preserve"><value>Setup assistant started.</value></data>
+  <data name="TlsCertificateIssued" xml:space="preserve"><value>TLS certificate issued.</value></data>
+  <data name="TlsActivatingRestart" xml:space="preserve"><value>TLS is activating — HomeCA is restarting.</value></data>
+  <data name="ConfirmRfc8555AccountDelete" xml:space="preserve"><value>Click Delete again to remove the RFC 8555 account.</value></data>
+  <data name="Rfc8555AccountDeleted" xml:space="preserve"><value>RFC 8555 account deleted.</value></data>
+  <data name="ConfirmRfc8555OrderDelete" xml:space="preserve"><value>Click Delete again to remove the RFC 8555 order.</value></data>
+  <data name="Rfc8555OrderDeleted" xml:space="preserve"><value>RFC 8555 order deleted.</value></data>
+  <data name="Step1" xml:space="preserve"><value>Step 1</value></data>
+  <data name="Step2" xml:space="preserve"><value>Step 2</value></data>
+  <data name="Step3" xml:space="preserve"><value>Step 3</value></data>
+  <data name="SelectTargetSystem" xml:space="preserve"><value>Select target system</value></data>
+  <data name="DefineCertificate" xml:space="preserve"><value>Define certificate</value></data>
+  <data name="TargetProfile" xml:space="preserve"><value>Target profile</value></data>
+  <data name="CheckDns" xml:space="preserve"><value>Check DNS</value></data>
+  <data name="Details" xml:space="preserve"><value>Details</value></data>
+  <data name="DeploymentPackageTooltip" xml:space="preserve"><value>Includes all exports, including the private key, plus instructions, checksums, and a renewal script.</value></data>
+  <data name="DeploymentPackage" xml:space="preserve"><value>ZIP package</value></data>
+  <data name="ConfirmCertificateRevokeButton" xml:space="preserve"><value>Confirm revocation</value></data>
+  <data name="CreateTargetProfile" xml:space="preserve"><value>Create target profile</value></data>
+  <data name="EditTargetProfile" xml:space="preserve"><value>Edit target profile</value></data>
+  <data name="ProfileId" xml:space="preserve"><value>Profile ID</value></data>
+  <data name="ProfileIdHelper" xml:space="preserve"><value>Lowercase letters, numbers, and hyphens.</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>Display name</value></data>
+  <data name="Purpose" xml:space="preserve"><value>Purpose</value></data>
+  <data name="ExportFormats" xml:space="preserve"><value>Export formats</value></data>
+  <data name="ExportFormatsHelper" xml:space="preserve"><value>Separate with commas, for example PEM, PFX, DER.</value></data>
+  <data name="RequiresDnsName" xml:space="preserve"><value>Require DNS name</value></data>
+  <data name="AllowsIpSan" xml:space="preserve"><value>Allow IP SAN</value></data>
+  <data name="InstallationInstructions" xml:space="preserve"><value>Installation instructions</value></data>
+  <data name="RenewalScript" xml:space="preserve"><value>Renewal script</value></data>
+  <data name="SshCertificateKind" xml:space="preserve"><value>Type</value></data>
+  <data name="SshPrincipals" xml:space="preserve"><value>Principals</value></data>
+  <data name="CommaSeparated" xml:space="preserve"><value>Separate with commas</value></data>
+  <data name="SshPublicKey" xml:space="preserve"><value>Public SSH key</value></data>
+  <data name="IssueSshCertificate" xml:space="preserve"><value>Issue SSH certificate</value></data>
+  <data name="RenewalPlan" xml:space="preserve"><value>Renewal plan</value></data>
+  <data name="EditRenewalPlan" xml:space="preserve"><value>Edit plan</value></data>
+  <data name="SaveRenewalPlan" xml:space="preserve"><value>Save renewal plan</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="SubjectDn" xml:space="preserve"><value>Subject (DN)</value></data>
+  <data name="TargetProfileDescription" xml:space="preserve"><value>The target profile sets defaults for algorithm, validity, exports, and installation guidance.</value></data>
+  <data name="ProfileForcesRsa" xml:space="preserve"><value>This target profile requires RSA. The difference from the default ECC choice is intentionally visible here.</value></data>
+  <data name="RsaKeySize" xml:space="preserve"><value>RSA key size</value></data>
+  <data name="RsaKeySizeHelper" xml:space="preserve"><value>Legacy profiles use RSA 2048 or 3072 bit.</value></data>
+  <data name="CreateDeploymentPackage" xml:space="preserve"><value>Create deployment package</value></data>
+  <data name="DeploymentPackageDescription" xml:space="preserve"><value>When issuing, HomeCA stores a versioned snapshot with exports, instructions, checksums, and a renewal script.</value></data>
+  <data name="EmailNotifications" xml:space="preserve"><value>Email notifications</value></data>
+  <data name="EmailNotificationsDescription" xml:space="preserve"><value>Notifies after an automatic renewal or when it fails. Credentials are not shown again after saving.</value></data>
+  <data name="EnableEmailNotifications" xml:space="preserve"><value>Enable email notifications</value></data>
+  <data name="Recipients" xml:space="preserve"><value>Recipients</value></data>
+  <data name="RecipientsHelper" xml:space="preserve"><value>Separate multiple addresses with commas or semicolons.</value></data>
+  <data name="DeliveryMethod" xml:space="preserve"><value>Delivery method</value></data>
+  <data name="SenderAddress" xml:space="preserve"><value>Sender address</value></data>
+  <data name="SmtpServer" xml:space="preserve"><value>SMTP server</value></data>
+  <data name="SmtpPort" xml:space="preserve"><value>SMTP port</value></data>
+  <data name="SmtpUsernameOptional" xml:space="preserve"><value>SMTP username (optional)</value></data>
+  <data name="SmtpPassword" xml:space="preserve"><value>SMTP password</value></data>
+  <data name="KeepSavedPassword" xml:space="preserve"><value>Leave unchanged to keep the saved password</value></data>
+  <data name="EnterPassword" xml:space="preserve"><value>Enter password</value></data>
+  <data name="M365GraphPermission" xml:space="preserve"><value>The Microsoft 365 app requires the Graph permission Mail.Send (application permission) with granted admin consent.</value></data>
+  <data name="TenantId" xml:space="preserve"><value>Tenant ID</value></data>
+  <data name="ClientId" xml:space="preserve"><value>Client ID</value></data>
+  <data name="ClientSecret" xml:space="preserve"><value>Client secret</value></data>
+  <data name="KeepSavedSecret" xml:space="preserve"><value>Leave unchanged to keep the saved secret</value></data>
+  <data name="EnterClientSecret" xml:space="preserve"><value>Enter client secret</value></data>
+  <data name="SenderMailbox" xml:space="preserve"><value>Sender mailbox</value></data>
+  <data name="Saving" xml:space="preserve"><value>Saving …</value></data>
+  <data name="SaveNotifications" xml:space="preserve"><value>Save notifications</value></data>
+  <data name="SendingTest" xml:space="preserve"><value>Sending test …</value></data>
+  <data name="SendTestEmail" xml:space="preserve"><value>Send test email</value></data>
+  <data name="CreateDnsConnector" xml:space="preserve"><value>Create DNS connector</value></data>
+  <data name="EditDnsConnector" xml:space="preserve"><value>Edit DNS connector</value></data>
+  <data name="Type" xml:space="preserve"><value>Type</value></data>
+  <data name="TechnitiumEndpoint" xml:space="preserve"><value>Technitium endpoint</value></data>
+  <data name="ConnectorSecretEditHint" xml:space="preserve"><value>Editing replaces the saved access key.</value></data>
+  <data name="SaveConnector" xml:space="preserve"><value>Save connector</value></data>
+  <data name="UpdateConnector" xml:space="preserve"><value>Update connector</value></data>
+  <data name="CreateDomain" xml:space="preserve"><value>Create domain</value></data>
+  <data name="EditDomain" xml:space="preserve"><value>Edit domain</value></data>
+  <data name="DomainName" xml:space="preserve"><value>Domain name</value></data>
+  <data name="DnsConnector" xml:space="preserve"><value>DNS connector</value></data>
+  <data name="InternalIssuanceZone" xml:space="preserve"><value>Internal issuance zone</value></data>
+  <data name="SaveDomain" xml:space="preserve"><value>Save domain</value></data>
+  <data name="UpdateDomain" xml:space="preserve"><value>Update domain</value></data>
+  <data name="ExternalAcmeIssuer" xml:space="preserve"><value>External ACME issuer</value></data>
+  <data name="EditIssuer" xml:space="preserve"><value>Edit issuer</value></data>
+  <data name="DirectoryUrl" xml:space="preserve"><value>Directory URL</value></data>
+  <data name="SaveIssuer" xml:space="preserve"><value>Save issuer</value></data>
+  <data name="RevokeCertificate" xml:space="preserve"><value>Revoke certificate</value></data>
+  <data name="SerialNumberHex" xml:space="preserve"><value>Serial number (hexadecimal)</value></data>
+  <data name="RevocationReason" xml:space="preserve"><value>Revocation reason</value></data>
+  <data name="Unspecified" xml:space="preserve"><value>Unspecified</value></data>
+  <data name="KeyCompromise" xml:space="preserve"><value>Key compromise</value></data>
+  <data name="CessationOfOperation" xml:space="preserve"><value>Cessation of operation</value></data>
+  <data name="SmtpDeliveryMethod" xml:space="preserve"><value>SMTP (including Microsoft 365 SMTP)</value></data>
+  <data name="M365DeliveryMethod" xml:space="preserve"><value>Microsoft 365 via Graph</value></data>
+  <data name="ApiToken" xml:space="preserve"><value>API token</value></data>
+  <data name="Subject" xml:space="preserve"><value>Subject</value></data>
+  <data name="Algorithm" xml:space="preserve"><value>Algorithm</value></data>
+  <data name="Rfc8555OrderDetails" xml:space="preserve"><value>RFC 8555 order details</value></data>
+  <data name="OrderId" xml:space="preserve"><value>Order ID</value></data>
+  <data name="AccountId" xml:space="preserve"><value>Account ID</value></data>
+  <data name="Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Created" xml:space="preserve"><value>Created</value></data>
+  <data name="Expires" xml:space="preserve"><value>Expires</value></data>
+  <data name="Identifiers" xml:space="preserve"><value>Identifiers</value></data>
+  <data name="AcmeError" xml:space="preserve"><value>ACME error:</value></data>
+  <data name="Authorizations" xml:space="preserve"><value>Authorizations</value></data>
+  <data name="NoAuthorizations" xml:space="preserve"><value>No authorizations saved.</value></data>
+  <data name="Rfc8555AccountDetails" xml:space="preserve"><value>RFC 8555 account details</value></data>
+  <data name="JwkThumbprint" xml:space="preserve"><value>JWK thumbprint</value></data>
+  <data name="Contact" xml:space="preserve"><value>Contact</value></data>
+  <data name="Orders" xml:space="preserve"><value>Orders</value></data>
+  <data name="AssociatedOrders" xml:space="preserve"><value>Associated orders</value></data>
+  <data name="NoAssociatedOrders" xml:space="preserve"><value>There are no orders associated with this account.</value></data>
+  <data name="SshCertificateDialogTitle" xml:space="preserve"><value>SSH certificate — {0}</value></data>
+  <data name="SshCertificateDialogDescription" xml:space="preserve"><value>Copy the certificate contents or download the file.</value></data>
+  <data name="DeployHostCertificate" xml:space="preserve"><value>Deploy host certificate</value></data>
+  <data name="UseUserCertificate" xml:space="preserve"><value>Use user certificate</value></data>
+  <data name="SshHostCertificateDescription" xml:space="preserve"><value>Store the certificate beside the host key on the server and enable it in sshd_config.</value></data>
+  <data name="SshWriteCertificate" xml:space="preserve"><value>1. Write the certificate to the server</value></data>
+  <data name="SshConfigureSshd" xml:space="preserve"><value>2. Configure sshd_config</value></data>
+  <data name="SshReloadDaemon" xml:space="preserve"><value>3. Reload the SSH daemon</value></data>
+  <data name="SshHostTrustNotice" xml:space="preserve"><value>For clients to accept the host certificate, add the host CA to known_hosts; see Configure trust below.</value></data>
+  <data name="SshUserCertificateDescription" xml:space="preserve"><value>Store the certificate beside the private key. SSH finds it automatically by naming convention.</value></data>
+  <data name="SshSaveCertificate" xml:space="preserve"><value>1. Save certificate</value></data>
+  <data name="SshTestConnection" xml:space="preserve"><value>2. Test connection</value></data>
+  <data name="SshUserTrustNotice" xml:space="preserve"><value>For the server to accept the user certificate, configure TrustedUserCAKeys in sshd_config; see Configure trust below.</value></data>
+  <data name="ConfigureTrust" xml:space="preserve"><value>Configure trust</value></data>
+  <data name="VerifyCertificate" xml:space="preserve"><value>Verify certificate</value></data>
+  <data name="ShowCertificateContent" xml:space="preserve"><value>Show certificate contents</value></data>
+  <data name="BackupKey" xml:space="preserve"><value>Backup key</value></data>
+  <data name="BackupKeyDescription" xml:space="preserve"><value>The 32-byte AES-256 key encrypts all backups. Store it separately from the backups.</value></data>
+  <data name="DownloadKey" xml:space="preserve"><value>Download key</value></data>
+  <data name="UploadKey" xml:space="preserve"><value>Upload key</value></data>
+  <data name="EncryptedBackup" xml:space="preserve"><value>Encrypted backup</value></data>
+  <data name="EncryptedBackupDescription" xml:space="preserve"><value>Creates an encrypted archive of HomeCA data.</value></data>
+  <data name="UploadBackup" xml:space="preserve"><value>Upload backup</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="FileName" xml:space="preserve"><value>File name</value></data>
+  <data name="Size" xml:space="preserve"><value>Size</value></data>
+  <data name="Verify" xml:space="preserve"><value>Verify</value></data>
+  <data name="NoBackups" xml:space="preserve"><value>No backups available.</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="MaximumValidityDays" xml:space="preserve"><value>Maximum validity (days)</value></data>
+  <data name="DnsRequiredForProfile" xml:space="preserve"><value>At least one DNS name is required for this target profile.</value></data>
+  <data name="OptionalCommaSeparated" xml:space="preserve"><value>Optional, separate with commas.</value></data>
+  <data name="ProfileDisallowsIpSans" xml:space="preserve"><value>This target profile does not use IP SANs.</value></data>
+  <data name="ProfileMaximumValidity" xml:space="preserve"><value>Maximum {0} days for the selected target profile.</value></data>
+  <data name="IssueTlsCertificate" xml:space="preserve"><value>Issue TLS certificate</value></data>
+  <data name="IssueProfileCertificate" xml:space="preserve"><value>Issue {0}</value></data>
+  <data name="UnknownProfile" xml:space="preserve"><value>Unknown profile</value></data>
+  <data name="NoProfilePurpose" xml:space="preserve"><value>No purpose specified.</value></data>
+  <data name="NoProfileDocumentation" xml:space="preserve"><value>No profile-specific guidance is available.</value></data>
+  <data name="DnsNameTooLong" xml:space="preserve"><value>'{0}' is too long (maximum 253 characters).</value></data>
+  <data name="DnsNameContainsSpaces" xml:space="preserve"><value>'{0}' contains spaces.</value></data>
+  <data name="DnsNameLooksLikeUrl" xml:space="preserve"><value>'{0}' looks like a URL — enter only the hostname.</value></data>
+  <data name="DnsNameInvalid" xml:space="preserve"><value>'{0}' is not a valid DNS name.</value></data>
+  <data name="DnsWildcardNotCheckable" xml:space="preserve"><value>{0} — wildcard certificate; DNS resolution cannot be checked.</value></data>
+  <data name="DnsNoAddressFound" xml:space="preserve"><value>{0} — no IP address found.</value></data>
+  <data name="DnsResolutionFailed" xml:space="preserve"><value>{0} — could not be resolved. Has the DNS record been created?</value></data>
+  <data name="SshCaKeyNotFound" xml:space="preserve"><value>SSH CA key not found. Initialize the PKI first.</value></data>
+  <data name="SshCaKeyReadFailed" xml:space="preserve"><value>SSH CA key could not be read.</value></data>
+  <data name="SshHostCaKeyDownloaded" xml:space="preserve"><value>Host CA key downloaded.</value></data>
+  <data name="SshUserCaKeyDownloaded" xml:space="preserve"><value>User CA key downloaded.</value></data>
+  <data name="BackupKeyDownloadFailed" xml:space="preserve"><value>Key download failed: {0}</value></data>
+  <data name="BackupKeyUploadFailed" xml:space="preserve"><value>Key upload failed: {0}</value></data>
+  <data name="BackupDownloaded" xml:space="preserve"><value>Backup {0} downloaded.</value></data>
+  <data name="BackupDownloadFailed" xml:space="preserve"><value>Backup download failed: {0}</value></data>
+  <data name="BackupVerified" xml:space="preserve"><value>Backup {0} was verified successfully.</value></data>
+  <data name="BackupVerificationFailed" xml:space="preserve"><value>Backup verification failed: {0}</value></data>
+  <data name="BackupDeleteFailed" xml:space="preserve"><value>Backup could not be deleted: {0}</value></data>
+  <data name="LoginInvalidCredentials" xml:space="preserve"><value>Username or password is incorrect.</value></data>
+  <data name="LoginRateLimited" xml:space="preserve"><value>Too many failed sign-in attempts. Wait 15 minutes and try again.</value></data>
+  <data name="LoginHttpFailed" xml:space="preserve"><value>Sign-in failed (HTTP {0}). Check the service status or server log.</value></data>
+  <data name="Rfc8555AccountsMetric" xml:space="preserve"><value>RFC 8555 accounts</value></data>
+  <data name="Rfc8555OrdersMetric" xml:space="preserve"><value>RFC 8555 orders</value></data>
+  <data name="ExternalIssuersMetric" xml:space="preserve"><value>External issuers</value></data>
+  <data name="ExternalCertificatesMetric" xml:space="preserve"><value>External certificates</value></data>
+  <data name="StandardAcmeClientAccess" xml:space="preserve"><value>Standard ACME client access</value></data>
+  <data name="AcmeAllowlistDescription" xml:space="preserve"><value>Networks in the allowlist can create RFC 8555 accounts without EAB. Create a separate EAB credential for every other client. Enter only direct client IP addresses or CIDR networks, never a reverse proxy IP.</value></data>
+  <data name="AcmeAllowlistLabel" xml:space="preserve"><value>ACME client network allowlist</value></data>
+  <data name="AcmeAllowlistHelper" xml:space="preserve"><value>One IP address or CIDR network per line, for example 192.168.10.25 or 192.168.20.0/24.</value></data>
+  <data name="SaveAllowlist" xml:space="preserve"><value>Save allowlist</value></data>
+  <data name="CreateEabCredential" xml:space="preserve"><value>Create individual EAB credential</value></data>
+  <data name="ClientName" xml:space="preserve"><value>Client name</value></data>
+  <data name="EabCredentialHelper" xml:space="preserve"><value>An EAB credential registers exactly one ACME account.</value></data>
+  <data name="EabCredentialOneTimeNotice" xml:space="preserve"><value>These EAB credentials are shown only now. Copy them directly to the intended ACME client.</value></data>
+  <data name="KeyId" xml:space="preserve"><value>Key ID:</value></data>
+  <data name="HmacKey" xml:space="preserve"><value>HMAC key:</value></data>
+  <data name="Client" xml:space="preserve"><value>Client</value></data>
+  <data name="AcmeAccount" xml:space="preserve"><value>ACME account</value></data>
+  <data name="Registered" xml:space="preserve"><value>Registered</value></data>
+  <data name="Used" xml:space="preserve"><value>Used</value></data>
+  <data name="Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="ConfirmRevoke" xml:space="preserve"><value>Confirm revocation</value></data>
+  <data name="NoEabCredentials" xml:space="preserve"><value>No individual EAB credentials created yet.</value></data>
+  <data name="ExternalAcmeIssuers" xml:space="preserve"><value>External ACME issuers</value></data>
+  <data name="ExternalAcmeIssuersDescription" xml:space="preserve"><value>For publicly trusted certificates with DNS-01 challenge.</value></data>
+  <data name="NoExternalAcmeIssuers" xml:space="preserve"><value>No external ACME issuers registered yet.</value></data>
+  <data name="TrustCertificateChain" xml:space="preserve"><value>Certificate chain</value></data>
+  <data name="TrustRootCaUsage" xml:space="preserve"><value>Install in the trusted Root Certification Authorities store.</value></data>
+  <data name="TrustIntermediateCaUsage" xml:space="preserve"><value>Normally delivered with the server certificate; import only when the target explicitly requires it.</value></data>
+  <data name="TrustRootCaNotice" xml:space="preserve"><value>Always install the Root CA. For TLS services, the Intermediate CA belongs in the delivered certificate chain, not the Root store.</value></data>
+  <data name="TrustInstallationGuides" xml:space="preserve"><value>Installation guides</value></data>
+  <data name="TrustWindowsPowerShell" xml:space="preserve"><value>Windows – PowerShell (Administrator)</value></data>
+  <data name="TrustCopyWindowsScript" xml:space="preserve"><value>Copy Windows PowerShell script</value></data>
+  <data name="TrustCopyLinuxScript" xml:space="preserve"><value>Copy Debian or Ubuntu script</value></data>
+  <data name="TrustCopyProxmoxScript" xml:space="preserve"><value>Copy Proxmox script</value></data>
+  <data name="TrustHaProxyTitle" xml:space="preserve"><value>HAProxy (verify TLS backends)</value></data>
+  <data name="TrustHaProxyDescription" xml:space="preserve"><value>Use the Root CA to verify HTTPS upstreams and reference it with ca-file in the backend server line.</value></data>
+  <data name="TrustCopyHaProxyGuide" xml:space="preserve"><value>Copy HAProxy guidance</value></data>
+  <data name="TrustCopyMacOsScript" xml:space="preserve"><value>Copy macOS script</value></data>
+  <data name="TrustFirefoxTitle" xml:space="preserve"><value>Firefox (enterprise policy)</value></data>
+  <data name="TrustCopyFirefoxPolicy" xml:space="preserve"><value>Copy Firefox policy</value></data>
+  <data name="SshCertificateAuthorities" xml:space="preserve"><value>SSH certificate authorities</value></data>
+  <data name="SshCertificateAuthoritiesDescription" xml:space="preserve"><value>The public SSH CA keys are needed to establish trust on servers and clients.</value></data>
+  <data name="DownloadSshHostCaKey" xml:space="preserve"><value>Download host CA public key</value></data>
+  <data name="DownloadSshUserCaKey" xml:space="preserve"><value>Download user CA public key</value></data>
+  <data name="AcmeRfc8555AccountsDescription" xml:space="preserve"><value>Accounts registered through standard ACME clients such as OPNsense, acme.sh, and Certbot.</value></data>
+  <data name="IssuancePath" xml:space="preserve"><value>Issuance path</value></data><data name="IssuancePathDescription" xml:space="preserve"><value>Private keys and export paths remain on the HomeCA host. The workflow starts with the target system and derives certificate parameters from it.</value></data><data name="ActiveTargetProfile" xml:space="preserve"><value>Active target profile</value></data><data name="DefaultAlgorithm" xml:space="preserve"><value>Default algorithm:</value></data><data name="MaximumValidity" xml:space="preserve"><value>Maximum validity:</value></data><data name="DnsSan" xml:space="preserve"><value>DNS SAN:</value></data><data name="IpSan" xml:space="preserve"><value>IP SAN:</value></data><data name="Required" xml:space="preserve"><value>required</value></data><data name="Optional" xml:space="preserve"><value>optional</value></data><data name="Allowed" xml:space="preserve"><value>allowed</value></data><data name="NotAvailable" xml:space="preserve"><value>not available</value></data><data name="ProfileDeploymentPackage" xml:space="preserve"><value>Deployment package: {0}, plus profile-specific guidance and script snapshot.</value></data><data name="ScriptPreview" xml:space="preserve"><value>Script preview</value></data><data name="NoTargetProfileLoaded" xml:space="preserve"><value>No target profile is loaded. Exports and profile-specific defaults are unavailable.</value></data>
+  <data name="LoadingHelp" xml:space="preserve"><value>Loading help</value></data>
+  <data name="AuthorizationId" xml:space="preserve"><value>Authorization ID</value></data>
+  <data name="Challenges" xml:space="preserve"><value>Challenges</value></data>
+  <data name="Validated" xml:space="preserve"><value>Validated</value></data>
+  <data name="TrustWindowsActiveDirectoryTitle" xml:space="preserve"><value>Windows Server / Active Directory – Group Policy</value></data>
+  <data name="TrustWindowsActiveDirectoryDescription" xml:space="preserve"><value>In Group Policy Management, open Computer Configuration › Policies › Windows Settings › Security Settings › Public Key Policies › Trusted Root Certification Authorities. Import the downloaded root CA as a .cer file and link the policy to the target computers.</value></data>
+  <data name="TrustOpnSenseDescription" xml:space="preserve"><value>Open System › Trust › Authorities › +, select Import an existing Certificate Authority, paste the root CA as PEM, and save. If services need a complete chain, configure intermediate CA handling under System › Trust › Settings.</value></data>
+  <data name="TrustVmwareDescription" xml:space="preserve"><value>For vCenter, import the root CA as a trusted root CA in certificate management. In current vSphere versions, use Menu › Administration › Certificate Management › Trusted Root Certificates › Add. For an individual ESXi host, browser trust is configured on the accessing client; for TLS connections to other services, use the relevant host or vCenter trust management.</value></data>
+  <data name="SshHostTrustDescription" xml:space="preserve"><value>Add the host CA to the clients' known_hosts file so signed host keys are accepted without a fingerprint prompt.</value></data>
+  <data name="SshSingleUser" xml:space="preserve"><value>Single user</value></data>
+  <data name="SshSystemWide" xml:space="preserve"><value>System-wide</value></data>
+  <data name="SshUserTrustDescription" xml:space="preserve"><value>Configure the target server to accept user certificates issued by the user CA.</value></data>
+  <data name="SshConfigureUserCaTrust" xml:space="preserve"><value>Copy the user CA to the server and extend sshd_config</value></data>
+  <data name="RootCa" xml:space="preserve"><value>Root CA</value></data>
+  <data name="IntermediateCa" xml:space="preserve"><value>Intermediate CA</value></data>
+  <data name="WindowsCer" xml:space="preserve"><value>Windows CER</value></data>
+  <data name="Root" xml:space="preserve"><value>Root</value></data>
+  <data name="Intermediate" xml:space="preserve"><value>Intermediate</value></data>
+  <data name="PrivateKey" xml:space="preserve"><value>Private key</value></data>
+  <data name="CertificateChain" xml:space="preserve"><value>Certificate chain</value></data>
+  <data name="FullChain" xml:space="preserve"><value>Full chain</value></data>
+  <data name="Bundle" xml:space="preserve"><value>Bundle</value></data>
+</root>

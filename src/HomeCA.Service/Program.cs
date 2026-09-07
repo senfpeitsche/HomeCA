@@ -16,6 +16,9 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
 using MudBlazor.Services;
+using HomeCA.Service.Localization;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +31,8 @@ builder.Services.AddSingleton<HomeCaStorage>();
 builder.Services.AddSingleton<HomeCaInternalHttpClient>();
 builder.Services.AddSingleton<SetupStateService>();
 builder.Services.AddSingleton<LocalAdministrationService>();
+builder.Services.AddSingleton<BrowserSessionService>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<CertificateAuthorityService>();
 builder.Services.AddSingleton<CertificateIssuanceService>();
 builder.Services.AddSingleton<SshCertificateService>();
@@ -52,7 +57,10 @@ builder.Services.AddSingleton<CrlService>();
 builder.Services.AddSingleton<BearerTokenFilter>();
 builder.Services.AddSingleton<LoginRateLimiter>();
 builder.Services.AddSingleton<UpdateCheckService>();
-builder.Services.AddScoped<UiStrings>();
+// UiText is the resource marker in the Resources namespace, so the embedded
+// resource names already include the directory. Adding a ResourcesPath here
+// would make the localizer search for Resources.Resources.UiText instead.
+builder.Services.AddLocalization();
 builder.Services.AddHostedService<RenewalBackgroundService>();
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi(options =>
@@ -84,6 +92,21 @@ ConfigureTlsCertificateChain(builder);
 
 var app = builder.Build();
 
+var supportedCultures = LocaleCatalog.Cultures.ToList();
+var localizationOptions = new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(LocaleCatalog.DefaultCulture),
+    SupportedCultures = supportedCultures,
+    SupportedUICultures = supportedCultures,
+    FallBackToParentCultures = false,
+    FallBackToParentUICultures = false
+};
+// A user choice wins; an absent, malformed, or unsupported cookie falls back to English.
+localizationOptions.RequestCultureProviders =
+[
+    new CookieRequestCultureProvider { CookieName = CookieRequestCultureProvider.DefaultCookieName }
+];
+
 // ── Load the persisted public URL, if available ─────────────────────────────
 {
     var storage = app.Services.GetRequiredService<HomeCaStorage>();
@@ -99,6 +122,7 @@ var app = builder.Build();
 }
 
 app.UseForwardedHeaders();
+app.UseRequestLocalization(localizationOptions);
 app.UseStaticFiles();
 app.UseAntiforgery();
 

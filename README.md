@@ -1,5 +1,7 @@
 # HomeCA
 
+[Deutsch](README.de.md) · English
+
 A self-hosted, minimal PKI for homelabs. Manage root and issuing CAs, issue TLS/mTLS and SSH certificates, distribute trust anchors, and handle ACME flows — all from a single service with a built-in web UI.
 
 HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Synology, network switches, and similar infrastructure and want to get rid of certificate warnings without the complexity of enterprise PKI tools.
@@ -17,7 +19,8 @@ HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Sy
 - Automatic renewal via background service
 - Encrypted backups (AES-256-GCM)
 - Audit logging
-- Blazor Server UI with MudBlazor (German and English)
+- Blazor Server UI with MudBlazor: English by default, with complete German support
+- Persistent language selector, culture-aware dates and numbers, and safe localized in-app help
 - OpenAPI documentation at `/openapi/v1.json`
 - Unauthenticated Root-CA download for trust distribution; issuing certificates are delivered with certificate exports, not installed as trust anchors
 
@@ -45,7 +48,7 @@ The UI opens at `http://localhost:5152`. In development mode, log in with `admin
 dotnet test
 ```
 
-34 tests covering CA management, certificate issuance (ECC + RSA), CRL generation, certificate exports, security (password hashing, rate limiting), and backup/restore.
+61 tests covering CA management, certificate issuance (ECC + RSA), CRL generation, certificate exports, security (password hashing, rate limiting and browser-session handling), backup/restore, and localization/help completeness.
 
 ## Architecture
 
@@ -140,6 +143,11 @@ Encrypted backups use the `HCAB1` format: a ZIP payload encrypted with AES-256-G
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+When changing user-facing UI copy or in-app help, update both English and German
+in the same change. See [the localization guide](docs/en/localization.md) for
+the required resource, help-article, and test workflow. The corresponding German
+guide is available at [docs/localization.md](docs/localization.md).
 
 ## License
 

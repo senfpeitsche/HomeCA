@@ -1,0 +1,26 @@
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+@using HomeCA.Service.Localization
+
+<MudSelect T="string" Value="@ActiveCulture" ValueChanged="SelectCultureAsync"
+           Dense="true" Variant="Variant.Outlined" Class="language-selector"
+           aria-label="@SelectorLabel">
+    @foreach (var locale in LocaleCatalog.Locales)
+    {
+        <MudSelectItem Value="@locale.Culture">@locale.DisplayName</MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+
+    private string SelectorLabel => Label ?? Text["LanguageSelectorLabel"];
+
+    private string ActiveCulture => LocaleCatalog.NormalizeOrDefault(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+
+    private async Task SelectCultureAsync(string culture)
+    {
+        var selected = LocaleCatalog.NormalizeOrDefault(culture);
+        await JS.InvokeVoidAsync("homeca.setCulture", selected);
+    }
+}

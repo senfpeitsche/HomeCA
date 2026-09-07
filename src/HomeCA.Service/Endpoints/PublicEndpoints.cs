@@ -96,6 +96,32 @@ namespace HomeCA.Service.Endpoints;
             rateLimiter.RecordSuccess(ip);
             return Results.Ok(new { accessToken = loginResponse.AccessToken, expiresInSeconds = loginResponse.ExpiresInSeconds, mustChangePassword = loginResponse.MustChangePassword });
         });
+
+        endpoints.MapPost("/api/v1/ui-session", async (HttpContext context, LocalAdministrationService administration, BrowserSessionService browserSessions, CancellationToken ct) =>
+        {
+            var authorization = context.Request.Headers.Authorization.ToString();
+            var token = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authorization[7..].Trim() : null;
+            var validation = await administration.ValidateSessionAsync(token, ct);
+            if (!validation.IsValid || string.IsNullOrWhiteSpace(token)) return Results.Unauthorized();
+
+            var browserSessionId = browserSessions.Create(token, 43200);
+            context.Response.Cookies.Append("HomeCA.UiSession", browserSessionId, new CookieOptions
+            {
+                HttpOnly = true,
+                IsEssential = true,
+                SameSite = SameSiteMode.Strict,
+                Secure = context.Request.IsHttps,
+                Path = "/"
+            });
+            return Results.NoContent();
+        });
+
+        endpoints.MapPost("/api/v1/ui-session/logout", (HttpContext context, BrowserSessionService browserSessions) =>
+        {
+            browserSessions.Remove(context.Request.Cookies["HomeCA.UiSession"]);
+            context.Response.Cookies.Delete("HomeCA.UiSession", new CookieOptions { Path = "/", Secure = context.Request.IsHttps });
+            return Results.NoContent();
+        });
         
         // ── Unauthenticated ACME client endpoints ───────────────────────────────────
         

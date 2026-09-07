@@ -18,6 +18,8 @@ html, body { min-height: 100%; background: var(--mud-palette-background); color:
 .login-card .service-title { font-size: 3.1rem; margin: .25rem 0 .5rem; }
 .signal-text, .section-kicker { color: var(--mud-palette-primary); font-weight: 700; letter-spacing: .1em; }
 .form-stack { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.mud-input-control.language-selector { flex: 0 0 7.5rem; inline-size: 7.5rem; min-inline-size: 7.5rem; width: 7.5rem; }
+.login-shell > .language-selector { position: fixed; top: 1rem; right: 1rem; z-index: 1; }
 
 .app-bar { background: var(--mud-palette-appbar-background); color: var(--mud-palette-appbar-text); min-height: 4rem; border-bottom: 1px solid var(--mud-palette-divider); }
 .app-name { letter-spacing: .01em; font-weight: 600; }
@@ -53,6 +55,14 @@ html, body { min-height: 100%; background: var(--mud-palette-background); color:
 .trust-anchor-table { margin-top: .5rem; }
 .trust-anchor-table td:last-child { white-space: nowrap; }
 .trust-install-guides { margin-top: .5rem; }
+.help-content { max-width: 78rem; }
+.help-content h1, .help-content h2, .help-content h3 { color: var(--mud-palette-text-primary); margin: 1.5rem 0 .75rem; }
+.help-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.help-content th, .help-content td { border: 1px solid var(--mud-palette-divider); padding: .65rem; text-align: left; vertical-align: top; }
+.help-content pre { position: relative; overflow-x: auto; padding: .875rem 3.25rem .875rem .875rem; background: var(--mud-palette-background-gray); border: 1px solid var(--mud-palette-divider); }
+.help-content .help-copy-button { position: absolute; top: .4rem; right: .4rem; min-width: 2rem; min-height: 2rem; border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); background: var(--mud-palette-surface); color: var(--mud-palette-primary); cursor: pointer; font-size: 1rem; }
+.help-content .help-copy-button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.help-content blockquote { margin: 1rem 0; padding: .75rem 1rem; border-left: 4px solid var(--mud-palette-info); background: var(--mud-palette-info-hover); }
 .empty-panel { max-width: 42rem; }
 .page-loader { margin: -2rem -4rem 1.5rem; }
 .mud-input-control-input-container, .mud-input-outlined-border { border-radius: var(--mud-default-borderradius) !important; }

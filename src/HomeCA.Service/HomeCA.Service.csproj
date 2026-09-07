@@ -4,17 +4,19 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.3.7</Version>
+    <Version>0.3.8</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Certes" Version="3.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="MudBlazor" Version="8.12.0" />
+    <PackageReference Include="Markdig" Version="0.40.0" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="../../profiles/profiles.json" Link="profiles.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Help\**\*.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

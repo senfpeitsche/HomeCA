@@ -1,0 +1,857 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Language" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="LanguageSelectorLabel" xml:space="preserve">
+    <value>Sprache auswählen</value>
+  </data>
+  <data name="HelpUnavailable" xml:space="preserve">
+    <value>Dieser Hilfeartikel ist noch nicht verfügbar.</value>
+  </data>
+  <data name="HelpFallbackNotice" xml:space="preserve">
+    <value>Dieser Artikel wird auf Englisch angezeigt, weil keine Übersetzung verfügbar ist.</value>
+  </data>
+  <data name="CopyCode" xml:space="preserve">
+    <value>Code kopieren</value>
+  </data>
+  <data name="EnableLightTheme" xml:space="preserve">
+    <value>Helles Design aktivieren</value>
+  </data>
+  <data name="EnableDarkTheme" xml:space="preserve">
+    <value>Dunkles Design aktivieren</value>
+  </data>
+  <data name="PageNotFound" xml:space="preserve">
+    <value>Seite nicht gefunden</value>
+  </data>
+  <data name="SetupKicker" xml:space="preserve">
+    <value>ERSTEINRICHTUNG</value>
+  </data>
+  <data name="SetupTitle" xml:space="preserve">
+    <value>HomeCA Setup-Assistent</value>
+  </data>
+  <data name="SetupHostnameStep" xml:space="preserve">
+    <value>1. Hostname und Domain</value>
+  </data>
+  <data name="SetupConnectorStep" xml:space="preserve">
+    <value>2. DNS-Connector (optional)</value>
+  </data>
+  <data name="SetupCaStep" xml:space="preserve">
+    <value>3. Zertifizierungsstellen erstellen</value>
+  </data>
+  <data name="SetupHostnameTitle" xml:space="preserve">
+    <value>Hostname und Domain festlegen</value>
+  </data>
+  <data name="SetupHostnameLabel" xml:space="preserve">
+    <value>Hostname / FQDN</value>
+  </data>
+  <data name="SetupHostnameRequired" xml:space="preserve">
+    <value>Hostname ist erforderlich</value>
+  </data>
+  <data name="SetupPortLabel" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="SetupSave" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="SetupSaving" xml:space="preserve">
+    <value>Wird gespeichert …</value>
+  </data>
+  <data name="SetupSkip" xml:space="preserve">
+    <value>Überspringen</value>
+  </data>
+  <data name="SetupDescription" xml:space="preserve">
+    <value>Dieser Assistent konfiguriert deine lokale PKI in drei Schritten.</value>
+  </data>
+  <data name="SetupConnectorTitle" xml:space="preserve">
+    <value>DNS-Connector einrichten (optional)</value>
+  </data>
+  <data name="SetupConnectorNow" xml:space="preserve">
+    <value>DNS-Connector jetzt einrichten</value>
+  </data>
+  <data name="SetupConnectorType" xml:space="preserve">
+    <value>Connector-Typ</value>
+  </data>
+  <data name="SetupConnectorName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="SetupConnectorSaved" xml:space="preserve">
+    <value>DNS-Connector wurde gespeichert.</value>
+  </data>
+  <data name="SetupCaTitle" xml:space="preserve">
+    <value>Zertifizierungsstellen erstellen</value>
+  </data>
+  <data name="SetupCaReady" xml:space="preserve">
+    <value>HomeCA ist einsatzbereit.</value>
+  </data>
+  <data name="SetupDashboard" xml:space="preserve">
+    <value>Zum Dashboard</value>
+  </data>
+  <data name="SetupCreateCa" xml:space="preserve">
+    <value>CA jetzt erstellen</value>
+  </data>
+  <data name="SetupHostnameSpaces" xml:space="preserve">
+    <value>Hostname darf keine Leerzeichen enthalten.</value>
+  </data>
+  <data name="SetupHostnameNoUrl" xml:space="preserve">
+    <value>Nur den Hostnamen eingeben, nicht die URL.</value>
+  </data>
+  <data name="SetupHostnameInvalid" xml:space="preserve">
+    <value>Kein gültiger Hostname (z. B. homeca.home.local).</value>
+  </data>
+  <data name="SetupHostnameSaveFailed" xml:space="preserve">
+    <value>Hostname konnte nicht gespeichert werden.</value>
+  </data>
+  <data name="SetupConnectorSave" xml:space="preserve">
+    <value>Connector speichern</value>
+  </data>
+  <data name="SetupConnectorSkipLater" xml:space="preserve">
+    <value>Überspringen — später einrichten</value>
+  </data>
+  <data name="SetupConnectorDescription" xml:space="preserve">
+    <value>Ein DNS-Connector wird für automatische DNS-01-Challenges (ACME) und externe Zertifikate benötigt. Für rein interne Zertifikate kannst du diesen Schritt überspringen.</value>
+  </data>
+  <data name="SetupContinueCa" xml:space="preserve">
+    <value>Weiter: CA erstellen</value>
+  </data>
+  <data name="SetupCaDescription" xml:space="preserve">
+    <value>HomeCA erstellt eine Root-CA (10 Jahre) und eine TLS-Issuing-CA (5 Jahre). Danach können Zertifikate für dein Homelab ausgestellt werden.</value>
+  </data>
+  <data name="SetupCaCreated" xml:space="preserve">
+    <value>Root-CA und TLS-Issuing-CA wurden erfolgreich erstellt.</value>
+  </data>
+  <data name="SetupSkipAssistant" xml:space="preserve">
+    <value>Assistent überspringen (nicht empfohlen)</value>
+  </data>
+  <data name="LoginSignalText" xml:space="preserve">
+    <value>LOKALE ZERTIFIKATSSTELLE</value>
+  </data>
+  <data name="LoginSubtitle" xml:space="preserve">
+    <value>Melden Sie sich an, um Ihre lokale PKI zu verwalten.</value>
+  </data>
+  <data name="LoginUsername" xml:space="preserve">
+    <value>Benutzername</value>
+  </data>
+  <data name="LoginPassword" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="LoginButton" xml:space="preserve">
+    <value>Anmelden</value>
+  </data>
+  <data name="LoginBusy" xml:space="preserve">
+    <value>Anmeldung läuft …</value>
+  </data>
+  <data name="LogoutButton" xml:space="preserve">
+    <value>Abmelden</value>
+  </data>
+  <data name="RefreshAriaLabel" xml:space="preserve">
+    <value>Daten aktualisieren</value>
+  </data>
+  <data name="ChangePasswordTitle" xml:space="preserve">
+    <value>Passwort ändern</value>
+  </data>
+  <data name="ChangePasswordDescription" xml:space="preserve">
+    <value>Das Standardpasswort muss vor der ersten Nutzung geändert werden.</value>
+  </data>
+  <data name="DefaultCredentialsHint" xml:space="preserve">
+    <value>Erstanmeldung: Benutzername admin, Passwort admin</value>
+  </data>
+  <data name="CurrentPassword" xml:space="preserve">
+    <value>Aktuelles Passwort</value>
+  </data>
+  <data name="NewPassword" xml:space="preserve">
+    <value>Neues Passwort</value>
+  </data>
+  <data name="ConfirmNewPassword" xml:space="preserve">
+    <value>Neues Passwort bestätigen</value>
+  </data>
+  <data name="ChangePasswordButton" xml:space="preserve">
+    <value>Passwort ändern</value>
+  </data>
+  <data name="ChangePasswordBusy" xml:space="preserve">
+    <value>Passwort wird geändert …</value>
+  </data>
+  <data name="ChangePasswordSuccess" xml:space="preserve">
+    <value>Passwort erfolgreich geändert. Bitte melden Sie sich mit dem neuen Passwort an.</value>
+  </data>
+  <data name="ChangePasswordError" xml:space="preserve">
+    <value>Passwortänderung fehlgeschlagen. Prüfen Sie das aktuelle Passwort.</value>
+  </data>
+  <data name="ChangePasswordMismatch" xml:space="preserve">
+    <value>Die Passwörter stimmen nicht überein.</value>
+  </data>
+  <data name="ChangePasswordTooShort" xml:space="preserve">
+    <value>Das neue Passwort muss mindestens 12 Zeichen lang sein.</value>
+  </data>
+  <data name="TrustInstallTitle" xml:space="preserve">
+    <value>Zertifikatskette auf Geräten installieren</value>
+  </data>
+  <data name="TrustInstallDescription" xml:space="preserve">
+    <value>Kopieren Sie das passende Skript und führen Sie es auf dem Zielgerät aus. Es installiert die HomeCA-Root-CA.</value>
+  </data>
+  <data name="TrustInstallCopied" xml:space="preserve">
+    <value>In die Zwischenablage kopiert.</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Übersicht</value>
+  </data>
+  <data name="NavCertificates" xml:space="preserve">
+    <value>Zertifikate</value>
+  </data>
+  <data name="NavAuthorities" xml:space="preserve">
+    <value>Zertifizierungsstellen</value>
+  </data>
+  <data name="NavAutomation" xml:space="preserve">
+    <value>Automatik</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="NavProfiles" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="NavOperations" xml:space="preserve">
+    <value>Betrieb</value>
+  </data>
+  <data name="NavHelp" xml:space="preserve">
+    <value>Hilfe</value>
+  </data>
+  <data name="NavAcme" xml:space="preserve">
+    <value>ACME</value>
+  </data>
+  <data name="AcmeKicker" xml:space="preserve">
+    <value>Automatische Zertifikatsverwaltung</value>
+  </data>
+  <data name="AcmeTitle" xml:space="preserve">
+    <value>ACME-Verwaltung</value>
+  </data>
+  <data name="AcmeRfc8555Accounts" xml:space="preserve">
+    <value>RFC 8555-Konten (OPNsense, acme.sh, Certbot)</value>
+  </data>
+  <data name="AcmeRfc8555Orders" xml:space="preserve">
+    <value>RFC 8555-Aufträge</value>
+  </data>
+  <data name="AcmeSimplifiedAccounts" xml:space="preserve">
+    <value>Vereinfachte API-Konten (curl/Skripte)</value>
+  </data>
+  <data name="AcmeSimplifiedOrders" xml:space="preserve">
+    <value>Vereinfachte API-Aufträge</value>
+  </data>
+  <data name="AcmeNoAccounts" xml:space="preserve">
+    <value>Noch keine ACME-Konten registriert.</value>
+  </data>
+  <data name="AcmeNoOrders" xml:space="preserve">
+    <value>Noch keine ACME-Aufträge vorhanden.</value>
+  </data>
+  <data name="AcmeColumnContact" xml:space="preserve">
+    <value>Kontakt</value>
+  </data>
+  <data name="AcmeColumnThumbprint" xml:space="preserve">
+    <value>Schlüssel-Thumbprint</value>
+  </data>
+  <data name="AcmeColumnCreated" xml:space="preserve">
+    <value>Erstellt</value>
+  </data>
+  <data name="AcmeColumnIdentifiers" xml:space="preserve">
+    <value>Identitäten</value>
+  </data>
+  <data name="AcmeColumnStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="AcmeColumnCertificate" xml:space="preserve">
+    <value>Zertifikat</value>
+  </data>
+  <data name="AcmeExternalIssuers" xml:space="preserve">
+    <value>Externe ACME-Aussteller</value>
+  </data>
+  <data name="AcmeExternalCertificates" xml:space="preserve">
+    <value>Externe ACME-Zertifikate</value>
+  </data>
+  <data name="AcmeNoExternalCerts" xml:space="preserve">
+    <value>Noch keine externen ACME-Zertifikate vorhanden.</value>
+  </data>
+  <data name="HelpKicker" xml:space="preserve">
+    <value>Anleitungen und Referenz</value>
+  </data>
+  <data name="HelpTitle" xml:space="preserve">
+    <value>Hilfe</value>
+  </data>
+  <data name="HelpDescription" xml:space="preserve">
+    <value>Schritt-für-Schritt-Anleitungen für TLS- und SSH-Zertifikate, Vertrauensstellung und ACME-Einrichtung.</value>
+  </data>
+  <data name="HelpTabTls" xml:space="preserve">
+    <value>TLS-Zertifikate</value>
+  </data>
+  <data name="HelpTabSsh" xml:space="preserve">
+    <value>SSH-Zertifikate</value>
+  </data>
+  <data name="HelpTabTrust" xml:space="preserve">
+    <value>Vertrauensstellung</value>
+  </data>
+  <data name="HelpTabAcme" xml:space="preserve">
+    <value>ACME-Einrichtung</value>
+  </data>
+  <data name="HelpTabCaRotation" xml:space="preserve">
+    <value>CA-Rotation</value>
+  </data>
+  <data name="OverviewKicker" xml:space="preserve">
+    <value>Zustand der Vertrauensbasis</value>
+  </data>
+  <data name="OverviewTitle" xml:space="preserve">
+    <value>Übersicht</value>
+  </data>
+  <data name="MetricCertificates" xml:space="preserve">
+    <value>Zertifikate</value>
+  </data>
+  <data name="MetricCAs" xml:space="preserve">
+    <value>CAs</value>
+  </data>
+  <data name="MetricRenewals" xml:space="preserve">
+    <value>Erneuerungen</value>
+  </data>
+  <data name="TrustAnchorTitle" xml:space="preserve">
+    <value>Vertrauensanker verteilen</value>
+  </data>
+  <data name="TrustAnchorDescription" xml:space="preserve">
+    <value>Damit Geräte und Browser den Zertifikaten dieser PKI vertrauen, muss das Root-CA-Zertifikat im Vertrauensspeicher installiert werden. Die folgenden Endpunkte sind ohne Authentifizierung erreichbar.</value>
+  </data>
+  <data name="TrustAnchorPem" xml:space="preserve">
+    <value>Root-CA als PEM</value>
+  </data>
+  <data name="TrustAnchorDer" xml:space="preserve">
+    <value>Root-CA als Windows CER</value>
+  </data>
+  <data name="LatestCertificates" xml:space="preserve">
+    <value>Neueste Zertifikate</value>
+  </data>
+  <data name="CertificatesKicker" xml:space="preserve">
+    <value>X.509 und SSH</value>
+  </data>
+  <data name="CertificatesTitle" xml:space="preserve">
+    <value>Zertifikate ausstellen</value>
+  </data>
+  <data name="TabTls" xml:space="preserve">
+    <value>TLS- und mTLS-Zertifikat</value>
+  </data>
+  <data name="TabSsh" xml:space="preserve">
+    <value>SSH-Zertifikat</value>
+  </data>
+  <data name="TabAcme" xml:space="preserve">
+    <value>Interne ACME</value>
+  </data>
+  <data name="CertificateInventory" xml:space="preserve">
+    <value>Zertifikatsinventar</value>
+  </data>
+  <data name="NoCertificatesYet" xml:space="preserve">
+    <value>Noch keine Zertifikate ausgestellt.</value>
+  </data>
+  <data name="ColumnSubject" xml:space="preserve">
+    <value>Betreff</value>
+  </data>
+  <data name="ColumnAlgorithm" xml:space="preserve">
+    <value>Algorithmus</value>
+  </data>
+  <data name="ColumnExpiresAt" xml:space="preserve">
+    <value>Läuft ab</value>
+  </data>
+  <data name="ColumnDownload" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="AuthoritiesKicker" xml:space="preserve">
+    <value>Vertrauenshierarchie und Sperrlisten</value>
+  </data>
+  <data name="AuthoritiesTitle" xml:space="preserve">
+    <value>Zertifizierungsstellen</value>
+  </data>
+  <data name="CreateCa" xml:space="preserve">
+    <value>CA erstellen</value>
+  </data>
+  <data name="ManageCa" xml:space="preserve">
+    <value>CA verwalten</value>
+  </data>
+  <data name="SaveChanges" xml:space="preserve">
+    <value>Änderungen speichern</value>
+  </data>
+  <data name="CancelEdit" xml:space="preserve">
+    <value>Bearbeiten abbrechen</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Bearbeiten</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Löschen</value>
+  </data>
+  <data name="ConfirmDelete" xml:space="preserve">
+    <value>Löschen bestätigen</value>
+  </data>
+  <data name="Revoke" xml:space="preserve">
+    <value>Sperren</value>
+  </data>
+  <data name="CaInventory" xml:space="preserve">
+    <value>CA-Inventar</value>
+  </data>
+  <data name="NoRootCaYet" xml:space="preserve">
+    <value>Legen Sie zuerst eine Root-CA an.</value>
+  </data>
+  <data name="NewIntermediate" xml:space="preserve">
+    <value>Neue Intermediate-CA</value>
+  </data>
+  <data name="PfxDialogTitle" xml:space="preserve">
+    <value>PFX-Kennwort festlegen</value>
+  </data>
+  <data name="PfxDialogDescription" xml:space="preserve">
+    <value>Das PFX-Archiv wird mit diesem Kennwort verschlüsselt. Verwenden Sie ein starkes Kennwort und geben Sie es nur an das Zielsystem weiter.</value>
+  </data>
+  <data name="PfxPasswordLabel" xml:space="preserve">
+    <value>Kennwort</value>
+  </data>
+  <data name="PfxConfirmLabel" xml:space="preserve">
+    <value>Kennwort bestätigen</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="OperationsKicker" xml:space="preserve">
+    <value>Sperrung und Wiederherstellbarkeit</value>
+  </data>
+  <data name="OperationsTitle" xml:space="preserve">
+    <value>Betrieb</value>
+  </data>
+  <data name="GenerateCrl" xml:space="preserve">
+    <value>Sperrliste erzeugen</value>
+  </data>
+  <data name="BackupTitle" xml:space="preserve">
+    <value>Verschlüsseltes Backup</value>
+  </data>
+  <data name="BackupDescription" xml:space="preserve">
+    <value>Erstellt ein verschlüsseltes Archiv der HomeCA-Daten.</value>
+  </data>
+  <data name="CreateBackup" xml:space="preserve">
+    <value>Backup erstellen</value>
+  </data>
+  <data name="VerifyBackup" xml:space="preserve">
+    <value>verifizieren</value>
+  </data>
+  <data name="Days" xml:space="preserve">
+    <value>Tage</value>
+  </data>
+  <data name="Active" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Inactive" xml:space="preserve">
+    <value>Inaktiv</value>
+  </data>
+  <data name="Revoked" xml:space="preserve">
+    <value>Gesperrt</value>
+  </data>
+  <data name="SetupHostnameDescription" xml:space="preserve"><value>Unter welchem Namen ist dieser HomeCA-Container im Netzwerk erreichbar? Der Hostname wird als CRL-Verteilungspunkt in alle ausgestellten Zertifikate eingetragen.</value></data>
+  <data name="SetupHostnameHelper" xml:space="preserve"><value>DNS-Name, unter dem HomeCA erreichbar ist (z. B. homeca.home.local)</value></data>
+  <data name="SetupPortHelper" xml:space="preserve"><value>Standard: 5080 (HTTP)</value></data>
+  <data name="SetupPublicUrlConfigured" xml:space="preserve"><value>PublicUrl gesetzt: http://{0}:{1}; diese URL wird als CRL-Verteilungspunkt in Zertifikate eingetragen.</value></data>
+  <data name="SetupContinueConnector" xml:space="preserve"><value>Weiter: DNS-Connector</value></data>
+  <data name="SetupApplyHostname" xml:space="preserve"><value>Hostname übernehmen</value></data>
+  <data name="SetupConnectorNamePlaceholder" xml:space="preserve"><value>Mein DNS-Server</value></data>
+  <data name="SetupApiEndpoint" xml:space="preserve"><value>API-Endpunkt</value></data>
+  <data name="SetupTechnitiumApiUrl" xml:space="preserve"><value>URL der Technitium-DNS-API</value></data>
+  <data name="SetupApiToken" xml:space="preserve"><value>API-Token</value></data>
+  <data name="SetupTechnitiumApiToken" xml:space="preserve"><value>Technitium API-Token</value></data>
+  <data name="SetupHetznerApiToken" xml:space="preserve"><value>Hetzner DNS API-Token</value></data>
+  <data name="SetupHetznerApiTokenHelper" xml:space="preserve"><value>API-Token aus der Hetzner DNS Console</value></data>
+  <data name="SetupLoading" xml:space="preserve"><value>Wird geladen …</value></data>
+  <data name="SetupCreatingCa" xml:space="preserve"><value>CA wird erstellt …</value></data>
+  <data name="SetupCrlUrl" xml:space="preserve"><value>CRL-URL in Zertifikaten:</value></data>
+  <data name="SetupPublicUrlSaved" xml:space="preserve"><value>PublicUrl auf http://{0}:{1} gesetzt.</value></data>
+  <data name="SetupConnectorCreated" xml:space="preserve"><value>DNS-Connector gespeichert.</value></data>
+  <data name="SetupAuthoritiesAlreadyConfigured" xml:space="preserve"><value>Zertifizierungsstellen sind bereits eingerichtet.</value></data>
+  <data name="SetupCaCreateFailed" xml:space="preserve"><value>CA-Erstellung fehlgeschlagen: {0}</value></data>
+  <data name="SetupCaCreatedNotification" xml:space="preserve"><value>Root-CA und TLS-Issuing-CA wurden erstellt.</value></data>
+  <data name="AppNameSuffix" xml:space="preserve"><value>LOKALE PKI</value></data>
+  <data name="UpdateAvailable" xml:space="preserve"><value>Version {0} verfügbar</value></data>
+  <data name="UpdateAvailableAria" xml:space="preserve"><value>Update verfügbar</value></data>
+  <data name="CertificateDetailsTitle" xml:space="preserve"><value>Zertifikatsdetails</value></data>
+  <data name="Issuer" xml:space="preserve"><value>Aussteller</value></data>
+  <data name="SerialNumber" xml:space="preserve"><value>Seriennummer</value></data>
+  <data name="Fingerprint" xml:space="preserve"><value>SHA-256-Fingerabdruck</value></data>
+  <data name="ValidFrom" xml:space="preserve"><value>Gültig ab</value></data>
+  <data name="ValidUntil" xml:space="preserve"><value>Gültig bis</value></data>
+  <data name="Usage" xml:space="preserve"><value>Verwendung</value></data>
+  <data name="DnsNames" xml:space="preserve"><value>DNS-Namen</value></data>
+  <data name="IpAddresses" xml:space="preserve"><value>IP-Adressen</value></data>
+  <data name="ExtendedKeyUsage" xml:space="preserve"><value>Erweiterte Schlüsselverwendung</value></data>
+  <data name="CertificateId" xml:space="preserve"><value>Zertifikat-ID</value></data>
+  <data name="Close" xml:space="preserve"><value>Schließen</value></data>
+  <data name="SshCertificateInventory" xml:space="preserve"><value>SSH-Zertifikatsinventar</value></data>
+  <data name="Identity" xml:space="preserve"><value>Identität</value></data>
+  <data name="Kind" xml:space="preserve"><value>Art</value></data>
+  <data name="IssuedAt" xml:space="preserve"><value>Ausgestellt</value></data>
+  <data name="Host" xml:space="preserve"><value>Host</value></data>
+  <data name="User" xml:space="preserve"><value>Benutzer</value></data>
+  <data name="Certificate" xml:space="preserve"><value>Zertifikat</value></data>
+  <data name="NoSshCertificatesYet" xml:space="preserve"><value>Noch keine SSH-Zertifikate ausgestellt.</value></data>
+  <data name="AutomationKicker" xml:space="preserve"><value>Abläufe vorbereiten</value></data>
+  <data name="AutomationTitle" xml:space="preserve"><value>Erneuerungsautomatik</value></data>
+  <data name="DaysBeforeExpiry" xml:space="preserve"><value>Tage vorher</value></data>
+  <data name="SettingsKicker" xml:space="preserve"><value>Externe Dienste und Zonen</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Einstellungen</value></data>
+  <data name="ProfilesKicker" xml:space="preserve"><value>Zielsysteme und Exportvorgaben</value></data>
+  <data name="ProfilesTitle" xml:space="preserve"><value>Profile</value></data>
+  <data name="TargetProfiles" xml:space="preserve"><value>Zielprofile</value></data>
+  <data name="NoTargetProfiles" xml:space="preserve"><value>Es sind noch keine Zielprofile angelegt.</value></data>
+  <data name="Revocations" xml:space="preserve"><value>Sperrungen</value></data>
+  <data name="Reason" xml:space="preserve"><value>Grund</value></data>
+  <data name="Date" xml:space="preserve"><value>Datum</value></data>
+  <data name="SavedDnsConnectors" xml:space="preserve"><value>Gespeicherte DNS-Connectoren</value></data>
+  <data name="CheckHetzner" xml:space="preserve"><value>Hetzner prüfen</value></data>
+  <data name="CheckTechnitium" xml:space="preserve"><value>Technitium prüfen</value></data>
+  <data name="TxtTest" xml:space="preserve"><value>TXT-Test</value></data>
+  <data name="SavedDomains" xml:space="preserve"><value>Gespeicherte Domains</value></data>
+  <data name="IssuanceZone" xml:space="preserve"><value>Ausstellungszone</value></data>
+  <data name="Internal" xml:space="preserve"><value>Intern</value></data>
+  <data name="External" xml:space="preserve"><value>Extern</value></data>
+  <data name="TlsSettingsTitle" xml:space="preserve"><value>TLS für HomeCA-Oberfläche</value></data>
+  <data name="TlsSettingsDescription" xml:space="preserve"><value>HomeCA stellt sich selbst ein TLS-Zertifikat aus und ist danach nur noch über HTTPS (Port 5443) erreichbar. Die CA muss dafür bereits eingerichtet sein.</value></data>
+  <data name="TlsRestartNotice" xml:space="preserve"><value>HomeCA startet neu und ist gleich unter HTTPS erreichbar. Diese Seite wird automatisch weitergeleitet.</value></data>
+  <data name="TlsHostAlternative" xml:space="preserve"><value>Alternativ auf dem Host ausführen:</value></data>
+  <data name="TlsActivating" xml:space="preserve"><value>TLS wird aktiviert …</value></data>
+  <data name="TlsActivateRestart" xml:space="preserve"><value>TLS jetzt aktivieren und neu starten</value></data>
+  <data name="TlsHostnameHelper" xml:space="preserve"><value>DNS-Name für das TLS-Zertifikat</value></data>
+  <data name="TlsIpAddress" xml:space="preserve"><value>IP-Adresse (optional)</value></data>
+  <data name="TlsIpAddressHelper" xml:space="preserve"><value>Wird als zusätzlicher SAN aufgenommen</value></data>
+  <data name="TlsSettingUp" xml:space="preserve"><value>TLS wird eingerichtet …</value></data>
+  <data name="TlsIssueActivate" xml:space="preserve"><value>TLS-Zertifikat ausstellen und aktivieren</value></data>
+  <data name="SetupRepeatTitle" xml:space="preserve"><value>Ersteinrichtung</value></data>
+  <data name="SetupRepeatDescription" xml:space="preserve"><value>Den Setup-Assistenten erneut durchlaufen, um z. B. Hostname, DNS-Connector oder CA-Einrichtung zu wiederholen.</value></data>
+  <data name="SetupRepeat" xml:space="preserve"><value>Ersteinrichtung wiederholen</value></data>
+  <data name="RotateIntermediate" xml:space="preserve"><value>Intermediate rotieren</value></data>
+  <data name="CreateCaTitle" xml:space="preserve"><value>CA anlegen</value></data>
+  <data name="RotateIntermediateWarning" xml:space="preserve"><value>Nach dem Speichern werden neue Zertifikate sofort mit der Ersatz-CA ausgestellt. Die bisherige Intermediate wird nur deaktiviert, nicht gesperrt.</value></data>
+  <data name="AuthorityType" xml:space="preserve"><value>Typ</value></data>
+  <data name="ParentRootCa" xml:space="preserve"><value>Übergeordnete Root-CA</value></data>
+  <data name="ValidityDays" xml:space="preserve"><value>Laufzeit (Tage)</value></data>
+  <data name="KeyAlgorithm" xml:space="preserve"><value>Schlüsselalgorithmus</value></data>
+  <data name="CrlValidityDays" xml:space="preserve"><value>CRL-Gültigkeit (Tage)</value></data>
+  <data name="ActiveForNewIssuance" xml:space="preserve"><value>Für neue Ausstellungen aktiv</value></data>
+  <data name="PerformRotation" xml:space="preserve"><value>Rotation durchführen</value></data>
+  <data name="LoginUnavailable" xml:space="preserve"><value>HomeCA ist nicht erreichbar. Prüfen Sie die Netzwerkverbindung und den Dienststatus.</value></data>
+  <data name="LoginProcessingFailed" xml:space="preserve"><value>Die Anmeldung konnte nicht verarbeitet werden. Prüfen Sie das Serverprotokoll.</value></data>
+  <data name="SignedOut" xml:space="preserve"><value>Sie wurden abgemeldet.</value></data>
+  <data name="ManagementDataLoadFailed" xml:space="preserve"><value>Die Verwaltungsdaten konnten nicht geladen werden. Prüfen Sie die Verbindung oder melden Sie sich erneut an.</value></data>
+  <data name="ChangesSaved" xml:space="preserve"><value>Änderung wurde gespeichert.</value></data>
+  <data name="ActionFailed" xml:space="preserve"><value>Die Aktion konnte nicht abgeschlossen werden.</value></data>
+  <data name="AuthorityNameSubjectRequired" xml:space="preserve"><value>Name und Subject sind erforderlich.</value></data>
+  <data name="ParentRootCaRequired" xml:space="preserve"><value>Wählen Sie die übergeordnete Root-CA aus.</value></data>
+  <data name="AuthoritySettingsSaved" xml:space="preserve"><value>CA-Einstellungen gespeichert.</value></data>
+  <data name="ConfirmAuthorityDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um die CA unwiderruflich zu entfernen.</value></data>
+  <data name="AuthorityDeleted" xml:space="preserve"><value>CA gelöscht.</value></data>
+  <data name="ConfirmCertificateRevoke" xml:space="preserve"><value>Klicken Sie erneut, um das Zertifikat zu widerrufen. Die Zertifikatsakte bleibt für Audits erhalten.</value></data>
+  <data name="CertificateRevoked" xml:space="preserve"><value>Zertifikat widerrufen. Die CRL wurde aktualisiert; die Zertifikatsakte bleibt erhalten.</value></data>
+  <data name="NoActiveRootCa" xml:space="preserve"><value>Keine aktive Root-CA gefunden. Bitte zuerst die PKI initialisieren.</value></data>
+  <data name="PasswordRequired" xml:space="preserve"><value>Ein Kennwort ist erforderlich.</value></data>
+  <data name="PfxDownloaded" xml:space="preserve"><value>PFX-Datei wurde heruntergeladen.</value></data>
+  <data name="SelectTargetProfile" xml:space="preserve"><value>Wählen Sie zuerst ein Zielprofil aus.</value></data>
+  <data name="TargetProfileRequiresDns" xml:space="preserve"><value>Für dieses Zielprofil ist mindestens ein DNS-Name erforderlich.</value></data>
+  <data name="TargetProfileDisallowsIp" xml:space="preserve"><value>Dieses Zielprofil erlaubt keine IP-SANs.</value></data>
+  <data name="TargetProfileValidityLimit" xml:space="preserve"><value>Dieses Zielprofil erlaubt höchstens {0} Tage Laufzeit.</value></data>
+  <data name="SshRequiredFields" xml:space="preserve"><value>Füllen Sie alle Pflichtfelder für das SSH-Zertifikat aus.</value></data>
+  <data name="SshCertificateIssued" xml:space="preserve"><value>SSH-Zertifikat ausgestellt.</value></data>
+  <data name="ConfirmSshCertificateDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um das SSH-Zertifikat zu entfernen.</value></data>
+  <data name="SshCertificateDeleted" xml:space="preserve"><value>SSH-Zertifikat gelöscht.</value></data>
+  <data name="SelectCertificate" xml:space="preserve"><value>Wählen Sie ein Zertifikat aus.</value></data>
+  <data name="RenewalPlanUpdated" xml:space="preserve"><value>Erneuerungsplan aktualisiert.</value></data>
+  <data name="ConfirmRenewalPlanDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um den Erneuerungsplan zu entfernen.</value></data>
+  <data name="RenewalPlanDeleted" xml:space="preserve"><value>Erneuerungsplan gelöscht.</value></data>
+  <data name="AcmeAllowlistSaved" xml:space="preserve"><value>ACME-Client-Allowlist gespeichert.</value></data>
+  <data name="AcmeClientNameRequired" xml:space="preserve"><value>Geben Sie einen Namen für den ACME-Client an.</value></data>
+  <data name="AcmeEabCredentialsMissing" xml:space="preserve"><value>EAB-Zugangsdaten fehlen in der Serverantwort.</value></data>
+  <data name="AcmeEabCreated" xml:space="preserve"><value>EAB-Zugang erstellt. Den HMAC-Key jetzt in den ACME-Client übertragen.</value></data>
+  <data name="ConfirmAcmeEabRevoke" xml:space="preserve"><value>Nochmals klicken, um diesen EAB-Zugang zu sperren.</value></data>
+  <data name="AcmeEabRevoked" xml:space="preserve"><value>EAB-Zugang gesperrt.</value></data>
+  <data name="RenewalNotificationsSaved" xml:space="preserve"><value>E-Mail-Benachrichtigungen gespeichert.</value></data>
+  <data name="RenewalNotificationTestSent" xml:space="preserve"><value>Test-E-Mail wurde versendet.</value></data>
+  <data name="DomainRequired" xml:space="preserve"><value>Ein Domainname ist erforderlich.</value></data>
+  <data name="DomainUpdated" xml:space="preserve"><value>Domain aktualisiert.</value></data>
+  <data name="ProfileIdRequired" xml:space="preserve"><value>Eine Profil-ID ist erforderlich.</value></data>
+  <data name="TargetProfileRequiredFields" xml:space="preserve"><value>Füllen Sie alle Pflichtfelder des Zielprofils aus.</value></data>
+  <data name="TargetProfileUpdated" xml:space="preserve"><value>Zielprofil aktualisiert.</value></data>
+  <data name="TargetProfileSaved" xml:space="preserve"><value>Zielprofil gespeichert.</value></data>
+  <data name="ConfirmTargetProfileDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um das Zielprofil zu entfernen.</value></data>
+  <data name="TargetProfileDeleted" xml:space="preserve"><value>Zielprofil gelöscht.</value></data>
+  <data name="NoConnector" xml:space="preserve"><value>Keiner</value></data>
+  <data name="UnknownConnector" xml:space="preserve"><value>Unbekannter Connector</value></data>
+  <data name="ConnectorNameTokenRequired" xml:space="preserve"><value>Name und API-Token sind erforderlich.</value></data>
+  <data name="TechnitiumEndpointInvalid" xml:space="preserve"><value>Der Technitium-Endpunkt muss eine vollständige URL sein, z. B. http://192.168.1.10:5380.</value></data>
+  <data name="ConnectorUpdated" xml:space="preserve"><value>Connector aktualisiert.</value></data>
+  <data name="ConnectorEditCredentialsHint" xml:space="preserve"><value>Geben Sie Endpoint und Zugangsschlüssel erneut ein, um den Connector zu aktualisieren.</value></data>
+  <data name="IssuerRequiredFields" xml:space="preserve"><value>Name, Directory-URL und DNS-Connector sind erforderlich.</value></data>
+  <data name="IssuerUpdated" xml:space="preserve"><value>Issuer aktualisiert.</value></data>
+  <data name="ConfirmIssuerDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um den Issuer zu entfernen.</value></data>
+  <data name="IssuerDeleted" xml:space="preserve"><value>Issuer gelöscht.</value></data>
+  <data name="NoZonesFound" xml:space="preserve"><value>Keine Zonen gefunden.</value></data>
+  <data name="ConnectorZones" xml:space="preserve"><value>Zonen: {0}</value></data>
+  <data name="ConnectorConnected" xml:space="preserve"><value>Verbindung hergestellt. {0}</value></data>
+  <data name="ConnectorNotConnected" xml:space="preserve"><value>Verbindung nicht hergestellt. {0}</value></data>
+  <data name="ConnectorCheckFailed" xml:space="preserve"><value>Die Verbindung konnte nicht geprüft werden. Prüfen Sie Endpoint und Zugangsdaten.</value></data>
+  <data name="SerialNumberRequired" xml:space="preserve"><value>Eine Seriennummer ist erforderlich.</value></data>
+  <data name="ConfirmConnectorDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um den Connector zu entfernen.</value></data>
+  <data name="ConnectorDeleted" xml:space="preserve"><value>Connector gelöscht.</value></data>
+  <data name="ConfirmDomainDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um die Domain zu entfernen.</value></data>
+  <data name="DomainDeleted" xml:space="preserve"><value>Domain gelöscht.</value></data>
+  <data name="TxtTestRequiresDomain" xml:space="preserve"><value>Legen Sie zuerst eine Domain an, damit der TXT-Test eine Zielzone hat.</value></data>
+  <data name="TxtRoundTripSucceeded" xml:space="preserve"><value>TXT-Roundtrip für {0} war erfolgreich.</value></data>
+  <data name="TxtTestFailed" xml:space="preserve"><value>TXT-Test fehlgeschlagen: {0}</value></data>
+  <data name="BackupCreated" xml:space="preserve"><value>Backup {0} erstellt.</value></data>
+  <data name="BackupCreateFailed" xml:space="preserve"><value>Backup konnte nicht erstellt werden.</value></data>
+  <data name="BackupUploaded" xml:space="preserve"><value>Backup {0} hochgeladen.</value></data>
+  <data name="BackupUploadFailed" xml:space="preserve"><value>Backup-Upload fehlgeschlagen: {0}</value></data>
+  <data name="BackupKeyDownloaded" xml:space="preserve"><value>Backup-Schlüssel heruntergeladen.</value></data>
+  <data name="BackupKeyUploaded" xml:space="preserve"><value>Backup-Schlüssel hochgeladen.</value></data>
+  <data name="ConfirmBackupDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um das Backup zu entfernen.</value></data>
+  <data name="BackupDeleted" xml:space="preserve"><value>Backup {0} gelöscht.</value></data>
+  <data name="ResetFailed" xml:space="preserve"><value>Zurücksetzen fehlgeschlagen.</value></data>
+  <data name="SetupWizardStarted" xml:space="preserve"><value>Setup-Assistent wird gestartet.</value></data>
+  <data name="TlsCertificateIssued" xml:space="preserve"><value>TLS-Zertifikat ausgestellt.</value></data>
+  <data name="TlsActivatingRestart" xml:space="preserve"><value>TLS wird aktiviert — HomeCA startet neu.</value></data>
+  <data name="ConfirmRfc8555AccountDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um das RFC 8555-Konto zu entfernen.</value></data>
+  <data name="Rfc8555AccountDeleted" xml:space="preserve"><value>RFC 8555-Konto gelöscht.</value></data>
+  <data name="ConfirmRfc8555OrderDelete" xml:space="preserve"><value>Klicken Sie erneut auf Löschen, um den RFC 8555-Auftrag zu entfernen.</value></data>
+  <data name="Rfc8555OrderDeleted" xml:space="preserve"><value>RFC 8555-Auftrag gelöscht.</value></data>
+  <data name="Step1" xml:space="preserve"><value>Schritt 1</value></data>
+  <data name="Step2" xml:space="preserve"><value>Schritt 2</value></data>
+  <data name="Step3" xml:space="preserve"><value>Schritt 3</value></data>
+  <data name="SelectTargetSystem" xml:space="preserve"><value>Zielsystem wählen</value></data>
+  <data name="DefineCertificate" xml:space="preserve"><value>Zertifikat definieren</value></data>
+  <data name="TargetProfile" xml:space="preserve"><value>Zielprofil</value></data>
+  <data name="CheckDns" xml:space="preserve"><value>DNS prüfen</value></data>
+  <data name="Details" xml:space="preserve"><value>Details</value></data>
+  <data name="DeploymentPackageTooltip" xml:space="preserve"><value>Enthält alle Exporte einschließlich des privaten Schlüssels sowie Anleitung, Prüfsummen und Erneuerungsskript.</value></data>
+  <data name="DeploymentPackage" xml:space="preserve"><value>Paket ZIP</value></data>
+  <data name="ConfirmCertificateRevokeButton" xml:space="preserve"><value>Widerruf bestätigen</value></data>
+  <data name="CreateTargetProfile" xml:space="preserve"><value>Zielprofil anlegen</value></data>
+  <data name="EditTargetProfile" xml:space="preserve"><value>Zielprofil bearbeiten</value></data>
+  <data name="ProfileId" xml:space="preserve"><value>Profil-ID</value></data>
+  <data name="ProfileIdHelper" xml:space="preserve"><value>Kleinbuchstaben, Zahlen und Bindestriche.</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>Anzeigename</value></data>
+  <data name="Purpose" xml:space="preserve"><value>Einsatzzweck</value></data>
+  <data name="ExportFormats" xml:space="preserve"><value>Exportformate</value></data>
+  <data name="ExportFormatsHelper" xml:space="preserve"><value>Durch Kommas trennen, z. B. PEM, PFX, DER.</value></data>
+  <data name="RequiresDnsName" xml:space="preserve"><value>DNS-Name erforderlich</value></data>
+  <data name="AllowsIpSan" xml:space="preserve"><value>IP-SAN erlauben</value></data>
+  <data name="InstallationInstructions" xml:space="preserve"><value>Installationshinweise</value></data>
+  <data name="RenewalScript" xml:space="preserve"><value>Erneuerungsskript</value></data>
+  <data name="SshCertificateKind" xml:space="preserve"><value>Art</value></data>
+  <data name="SshPrincipals" xml:space="preserve"><value>Prinzipale</value></data>
+  <data name="CommaSeparated" xml:space="preserve"><value>Durch Kommas trennen</value></data>
+  <data name="SshPublicKey" xml:space="preserve"><value>Öffentlicher SSH-Schlüssel</value></data>
+  <data name="IssueSshCertificate" xml:space="preserve"><value>SSH-Zertifikat ausstellen</value></data>
+  <data name="RenewalPlan" xml:space="preserve"><value>Erneuerungsplan</value></data>
+  <data name="EditRenewalPlan" xml:space="preserve"><value>Plan bearbeiten</value></data>
+  <data name="SaveRenewalPlan" xml:space="preserve"><value>Erneuerungsplan speichern</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="SubjectDn" xml:space="preserve"><value>Betreff (DN)</value></data>
+  <data name="TargetProfileDescription" xml:space="preserve"><value>Das Zielprofil setzt Standardwerte für Algorithmus, Laufzeit, Exporte und Einspielhinweise.</value></data>
+  <data name="ProfileForcesRsa" xml:space="preserve"><value>Dieses Zielprofil erzwingt RSA. Die Abweichung zur Standardwahl ECC ist hier bewusst sichtbar.</value></data>
+  <data name="RsaKeySize" xml:space="preserve"><value>RSA-Schlüssellänge</value></data>
+  <data name="RsaKeySizeHelper" xml:space="preserve"><value>Legacy-Profile verwenden RSA 2048 oder 3072 Bit.</value></data>
+  <data name="CreateDeploymentPackage" xml:space="preserve"><value>Deployment-Paket erzeugen</value></data>
+  <data name="DeploymentPackageDescription" xml:space="preserve"><value>HomeCA speichert beim Ausstellen einen versionsierten Snapshot mit Exporten, Anleitung, Prüfsummen und Erneuerungsskript.</value></data>
+  <data name="EmailNotifications" xml:space="preserve"><value>E-Mail-Benachrichtigungen</value></data>
+  <data name="EmailNotificationsDescription" xml:space="preserve"><value>Informiert nach einer automatischen Erneuerung oder wenn diese fehlschlägt. Zugangsdaten werden nach dem Speichern nicht erneut angezeigt.</value></data>
+  <data name="EnableEmailNotifications" xml:space="preserve"><value>E-Mail-Versand aktivieren</value></data>
+  <data name="Recipients" xml:space="preserve"><value>Empfänger</value></data>
+  <data name="RecipientsHelper" xml:space="preserve"><value>Mehrere Adressen durch Komma oder Semikolon trennen.</value></data>
+  <data name="DeliveryMethod" xml:space="preserve"><value>Versandweg</value></data>
+  <data name="SenderAddress" xml:space="preserve"><value>Absenderadresse</value></data>
+  <data name="SmtpServer" xml:space="preserve"><value>SMTP-Server</value></data>
+  <data name="SmtpPort" xml:space="preserve"><value>SMTP-Port</value></data>
+  <data name="SmtpUsernameOptional" xml:space="preserve"><value>SMTP-Benutzername (optional)</value></data>
+  <data name="SmtpPassword" xml:space="preserve"><value>SMTP-Kennwort</value></data>
+  <data name="KeepSavedPassword" xml:space="preserve"><value>Unverändert lassen, um das gespeicherte Kennwort zu behalten</value></data>
+  <data name="EnterPassword" xml:space="preserve"><value>Kennwort eingeben</value></data>
+  <data name="M365GraphPermission" xml:space="preserve"><value>Die Microsoft-365-App benötigt die Graph-Berechtigung Mail.Send (Anwendungsberechtigung) mit erteiltem Admin-Consent.</value></data>
+  <data name="TenantId" xml:space="preserve"><value>Tenant-ID</value></data>
+  <data name="ClientId" xml:space="preserve"><value>Client-ID</value></data>
+  <data name="ClientSecret" xml:space="preserve"><value>Client-Secret</value></data>
+  <data name="KeepSavedSecret" xml:space="preserve"><value>Unverändert lassen, um das gespeicherte Secret zu behalten</value></data>
+  <data name="EnterClientSecret" xml:space="preserve"><value>Client-Secret eingeben</value></data>
+  <data name="SenderMailbox" xml:space="preserve"><value>Absenderpostfach</value></data>
+  <data name="Saving" xml:space="preserve"><value>Wird gespeichert …</value></data>
+  <data name="SaveNotifications" xml:space="preserve"><value>Benachrichtigungen speichern</value></data>
+  <data name="SendingTest" xml:space="preserve"><value>Test wird gesendet …</value></data>
+  <data name="SendTestEmail" xml:space="preserve"><value>Test-E-Mail senden</value></data>
+  <data name="CreateDnsConnector" xml:space="preserve"><value>DNS-Connector anlegen</value></data>
+  <data name="EditDnsConnector" xml:space="preserve"><value>DNS-Connector bearbeiten</value></data>
+  <data name="Type" xml:space="preserve"><value>Typ</value></data>
+  <data name="TechnitiumEndpoint" xml:space="preserve"><value>Technitium-Endpunkt</value></data>
+  <data name="ConnectorSecretEditHint" xml:space="preserve"><value>Beim Bearbeiten wird der gespeicherte Zugangsschlüssel ersetzt.</value></data>
+  <data name="SaveConnector" xml:space="preserve"><value>Connector speichern</value></data>
+  <data name="UpdateConnector" xml:space="preserve"><value>Connector aktualisieren</value></data>
+  <data name="CreateDomain" xml:space="preserve"><value>Domain anlegen</value></data>
+  <data name="EditDomain" xml:space="preserve"><value>Domain bearbeiten</value></data>
+  <data name="DomainName" xml:space="preserve"><value>Domainname</value></data>
+  <data name="DnsConnector" xml:space="preserve"><value>DNS-Connector</value></data>
+  <data name="InternalIssuanceZone" xml:space="preserve"><value>Interne Ausstellungszone</value></data>
+  <data name="SaveDomain" xml:space="preserve"><value>Domain speichern</value></data>
+  <data name="UpdateDomain" xml:space="preserve"><value>Domain aktualisieren</value></data>
+  <data name="ExternalAcmeIssuer" xml:space="preserve"><value>Externer ACME-Issuer</value></data>
+  <data name="EditIssuer" xml:space="preserve"><value>Issuer bearbeiten</value></data>
+  <data name="DirectoryUrl" xml:space="preserve"><value>Directory-URL</value></data>
+  <data name="SaveIssuer" xml:space="preserve"><value>Issuer speichern</value></data>
+  <data name="RevokeCertificate" xml:space="preserve"><value>Zertifikat sperren</value></data>
+  <data name="SerialNumberHex" xml:space="preserve"><value>Seriennummer (hexadezimal)</value></data>
+  <data name="RevocationReason" xml:space="preserve"><value>Sperrgrund</value></data>
+  <data name="Unspecified" xml:space="preserve"><value>Nicht angegeben</value></data>
+  <data name="KeyCompromise" xml:space="preserve"><value>Schlüssel kompromittiert</value></data>
+  <data name="CessationOfOperation" xml:space="preserve"><value>Außer Betrieb</value></data>
+  <data name="SmtpDeliveryMethod" xml:space="preserve"><value>SMTP (auch Microsoft 365 SMTP)</value></data>
+  <data name="M365DeliveryMethod" xml:space="preserve"><value>Microsoft 365 über Graph</value></data>
+  <data name="ApiToken" xml:space="preserve"><value>API-Token</value></data>
+  <data name="Subject" xml:space="preserve"><value>Betreff</value></data>
+  <data name="Algorithm" xml:space="preserve"><value>Algorithmus</value></data>
+  <data name="Rfc8555OrderDetails" xml:space="preserve"><value>RFC 8555-Auftragsdetails</value></data>
+  <data name="OrderId" xml:space="preserve"><value>Auftrags-ID</value></data>
+  <data name="AccountId" xml:space="preserve"><value>Konto-ID</value></data>
+  <data name="Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Created" xml:space="preserve"><value>Erstellt</value></data>
+  <data name="Expires" xml:space="preserve"><value>Läuft ab</value></data>
+  <data name="Identifiers" xml:space="preserve"><value>Identifikatoren</value></data>
+  <data name="AcmeError" xml:space="preserve"><value>ACME-Fehler:</value></data>
+  <data name="Authorizations" xml:space="preserve"><value>Autorisierungen</value></data>
+  <data name="NoAuthorizations" xml:space="preserve"><value>Keine Autorisierungen gespeichert.</value></data>
+  <data name="Rfc8555AccountDetails" xml:space="preserve"><value>RFC 8555-Kontodetails</value></data>
+  <data name="JwkThumbprint" xml:space="preserve"><value>JWK-Fingerabdruck</value></data>
+  <data name="Contact" xml:space="preserve"><value>Kontakt</value></data>
+  <data name="Orders" xml:space="preserve"><value>Aufträge</value></data>
+  <data name="AssociatedOrders" xml:space="preserve"><value>Zugeordnete Aufträge</value></data>
+  <data name="NoAssociatedOrders" xml:space="preserve"><value>Diesem Konto sind keine Aufträge zugeordnet.</value></data>
+  <data name="SshCertificateDialogTitle" xml:space="preserve"><value>SSH-Zertifikat — {0}</value></data>
+  <data name="SshCertificateDialogDescription" xml:space="preserve"><value>Kopieren Sie den Zertifikatsinhalt oder laden Sie die Datei herunter.</value></data>
+  <data name="DeployHostCertificate" xml:space="preserve"><value>Host-Zertifikat einspielen</value></data>
+  <data name="UseUserCertificate" xml:space="preserve"><value>Benutzerzertifikat verwenden</value></data>
+  <data name="SshHostCertificateDescription" xml:space="preserve"><value>Speichere das Zertifikat auf dem Server neben dem Host-Key und aktiviere es in der sshd_config.</value></data>
+  <data name="SshWriteCertificate" xml:space="preserve"><value>1. Zertifikat auf den Server schreiben</value></data>
+  <data name="SshConfigureSshd" xml:space="preserve"><value>2. sshd_config ergänzen</value></data>
+  <data name="SshReloadDaemon" xml:space="preserve"><value>3. SSH-Daemon neu laden</value></data>
+  <data name="SshHostTrustNotice" xml:space="preserve"><value>Damit Clients das Host-Zertifikat akzeptieren, muss die Host-CA in known_hosts eingetragen sein; siehe Vertrauensstellung unten.</value></data>
+  <data name="SshUserCertificateDescription" xml:space="preserve"><value>Speichere das Zertifikat neben dem privaten Schlüssel. SSH findet es automatisch über die Namenskonvention.</value></data>
+  <data name="SshSaveCertificate" xml:space="preserve"><value>1. Zertifikat speichern</value></data>
+  <data name="SshTestConnection" xml:space="preserve"><value>2. Verbindung testen</value></data>
+  <data name="SshUserTrustNotice" xml:space="preserve"><value>Damit der Server das Benutzerzertifikat akzeptiert, muss TrustedUserCAKeys in sshd_config konfiguriert sein; siehe Vertrauensstellung unten.</value></data>
+  <data name="ConfigureTrust" xml:space="preserve"><value>Vertrauensstellung einrichten</value></data>
+  <data name="VerifyCertificate" xml:space="preserve"><value>Zertifikat prüfen</value></data>
+  <data name="ShowCertificateContent" xml:space="preserve"><value>Zertifikatsinhalt anzeigen</value></data>
+  <data name="BackupKey" xml:space="preserve"><value>Backup-Schlüssel</value></data>
+  <data name="BackupKeyDescription" xml:space="preserve"><value>Der 32-Byte AES-256-Schlüssel verschlüsselt alle Backups. Sichern Sie diesen Schlüssel getrennt von den Backups auf.</value></data>
+  <data name="DownloadKey" xml:space="preserve"><value>Schlüssel herunterladen</value></data>
+  <data name="UploadKey" xml:space="preserve"><value>Schlüssel hochladen</value></data>
+  <data name="EncryptedBackup" xml:space="preserve"><value>Verschlüsseltes Backup</value></data>
+  <data name="EncryptedBackupDescription" xml:space="preserve"><value>Erstellt ein verschlüsseltes Archiv der HomeCA-Daten.</value></data>
+  <data name="UploadBackup" xml:space="preserve"><value>Backup hochladen</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Aktualisieren</value></data>
+  <data name="FileName" xml:space="preserve"><value>Dateiname</value></data>
+  <data name="Size" xml:space="preserve"><value>Größe</value></data>
+  <data name="Verify" xml:space="preserve"><value>Verifizieren</value></data>
+  <data name="NoBackups" xml:space="preserve"><value>Keine Backups vorhanden.</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="MaximumValidityDays" xml:space="preserve"><value>Maximale Laufzeit (Tage)</value></data>
+  <data name="DnsRequiredForProfile" xml:space="preserve"><value>Mindestens ein DNS-Name ist für dieses Zielprofil erforderlich.</value></data>
+  <data name="OptionalCommaSeparated" xml:space="preserve"><value>Optional, durch Kommas trennen.</value></data>
+  <data name="ProfileDisallowsIpSans" xml:space="preserve"><value>Dieses Zielprofil arbeitet ohne IP-SANs.</value></data>
+  <data name="ProfileMaximumValidity" xml:space="preserve"><value>Maximal {0} Tage für das gewählte Zielprofil.</value></data>
+  <data name="IssueTlsCertificate" xml:space="preserve"><value>TLS-Zertifikat ausstellen</value></data>
+  <data name="IssueProfileCertificate" xml:space="preserve"><value>{0} ausstellen</value></data>
+  <data name="UnknownProfile" xml:space="preserve"><value>Unbekanntes Profil</value></data>
+  <data name="NoProfilePurpose" xml:space="preserve"><value>Kein Einsatzzweck hinterlegt.</value></data>
+  <data name="NoProfileDocumentation" xml:space="preserve"><value>Keine profilspezifische Anleitung hinterlegt.</value></data>
+  <data name="DnsNameTooLong" xml:space="preserve"><value>'{0}' ist zu lang (max. 253 Zeichen).</value></data>
+  <data name="DnsNameContainsSpaces" xml:space="preserve"><value>'{0}' enthält Leerzeichen.</value></data>
+  <data name="DnsNameLooksLikeUrl" xml:space="preserve"><value>'{0}' sieht nach einer URL aus — nur den Hostnamen eingeben.</value></data>
+  <data name="DnsNameInvalid" xml:space="preserve"><value>'{0}' ist kein gültiger DNS-Name.</value></data>
+  <data name="DnsWildcardNotCheckable" xml:space="preserve"><value>{0} — Wildcard-Zertifikat, DNS-Auflösung nicht prüfbar.</value></data>
+  <data name="DnsNoAddressFound" xml:space="preserve"><value>{0} — keine IP-Adresse gefunden.</value></data>
+  <data name="DnsResolutionFailed" xml:space="preserve"><value>{0} — konnte nicht aufgelöst werden. Ist der DNS-Eintrag schon erstellt?</value></data>
+  <data name="SshCaKeyNotFound" xml:space="preserve"><value>SSH-CA-Schlüssel nicht gefunden. Bitte zuerst die PKI initialisieren.</value></data>
+  <data name="SshCaKeyReadFailed" xml:space="preserve"><value>SSH-CA-Schlüssel konnte nicht gelesen werden.</value></data>
+  <data name="SshHostCaKeyDownloaded" xml:space="preserve"><value>Host-CA-Schlüssel heruntergeladen.</value></data>
+  <data name="SshUserCaKeyDownloaded" xml:space="preserve"><value>User-CA-Schlüssel heruntergeladen.</value></data>
+  <data name="BackupKeyDownloadFailed" xml:space="preserve"><value>Schlüssel-Download fehlgeschlagen: {0}</value></data>
+  <data name="BackupKeyUploadFailed" xml:space="preserve"><value>Schlüssel-Upload fehlgeschlagen: {0}</value></data>
+  <data name="BackupDownloaded" xml:space="preserve"><value>Backup {0} heruntergeladen.</value></data>
+  <data name="BackupDownloadFailed" xml:space="preserve"><value>Backup-Download fehlgeschlagen: {0}</value></data>
+  <data name="BackupVerified" xml:space="preserve"><value>Backup {0} wurde erfolgreich verifiziert.</value></data>
+  <data name="BackupVerificationFailed" xml:space="preserve"><value>Backup-Verifizierung fehlgeschlagen: {0}</value></data>
+  <data name="BackupDeleteFailed" xml:space="preserve"><value>Backup konnte nicht gelöscht werden: {0}</value></data>
+  <data name="LoginInvalidCredentials" xml:space="preserve"><value>Benutzername oder Passwort sind nicht korrekt.</value></data>
+  <data name="LoginRateLimited" xml:space="preserve"><value>Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.</value></data>
+  <data name="LoginHttpFailed" xml:space="preserve"><value>Anmeldung fehlgeschlagen (HTTP {0}). Prüfen Sie den Dienststatus oder das Serverprotokoll.</value></data>
+  <data name="Rfc8555AccountsMetric" xml:space="preserve"><value>RFC 8555-Konten</value></data>
+  <data name="Rfc8555OrdersMetric" xml:space="preserve"><value>RFC 8555-Aufträge</value></data>
+  <data name="ExternalIssuersMetric" xml:space="preserve"><value>Externe Aussteller</value></data>
+  <data name="ExternalCertificatesMetric" xml:space="preserve"><value>Externe Zertifikate</value></data>
+  <data name="StandardAcmeClientAccess" xml:space="preserve"><value>Zugang für Standard-ACME-Clients</value></data>
+  <data name="AcmeAllowlistDescription" xml:space="preserve"><value>Client-Netze in der Allowlist können RFC-8555-Konten ohne EAB anlegen. Für jeden anderen Client einen eigenen EAB-Zugang erzeugen. Trage nur direkte Client-IP-Adressen oder CIDR-Netze ein, niemals pauschal die IP eines Reverse Proxys.</value></data>
+  <data name="AcmeAllowlistLabel" xml:space="preserve"><value>Allowlist für ACME-Clientnetze</value></data>
+  <data name="AcmeAllowlistHelper" xml:space="preserve"><value>Eine IP-Adresse oder ein CIDR-Netz pro Zeile, z. B. 192.168.10.25 oder 192.168.20.0/24.</value></data>
+  <data name="SaveAllowlist" xml:space="preserve"><value>Allowlist speichern</value></data>
+  <data name="CreateEabCredential" xml:space="preserve"><value>Individuellen EAB-Zugang erstellen</value></data>
+  <data name="ClientName" xml:space="preserve"><value>Clientname</value></data>
+  <data name="EabCredentialHelper" xml:space="preserve"><value>Ein EAB-Zugang registriert genau ein ACME-Konto.</value></data>
+  <data name="EabCredentialOneTimeNotice" xml:space="preserve"><value>Diese EAB-Zugangsdaten werden nur jetzt angezeigt. Kopiere sie direkt in den vorgesehenen ACME-Client.</value></data>
+  <data name="KeyId" xml:space="preserve"><value>Key-ID:</value></data>
+  <data name="HmacKey" xml:space="preserve"><value>HMAC-Key:</value></data>
+  <data name="Client" xml:space="preserve"><value>Client</value></data>
+  <data name="AcmeAccount" xml:space="preserve"><value>ACME-Konto</value></data>
+  <data name="Registered" xml:space="preserve"><value>Registriert</value></data>
+  <data name="Used" xml:space="preserve"><value>Verbraucht</value></data>
+  <data name="Ready" xml:space="preserve"><value>Bereit</value></data>
+  <data name="ConfirmRevoke" xml:space="preserve"><value>Sperren bestätigen</value></data>
+  <data name="NoEabCredentials" xml:space="preserve"><value>Noch keine individuellen EAB-Zugänge angelegt.</value></data>
+  <data name="ExternalAcmeIssuers" xml:space="preserve"><value>Externe ACME-Aussteller</value></data>
+  <data name="ExternalAcmeIssuersDescription" xml:space="preserve"><value>Für öffentlich vertrauenswürdige Zertifikate mit DNS-01-Challenge.</value></data>
+  <data name="NoExternalAcmeIssuers" xml:space="preserve"><value>Noch keine externen ACME-Issuer registriert.</value></data>
+  <data name="TrustCertificateChain" xml:space="preserve"><value>Zertifikatskette</value></data>
+  <data name="TrustRootCaUsage" xml:space="preserve"><value>In den vertrauenswürdigen Stammzertifikatsspeicher installieren.</value></data>
+  <data name="TrustIntermediateCaUsage" xml:space="preserve"><value>Wird normalerweise mit dem Serverzertifikat ausgeliefert; nur importieren, wenn das Zielsystem dies ausdrücklich verlangt.</value></data>
+  <data name="TrustRootCaNotice" xml:space="preserve"><value>Installiere grundsätzlich die Root-CA. Die Intermediate-CA gehört bei TLS-Diensten in die ausgelieferte Zertifikatskette, nicht in den Root-Speicher.</value></data>
+  <data name="TrustInstallationGuides" xml:space="preserve"><value>Installationsanleitungen</value></data>
+  <data name="TrustWindowsPowerShell" xml:space="preserve"><value>Windows – PowerShell (als Administrator)</value></data>
+  <data name="TrustCopyWindowsScript" xml:space="preserve"><value>Windows-PowerShell-Skript kopieren</value></data>
+  <data name="TrustCopyLinuxScript" xml:space="preserve"><value>Debian- oder Ubuntu-Skript kopieren</value></data>
+  <data name="TrustCopyProxmoxScript" xml:space="preserve"><value>Proxmox-Skript kopieren</value></data>
+  <data name="TrustHaProxyTitle" xml:space="preserve"><value>HAProxy (TLS-Backends prüfen)</value></data>
+  <data name="TrustHaProxyDescription" xml:space="preserve"><value>Nutze die Root-CA für die Prüfung von HTTPS-Upstreams und referenziere sie über ca-file in der jeweiligen Backend-Server-Zeile.</value></data>
+  <data name="TrustCopyHaProxyGuide" xml:space="preserve"><value>HAProxy-Anleitung kopieren</value></data>
+  <data name="TrustCopyMacOsScript" xml:space="preserve"><value>macOS-Skript kopieren</value></data>
+  <data name="TrustFirefoxTitle" xml:space="preserve"><value>Firefox (Enterprise-Richtlinie)</value></data>
+  <data name="TrustCopyFirefoxPolicy" xml:space="preserve"><value>Firefox-Richtlinie kopieren</value></data>
+  <data name="SshCertificateAuthorities" xml:space="preserve"><value>SSH-Zertifizierungsstellen</value></data>
+  <data name="SshCertificateAuthoritiesDescription" xml:space="preserve"><value>Die öffentlichen Schlüssel der SSH-CAs werden benötigt, um die Vertrauensstellung auf Servern und Clients einzurichten.</value></data>
+  <data name="DownloadSshHostCaKey" xml:space="preserve"><value>Host-CA Public Key herunterladen</value></data>
+  <data name="DownloadSshUserCaKey" xml:space="preserve"><value>User-CA Public Key herunterladen</value></data>
+  <data name="AcmeRfc8555AccountsDescription" xml:space="preserve"><value>Konten, die über Standard-ACME-Clients wie OPNsense, acme.sh und Certbot registriert wurden.</value></data>
+  <data name="IssuancePath" xml:space="preserve"><value>Ausstellungsweg</value></data><data name="IssuancePathDescription" xml:space="preserve"><value>Die privaten Schlüssel und Exportpfade verbleiben auf dem HomeCA-Host. Der Ablauf startet mit dem Zielsystem und leitet daraus die Zertifikatsparameter ab.</value></data><data name="ActiveTargetProfile" xml:space="preserve"><value>Aktives Zielprofil</value></data><data name="DefaultAlgorithm" xml:space="preserve"><value>Standardalgorithmus:</value></data><data name="MaximumValidity" xml:space="preserve"><value>Maximale Laufzeit:</value></data><data name="DnsSan" xml:space="preserve"><value>DNS-SAN:</value></data><data name="IpSan" xml:space="preserve"><value>IP-SAN:</value></data><data name="Required" xml:space="preserve"><value>erforderlich</value></data><data name="Optional" xml:space="preserve"><value>optional</value></data><data name="Allowed" xml:space="preserve"><value>erlaubt</value></data><data name="NotAvailable" xml:space="preserve"><value>nicht vorgesehen</value></data><data name="ProfileDeploymentPackage" xml:space="preserve"><value>Deployment-Paket: {0} sowie profilgebundene Anleitung und Skript-Snapshot.</value></data><data name="ScriptPreview" xml:space="preserve"><value>Skript-Vorschau</value></data><data name="NoTargetProfileLoaded" xml:space="preserve"><value>Es ist kein Zielprofil geladen. Ohne Profil fehlen Exporte und profilbezogene Vorgaben.</value></data>
+  <data name="LoadingHelp" xml:space="preserve"><value>Hilfe wird geladen</value></data>
+  <data name="AuthorizationId" xml:space="preserve"><value>Authorization-ID</value></data>
+  <data name="Challenges" xml:space="preserve"><value>Prüfungen</value></data>
+  <data name="Validated" xml:space="preserve"><value>Validiert</value></data>
+  <data name="TrustWindowsActiveDirectoryTitle" xml:space="preserve"><value>Windows Server / Active Directory – Gruppenrichtlinie</value></data>
+  <data name="TrustWindowsActiveDirectoryDescription" xml:space="preserve"><value>In der Gruppenrichtlinienverwaltung Computerkonfiguration › Richtlinien › Windows-Einstellungen › Sicherheitseinstellungen › Richtlinien öffentlicher Schlüssel › Vertrauenswürdige Stammzertifizierungsstellen öffnen. Dort die heruntergeladene Root-CA als .cer importieren und die Richtlinie mit den Zielcomputern verknüpfen.</value></data>
+  <data name="TrustOpnSenseDescription" xml:space="preserve"><value>System › Trust › Authorities › + öffnen, Import an existing Certificate Authority wählen, die Root-CA als PEM einfügen und speichern. Wenn Dienste eine vollständige Kette benötigen, die Behandlung von Intermediate-CAs unter System › Trust › Settings konfigurieren.</value></data>
+  <data name="TrustVmwareDescription" xml:space="preserve"><value>Für vCenter die Root-CA in der Zertifikatsverwaltung als vertrauenswürdige Root-CA importieren. In aktuellen vSphere-Versionen: Menü › Administration › Certificate Management › Trusted Root Certificates › Add. Bei einem einzelnen ESXi-Host wird Browser-Vertrauen auf dem zugreifenden Client eingerichtet; für TLS-Verbindungen zu anderen Diensten gilt die jeweilige Host- oder vCenter-Vertrauensverwaltung.</value></data>
+  <data name="SshHostTrustDescription" xml:space="preserve"><value>Die Host-CA in die known_hosts-Datei der Clients eintragen, damit signierte Host-Keys ohne Fingerprint-Abfrage akzeptiert werden.</value></data>
+  <data name="SshSingleUser" xml:space="preserve"><value>Einzelner Benutzer</value></data>
+  <data name="SshSystemWide" xml:space="preserve"><value>Systemweit</value></data>
+  <data name="SshUserTrustDescription" xml:space="preserve"><value>Den Zielserver so konfigurieren, dass er Benutzerzertifikate der User-CA akzeptiert.</value></data>
+  <data name="SshConfigureUserCaTrust" xml:space="preserve"><value>User-CA auf den Server kopieren und sshd_config ergänzen</value></data>
+  <data name="RootCa" xml:space="preserve"><value>Root-CA</value></data>
+  <data name="IntermediateCa" xml:space="preserve"><value>Intermediate-CA</value></data>
+  <data name="WindowsCer" xml:space="preserve"><value>Windows-CER</value></data>
+  <data name="Root" xml:space="preserve"><value>Stamm</value></data>
+  <data name="Intermediate" xml:space="preserve"><value>Zwischenzertifizierungsstelle</value></data>
+  <data name="PrivateKey" xml:space="preserve"><value>Privater Schlüssel</value></data>
+  <data name="CertificateChain" xml:space="preserve"><value>Zertifikatskette</value></data>
+  <data name="FullChain" xml:space="preserve"><value>Vollständige Kette</value></data>
+  <data name="Bundle" xml:space="preserve"><value>Bündel</value></data>
+</root>

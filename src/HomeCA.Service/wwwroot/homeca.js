@@ -37,3 +37,40 @@ window.homeca.copyToClipboard = async (text) => {
     document.body.removeChild(textarea);
   }
 };
+
+window.homeca.addHelpCopyButtons = (label) => {
+  document.querySelectorAll(".help-content pre").forEach(pre => {
+    if (pre.querySelector(".help-copy-button")) return;
+    const code = pre.querySelector("code");
+    if (!code) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "help-copy-button";
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.textContent = "⧉";
+    button.addEventListener("click", async () => {
+      await window.homeca.copyToClipboard(code.innerText);
+    });
+    pre.appendChild(button);
+  });
+};
+
+window.homeca.setCulture = (culture) => {
+  // ASP.NET Core's standard request-culture cookie. Reloading creates a new
+  // Blazor circuit with the selected culture rather than mutating a live one.
+  document.cookie = `.AspNetCore.Culture=c=${culture}|uic=${culture}; path=/; max-age=31536000; samesite=lax`;
+  window.location.reload();
+};
+
+window.homeca.clearBrowserSession = async () => {
+  await fetch("/api/v1/ui-session/logout", { method: "POST", credentials: "same-origin" });
+};
+
+window.homeca.persistBrowserSession = async (token) => {
+  await fetch("/api/v1/ui-session", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};

@@ -1,6 +1,6 @@
 # HomeCA UX contract
 
-The MudBlazor client is a local-admin tool. The session token exists only in the active server circuit and is cleared by **Abmelden**.
+The MudBlazor client is a local-admin tool. The bearer token exists only in the active server circuit. A browser-session HttpOnly cookie holds an opaque, server-side reference solely to survive a locale-triggered reload; **Abmelden** clears that reference.
 
 | Flow | Outcome | Feedback |
 |---|---|---|
@@ -13,5 +13,4 @@ The MudBlazor client is a local-admin tool. The session token exists only in the
 | Connector / backup test | Remain in settings | Show returned success or failure beside the operation |
 | Certificate, SSH certificate, ACME order, revocation or CRL action | Remain in the relevant work area | Persistent result or inline error plus a shared notification |
 
-The application uses German locale formatting. Native `select` controls are acceptable for the small fixed profile list. Destructive recovery actions are not exposed in the UI; restore remains a documented operator procedure.
-, auch die andern .md file prüfen
+The application defaults to English locale formatting. The shared language selector persists a browser-scoped choice using the ASP.NET Core request-culture cookie and takes effect after a reload; German is a production-supported alternative. Native `select` controls are acceptable for the small fixed profile list. Destructive recovery actions are not exposed in the UI; restore remains a documented operator procedure.

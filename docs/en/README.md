@@ -14,6 +14,8 @@ German file and its file with the same name here in sync whenever a technical pr
 | `ACME-SETUP.md` | [ACME setup](ACME-SETUP.md) |
 | `CONNECTORS.md` | [DNS connectors](CONNECTORS.md) |
 | `LXC-SETUP.md` | [Proxmox Debian LXC setup](LXC-SETUP.md) |
+| `localization-inventory.md` | [UI localization inventory](localization-inventory.md) |
+| `localization.md` | [Adding a HomeCA locale](localization.md) |
 | `SSH-USAGE.md` | [SSH certificates](SSH-USAGE.md) |
 | `SSL-USAGE.md` | [TLS certificates](SSL-USAGE.md) |
 | `TRUST-INSTALLATION.md` | [Root CA trust installation](TRUST-INSTALLATION.md) |

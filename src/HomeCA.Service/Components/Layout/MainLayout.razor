@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @using System.Reflection
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
 
 <MudThemeProvider Theme="@_theme" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -20,7 +21,7 @@
 @code {
     private string _version = string.Empty;
     private bool _isDarkMode;
-    private string ThemeToggleLabel => _isDarkMode ? "Helles Design aktivieren" : "Dunkles Design aktivieren";
+    private string ThemeToggleLabel => _isDarkMode ? Text["EnableLightTheme"] : Text["EnableDarkTheme"];
 
     private readonly MudTheme _theme = new()
     {
