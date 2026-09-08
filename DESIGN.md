@@ -46,7 +46,7 @@ Use MudBlazor's compact four-pixel radius consistently.
 
 ## Components
 
-Use MudBlazor components and their default control hierarchy. The global theme toggle switches the whole shell between accessible light and dark palettes. Status is communicated by text and semantic color. Forms keep errors inline.
+Use MudBlazor components and their default control hierarchy. The appearance menu switches the shell between accessible light and dark palettes, or follows the browser. Status is communicated by text and semantic color. Forms keep errors inline.
 
 ## Do's and Don'ts
 

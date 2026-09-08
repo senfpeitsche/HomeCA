@@ -56,6 +56,21 @@ window.homeca.addHelpCopyButtons = (label) => {
   });
 };
 
+// Per-browser preference. Guarded: private browsing can throw on access.
+window.homeca.getThemePreference = () => {
+  try {
+    return localStorage.getItem("homeca.theme");
+  } catch {
+    return null;
+  }
+};
+
+window.homeca.setThemePreference = (preference) => {
+  try {
+    localStorage.setItem("homeca.theme", preference);
+  } catch { }
+};
+
 window.homeca.setCulture = (culture) => {
   // ASP.NET Core's standard request-culture cookie. Reloading creates a new
   // Blazor circuit with the selected culture rather than mutating a live one.
