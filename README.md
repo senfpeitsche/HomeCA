@@ -24,7 +24,7 @@ HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Sy
 - Root CA and Intermediate CA management (ECC P-256 or RSA 3072)
 - TLS and mTLS certificate issuance with DNS and IP SANs
 - SSH host and user certificate signing
-- Internal ACME server for automated internal certificate provisioning
+- Internal ACME server for automated internal certificate provisioning, with optional allowlisted IP SANs resolved from validated DNS names
 - External ACME client (Let's Encrypt, etc.) with DNS-01 via Technitium or Hetzner DNS
 - 11 target system profiles: Proxmox, OPNsense, IIS/RDP, UniFi, HAProxy, Cisco, Huawei, Synology, TeamCity, Home Assistant, generic TLS
 - Export formats: PEM, key, chain, fullchain, bundle (HAProxy), PFX with issuing CA, and complete deployment-package ZIP downloads

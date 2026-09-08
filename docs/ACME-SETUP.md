@@ -415,6 +415,20 @@ Trage die Antwort `keyId` und `hmacKey` direkt im vorgesehenen ACME-Client ein u
 
 Die Allowlist wertet bewusst die IP der direkten TCP-Verbindung aus, nicht ungesicherte Forwarded-Header. Steht HomeCA hinter einem Reverse Proxy, sollte dessen IP **nicht** pauschal allowlistet werden: Sonst wuerden alle vom Proxy kommenden Clients EAB umgehen. In diesem Aufbau EAB verwenden oder die Zugangskontrolle am Proxy entsprechend restriktiv gestalten.
 
+### Optionale IP-SANs aus validierten DNS-Namen
+
+Für RFC-8555-Orders kann HomeCA zusätzlich die beim Ausstellen aufgelösten A- und AAAA-Adressen der erfolgreich validierten DNS-Namen als IP-SANs aufnehmen. Die Funktion ist anfangs deaktiviert. Sie akzeptiert keine frei vom ACME-Client angeforderten IP-Adressen.
+
+Hinterlege mindestens ein erlaubtes Netz, bevor du die Funktion aktivierst. Nur Adressen innerhalb dieser CIDR-Allowlist gelangen in das Zertifikat:
+
+```bash
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"allowedNetworks":["192.168.0.0/16","fd00::/8"]}' \
+  http://homeca.lab.example.com:5080/api/v1/acme/ip-san-policy
+```
+
+Die Richtlinie wird bei jeder neuen ACME-Ausstellung und Erneuerung neu ausgewertet. Bereits ausgestellte Zertifikate werden nicht verändert. Liefert die DNS-Auflösung keine Adresse innerhalb der Allowlist, bleibt das Zertifikat bei seinen DNS-SANs.
+
 - **Ablaufwarnungen:** `GET /api/v1/warnings/expiring` liefert Zertifikate, die innerhalb von 30 Tagen ablaufen. Integriere diesen Endpunkt in ein tägliches Monitoring.
 - **Backup:** Nach jeder ACME-Einrichtung ein verifiziertes Backup erzeugen, siehe [OPERATIONS.md](OPERATIONS.md).
 - **Zonenänderungen:** Wird eine Zone nachträglich auf `internalIssuanceEnabled: false` gesetzt, lehnt der ACME-Server neue Orders für diese Zone ab. Bestehende Zertifikate bleiben gültig.

@@ -2,15 +2,22 @@
 
 Installiere die HomeCA-Root-CA in jedem Client-Vertrauensspeicher. Für Unix-artige Systeme nutze den PEM-, für Windows den CER-Endpunkt.
 
+Bei einem HTTPS-Server, dessen Zertifikat von genau dieser Root-CA stammt,
+ist der erste Download ein Bootstrap-Schritt: Prüfe den Fingerabdruck der
+Root-CA vorher über einen unabhängigen administrativen Kanal und nutze
+`--insecure` nur für diesen ersten Abruf.
+
 ```sh
-curl -O http://HOMECA:5080/api/v1/trust-anchor/pem
+curl --fail --show-error --location --insecure -o homeca-root-ca.pem https://HOMECA:5443/api/v1/trust-anchor/pem
 ```
 
 > Die Root-CA gehört in den Vertrauensspeicher. Intermediate-CAs werden mit der TLS-Zertifikatskette ausgeliefert.
 
 ## Hinweise je Plattform
 
-Unter Debian oder Ubuntu die PEM-Datei nach `/usr/local/share/ca-certificates/` kopieren und `update-ca-certificates` ausführen. Unter Windows die CER-Datei in **Lokaler Computer → Vertrauenswürdige Stammzertifizierungsstellen** importieren. Für verwaltete Windows-Geräte die Root-CA über Gruppenrichtlinien verteilen.
+Unter Debian oder Ubuntu die PEM-Datei nach `/usr/local/share/ca-certificates/` kopieren und `update-ca-certificates` ausführen. Auf Proxmox-Knoten erfolgt das üblicherweise als `root`, daher ohne `sudo`. Unter Windows die CER-Datei in **Lokaler Computer → Vertrauenswürdige Stammzertifizierungsstellen** importieren. Für verwaltete Windows-Geräte die Root-CA über Gruppenrichtlinien verteilen.
+
+Auch Windows benötigt bei einer HTTPS-Instanz einen einmaligen Bootstrap-Abruf, weil das Server-Zertifikat vor der Root-CA-Installation noch nicht validiert werden kann. Führe dazu die Kopier-Anleitung als Administrator aus; sie verwendet die Zertifikatsausnahme nur für den ersten Download und prüft den Abruf danach ohne Ausnahme.
 
 | Plattform | Aktion für den Vertrauensanker |
 | --- | --- |

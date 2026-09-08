@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Formats.Asn1;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -26,6 +28,8 @@ public sealed class Rfc8555AcmeService
     private const string MalformedProblem = "malformed";
     private const string BadPublicKeyProblem = "badPublicKey";
     private readonly CertificateAuthorityService _authorities;
+    private readonly CertificateIssuanceService _certificates;
+    private readonly AcmeIpSanPolicyRegistry _ipSanPolicy;
     private readonly DomainRegistry _domains;
     private readonly HomeCaStorage _storage;
     private readonly IOptions<HomeCaStorageOptions> _options;
@@ -43,12 +47,16 @@ public sealed class Rfc8555AcmeService
 
     public Rfc8555AcmeService(
         CertificateAuthorityService authorities,
+        CertificateIssuanceService certificates,
+        AcmeIpSanPolicyRegistry ipSanPolicy,
         DomainRegistry domains,
         HomeCaStorage storage,
         IOptions<HomeCaStorageOptions> options,
         ILogger<Rfc8555AcmeService> logger)
     {
         _authorities = authorities;
+        _certificates = certificates;
+        _ipSanPolicy = ipSanPolicy;
         _domains = domains;
         _storage = storage;
         _options = options;
@@ -557,6 +565,25 @@ public sealed class Rfc8555AcmeService
         var san = new SubjectAlternativeNameBuilder();
         foreach (var name in dnsNames.Distinct(StringComparer.OrdinalIgnoreCase))
             san.AddDnsName(name);
+        var ipSanPolicy = await _ipSanPolicy.GetAsync(ct);
+        if (ipSanPolicy.Enabled)
+        {
+            var resolved = new HashSet<IPAddress>();
+            foreach (var name in dnsNames.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    foreach (var address in await Dns.GetHostAddressesAsync(name, ct))
+                        if (AcmeIpSanPolicyRegistry.IsAllowed(address, ipSanPolicy.AllowedNetworks)) resolved.Add(address);
+                }
+                catch (Exception exception) when (exception is SocketException or OperationCanceledException)
+                {
+                    if (exception is OperationCanceledException) throw;
+                    _logger.LogWarning(exception, "Could not resolve {DnsName} for optional ACME IP SANs", name);
+                }
+            }
+            foreach (var address in resolved) san.AddIpAddress(address);
+        }
         certRequest.CertificateExtensions.Add(san.Build());
         certRequest.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(pubKey, false));
         certRequest.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
@@ -594,6 +621,7 @@ public sealed class Rfc8555AcmeService
         var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
         await File.WriteAllTextAsync(Path.Combine(exportPath, "chain.pem"), chainPem, ct);
         await File.WriteAllTextAsync(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem, ct);
+        await _certificates.RegisterExistingCertificateAsync(id, ct);
 
         _logger.LogInformation("Issued RFC 8555 certificate {CertificateId} for {Subject}", id, subject);
         return id;

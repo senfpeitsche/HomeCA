@@ -82,6 +82,13 @@ namespace HomeCA.Service.Endpoints;
             catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [exception.Message] }); }
         });
         api.MapDelete("/acme/access-policy/eab-credentials/{keyId}", async (string keyId, AcmeAccessPolicyRegistry policy, CancellationToken ct) => await policy.RevokeEabAsync(keyId, ct) ? Results.NoContent() : Results.NotFound());
+
+        api.MapGet("/acme/ip-san-policy", async (AcmeIpSanPolicyRegistry policy, CancellationToken ct) => Results.Ok(await policy.GetAsync(ct)));
+        api.MapPut("/acme/ip-san-policy", async (UpdateAcmeIpSanPolicyRequest request, AcmeIpSanPolicyRegistry policy, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await policy.UpdateAsync(request, ct)); }
+            catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["allowedNetworks"] = [exception.Message] }); }
+        });
         
         // Renewal plans
     }

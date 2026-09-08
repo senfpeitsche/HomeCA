@@ -56,9 +56,14 @@ public sealed class Rfc8555AcmeServiceTests : IDisposable
         var storage = _fixture.CreateStorage();
         var authorities = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
         await authorities.InitializeAsync(CancellationToken.None);
+        var profiles = new TargetProfileRegistry(storage);
+        var deployments = new DeploymentPackageService(profiles, NullLogger<DeploymentPackageService>.Instance);
+        var revocations = new RevocationRegistry(storage, NullLogger<RevocationRegistry>.Instance);
+        var crl = new CrlService(storage, revocations, authorities, NullLogger<CrlService>.Instance);
+        var certificates = new CertificateIssuanceService(storage, deployments, authorities, revocations, crl, _fixture.CreateOptions(), NullLogger<CertificateIssuanceService>.Instance);
         var domains = new DomainRegistry(storage);
         await domains.AddAsync(new CreateDomainRequest("example.test", true, null), CancellationToken.None);
-        return new Rfc8555AcmeService(authorities, domains, storage, _fixture.CreateOptions(), NullLogger<Rfc8555AcmeService>.Instance);
+        return new Rfc8555AcmeService(authorities, certificates, new AcmeIpSanPolicyRegistry(storage), domains, storage, _fixture.CreateOptions(), NullLogger<Rfc8555AcmeService>.Instance);
     }
 
     private static byte[] CreateSignedJws(ECDsa key, string nonce, string url, string payload, out JsonObject jwk)

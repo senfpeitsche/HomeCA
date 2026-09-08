@@ -2,15 +2,22 @@
 
 Install the HomeCA Root CA in each client trust store. Use the PEM endpoint for Unix-like systems and the CER endpoint for Windows.
 
+When the HTTPS server certificate is issued by this very Root CA, the first
+download is a bootstrap step: verify the Root CA fingerprint through an
+independent administrative channel first, then use `--insecure` for this
+initial download only.
+
 ```sh
-curl -O http://HOMECA:5080/api/v1/trust-anchor/pem
+curl --fail --show-error --location --insecure -o homeca-root-ca.pem https://HOMECA:5443/api/v1/trust-anchor/pem
 ```
 
 > Install the Root CA in the trust store. Deliver Intermediate CAs with TLS certificate chains instead.
 
 ## Platform guidance
 
-On Debian or Ubuntu, copy the PEM file to `/usr/local/share/ca-certificates/` and run `update-ca-certificates`. On Windows, import the CER file into **Local Computer → Trusted Root Certification Authorities**. Distribute the Root CA through Group Policy for managed Windows devices.
+On Debian or Ubuntu, copy the PEM file to `/usr/local/share/ca-certificates/` and run `update-ca-certificates`. Proxmox nodes normally run these commands as `root`, so do not use `sudo` there. On Windows, import the CER file into **Local Computer → Trusted Root Certification Authorities**. Distribute the Root CA through Group Policy for managed Windows devices.
+
+Windows also needs a one-time bootstrap download for an HTTPS instance because the server certificate cannot be validated before the Root CA is installed. Run the copied instructions as an administrator; they use the certificate exception only for the first download and verify the endpoint without an exception afterwards.
 
 | Platform | Trust-anchor action |
 | --- | --- |

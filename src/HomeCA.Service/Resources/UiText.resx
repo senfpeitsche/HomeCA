@@ -863,4 +863,11 @@
   <data name="CertificateChain" xml:space="preserve"><value>Certificate chain</value></data>
   <data name="FullChain" xml:space="preserve"><value>Full chain</value></data>
   <data name="Bundle" xml:space="preserve"><value>Bundle</value></data>
+  <data name="AcmeIpSanTitle" xml:space="preserve"><value>Automatic ACME IP SANs</value></data>
+  <data name="AcmeIpSanDescription" xml:space="preserve"><value>For future DNS-validated ACME certificates, add resolved A and AAAA addresses that are within the allowed networks. Existing certificates are unchanged.</value></data>
+  <data name="AcmeIpSanEnabled" xml:space="preserve"><value>Add allowed resolved IP addresses</value></data>
+  <data name="AcmeIpSanNetworks" xml:space="preserve"><value>Allowed IP SAN networks</value></data>
+  <data name="AcmeIpSanNetworksHelper" xml:space="preserve"><value>One IP address or CIDR network per line, for example 192.168.10.0/24 or fd00::/8.</value></data>
+  <data name="SaveAcmeIpSanPolicy" xml:space="preserve"><value>Save IP SAN policy</value></data>
+  <data name="AcmeIpSanPolicySaved" xml:space="preserve"><value>ACME IP SAN policy saved.</value></data>
 </root>

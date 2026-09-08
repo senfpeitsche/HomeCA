@@ -203,6 +203,26 @@ The allowlist deliberately evaluates the direct TCP peer IP, not forwarded
 headers. Do not broadly allowlist a reverse proxy: it would let all proxied
 clients bypass EAB. Use EAB or enforce a restrictive proxy access policy.
 
+### Optional IP SANs from validated DNS names
+
+For RFC 8555 orders, HomeCA can additionally include A and AAAA addresses
+resolved while issuing the certificate from successfully validated DNS names as
+IP SANs. The feature is disabled initially. It never accepts arbitrary IP
+addresses requested by an ACME client.
+
+Configure at least one allowed network before enabling the feature. Only
+addresses within this CIDR allowlist are included in the certificate:
+
+```bash
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"allowedNetworks":["192.168.0.0/16","fd00::/8"]}' \
+  http://homeca.lab.example.com:5080/api/v1/acme/ip-san-policy
+```
+
+The policy is evaluated again for every new ACME issuance and renewal. Existing
+certificates are not modified. If DNS resolution produces no address inside the
+allowlist, the certificate keeps DNS SANs only.
+
 - Monitor `GET /api/v1/warnings/expiring` daily for certificates expiring
   within 30 days.
 - Create a verified backup after ACME setup; see [OPERATIONS.md](OPERATIONS.md).

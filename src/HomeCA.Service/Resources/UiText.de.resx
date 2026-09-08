@@ -863,4 +863,11 @@
   <data name="CertificateChain" xml:space="preserve"><value>Zertifikatskette</value></data>
   <data name="FullChain" xml:space="preserve"><value>Vollständige Kette</value></data>
   <data name="Bundle" xml:space="preserve"><value>Bündel</value></data>
+  <data name="AcmeIpSanTitle" xml:space="preserve"><value>Automatische ACME-IP-SANs</value></data>
+  <data name="AcmeIpSanDescription" xml:space="preserve"><value>Bei künftigen DNS-validierten ACME-Zertifikaten werden aufgelöste A- und AAAA-Adressen innerhalb der erlaubten Netze ergänzt. Bestehende Zertifikate bleiben unverändert.</value></data>
+  <data name="AcmeIpSanEnabled" xml:space="preserve"><value>Erlaubte aufgelöste IP-Adressen hinzufügen</value></data>
+  <data name="AcmeIpSanNetworks" xml:space="preserve"><value>Erlaubte IP-SAN-Netze</value></data>
+  <data name="AcmeIpSanNetworksHelper" xml:space="preserve"><value>Eine IP-Adresse oder ein CIDR-Netz pro Zeile, z. B. 192.168.10.0/24 oder fd00::/8.</value></data>
+  <data name="SaveAcmeIpSanPolicy" xml:space="preserve"><value>IP-SAN-Richtlinie speichern</value></data>
+  <data name="AcmeIpSanPolicySaved" xml:space="preserve"><value>ACME-IP-SAN-Richtlinie gespeichert.</value></data>
 </root>

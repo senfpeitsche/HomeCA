@@ -166,7 +166,12 @@ namespace HomeCA.Service.Endpoints;
             var teeResult = RunProcess("sudo", $"tee {overridePath}", overrideContent);
             if (!teeResult.Success)
                 return Results.Problem($"The systemd override could not be written: {teeResult.Error}");
-        
+
+            // Keep the persisted value in sync for installations that later
+            // remove the systemd override or change transport configuration.
+            var publicUrlPath = storage.GetConfigurationFilePath("public-url.conf");
+            await File.WriteAllTextAsync(publicUrlPath, tlsConfig.PublicUrl, ct);
+
             logger.LogInformation("Wrote systemd TLS override to {Path} via sudo", overridePath);
         
             // Reload systemd to pick up the override, then restart the service

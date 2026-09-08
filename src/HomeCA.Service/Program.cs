@@ -48,6 +48,7 @@ builder.Services.AddSingleton<IDnsConnector, HetznerDnsConnector>();
 builder.Services.AddSingleton<ConnectorCatalog>();
 builder.Services.AddSingleton<ConnectorRegistry>();
 builder.Services.AddSingleton<AcmeAccessPolicyRegistry>();
+builder.Services.AddSingleton<AcmeIpSanPolicyRegistry>();
 builder.Services.AddSingleton<ExternalAcmeIssuerRegistry>();
 builder.Services.AddSingleton<ExternalAcmeService>();
 builder.Services.AddSingleton<Rfc8555AcmeService>();
@@ -114,7 +115,10 @@ localizationOptions.RequestCultureProviders =
 {
     var storage = app.Services.GetRequiredService<HomeCaStorage>();
     var publicUrlPath = storage.GetConfigurationFilePath("public-url.conf");
-    if (File.Exists(publicUrlPath))
+    // A systemd environment override is authoritative. In particular, TLS
+    // activation installs Storage__PublicUrl with the HTTPS endpoint; an older
+    // persisted HTTP URL must not overwrite it on the subsequent restart.
+    if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("Storage__PublicUrl")) && File.Exists(publicUrlPath))
     {
         var savedUrl = File.ReadAllText(publicUrlPath).Trim();
         if (!string.IsNullOrEmpty(savedUrl))

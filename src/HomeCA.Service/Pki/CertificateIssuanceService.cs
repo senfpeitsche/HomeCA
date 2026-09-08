@@ -34,6 +34,23 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         return result;
     }
 
+    /// <summary>Adds a certificate already retained in HomeCA storage to the shared inventory.
+    /// This is used for ACME certificates, whose private key remains with the ACME client.</summary>
+    public async Task RegisterExistingCertificateAsync(string id, CancellationToken cancellationToken)
+    {
+        var pfxPath = Path.Combine(_certificateRoot, id, "certificate.pfx");
+        if (!File.Exists(pfxPath)) throw new FileNotFoundException("Certificate file was not found.", pfxPath);
+
+        using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+        await AddToInventoryAsync(new CertificateInventoryItem(
+            id,
+            certificate.Subject,
+            certificate.NotBefore,
+            certificate.NotAfter,
+            certificate.PublicKey.Oid?.FriendlyName ?? "Unknown",
+            Path.Combine(_exportRoot, id)), cancellationToken);
+    }
+
     /// <summary>Returns detailed certificate metadata including SANs, extensions, fingerprint and issuer chain.</summary>
     public Task<CertificateDetails?> GetDetailsAsync(string id, CancellationToken cancellationToken)
     {
@@ -200,20 +217,30 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         await _inventoryGate.WaitAsync(ct);
         try
         {
+            var items = new List<CertificateInventoryItem>();
             if (File.Exists(_inventoryPath))
             {
                 await using var stream = File.OpenRead(_inventoryPath);
-                return await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(stream, cancellationToken: ct) ?? [];
+                items = await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(stream, cancellationToken: ct) ?? [];
             }
-            if (!Directory.Exists(_certificateRoot)) return [];
-            var items = new List<CertificateInventoryItem>();
+            if (!Directory.Exists(_certificateRoot)) return items;
+
+            // ACME certificates are retained without a private key. Older versions
+            // wrote those files but did not add an inventory entry; reconcile any
+            // retained certificate missing from the index on every inventory load.
+            var knownIds = items.Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var changed = false;
             foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
             {
                 var pfxPath = Path.Combine(directory, "certificate.pfx"); if (!File.Exists(pfxPath)) continue;
+                var id = Path.GetFileName(directory);
+                if (knownIds.Contains(id)) continue;
                 using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
-                items.Add(new(Path.GetFileName(directory), certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, Path.GetFileName(directory))));
+                items.Add(new(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, id)));
+                changed = true;
             }
-            await WriteInventoryAsync(items, ct); return items;
+            if (changed || !File.Exists(_inventoryPath)) await WriteInventoryAsync(items, ct);
+            return items;
         }
         finally { _inventoryGate.Release(); }
     }
