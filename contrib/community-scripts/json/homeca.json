@@ -1,0 +1,62 @@
+{
+    "name": "HomeCA",
+    "slug": "homeca",
+    "categories": [
+        6
+    ],
+    "date_created": "2026-09-08",
+    "type": "ct",
+    "updateable": true,
+    "privileged": false,
+    "architectures": ["amd64"],
+    "interface_port": 5080,
+    "documentation": "https://github.com/senfpeitsche/HomeCA/blob/main/docs/README.md",
+    "website": "https://github.com/senfpeitsche/HomeCA",
+    "repository": "https://github.com/senfpeitsche/HomeCA",
+    "logo": "TODO-submit-icon-to-selfh.st-then-use-https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/homeca.webp",
+    "description": "HomeCA is a self-hosted, minimal PKI for homelabs. It manages root and issuing CAs, issues TLS/mTLS and SSH certificates, distributes trust anchors and handles ACME flows from a single service with a built-in web UI. It ships an internal ACME server, an external ACME client with DNS-01 support, CRL generation and distribution, target-system profiles for Proxmox, OPNsense, UniFi, HAProxy, Synology and others, plus encrypted backups. All state is file-based, so no external database is required.",
+    "install_methods": [
+        {
+            "type": "default",
+            "script": "ct/homeca.sh",
+            "config_path": "/etc/systemd/system/homeca.service",
+            "resources": {
+                "cpu": 2,
+                "ram": 2048,
+                "hdd": 8,
+                "os": "Debian",
+                "version": "13"
+            }
+        }
+    ],
+    "default_credentials": {
+        "username": "admin",
+        "password": "admin"
+    },
+    "notes": [
+        {
+            "text": "Log in at http://IP:5080 with admin/admin. HomeCA forces a password change on first login before anything else can be done.",
+            "type": "warning"
+        },
+        {
+            "text": "Two 32-byte keys are generated during installation: /etc/homeca/ca.key protects the CA private keys at rest and /etc/homeca/backup.key encrypts backups. Copy both out of the container and store them somewhere safe. Without ca.key the certificate authority cannot be recovered, and without backup.key its backups cannot be decrypted.",
+            "type": "warning"
+        },
+        {
+            "text": "The service listens on port 5080 over plain HTTP so the PKI is reachable on the LAN. Do not expose it to the Internet. Activate TLS in the web UI after the first login, which switches the service to https://HOSTNAME:5443.",
+            "type": "warning"
+        },
+        {
+            "text": "The CRL distribution point embedded in issued certificates is set to http://IP:5080 at install time. If the container gets a different address or a DNS name later, update the public URL in the web UI before issuing certificates, otherwise revocation checks will fail.",
+            "type": "info"
+        },
+        {
+            "text": "Persistent state lives in /var/lib/homeca (CAs, issued certificates, audit log), configuration in /etc/homeca and backups in /var/backups/homeca. Updates only replace /opt/homeca, so these survive. Include all three in regular backups.",
+            "type": "info"
+        },
+        {
+            "text": "1 vCPU and 1024 MB RAM are sufficient for small homelabs; the defaults above leave headroom for certificate issuance and the background renewal service.",
+            "type": "info"
+        }
+    ]
+}

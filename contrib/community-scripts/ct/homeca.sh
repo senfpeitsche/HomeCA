@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Engine comes from community-scripts/core; this repo only ships the scripts.
+# A local core checkout wins (COMMUNITY_SCRIPTS_CORE_DIR, else a sibling ../core),
+# so a fork or branch of core can be tested without editing this file.
+_cs_boot="${COMMUNITY_SCRIPTS_CORE_DIR:-$(dirname "${BASH_SOURCE[0]}")/../../core}/core/build.func"
+source "$_cs_boot" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_CORE_URL:-https://raw.githubusercontent.com/community-scripts/core/main}/core/build.func")
+# Copyright (c) 2021-2026 community-scripts ORG
+# Author: senfpeitsche
+# License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
+# Source: https://github.com/senfpeitsche/HomeCA
+
+APP="HomeCA"
+var_tags="${var_tags:-security;pki;certificates}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-8}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-13}"
+var_unprivileged="${var_unprivileged:-1}"
+var_arm64="${var_arm64:-no}" # upstream publishes a linux-x64 build only
+#var_testurl="${var_testurl:-https://github.com/community-scripts/ProxmoxVED/issues/PLACEHOLDER}"
+
+header_info "$APP"
+variables
+color
+catch_errors
+
+function update_script() {
+  header_info
+  check_container_storage
+  check_container_resources
+
+  if [[ ! -d /opt/homeca ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+
+  if check_for_gh_release "homeca" "senfpeitsche/HomeCA"; then
+    msg_info "Stopping Service"
+    systemctl stop homeca
+    msg_ok "Stopped Service"
+
+    # State lives in /var/lib/homeca and /etc/homeca, so /opt can be replaced wholesale.
+    CLEAN_INSTALL=1 fetch_and_deploy_gh_release "homeca" "senfpeitsche/HomeCA" "prebuild" "latest" "/opt/homeca" "homeca-linux-x64.tar.gz"
+
+    msg_info "Starting Service"
+    systemctl start homeca
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
+  fi
+  exit
+}
+
+start
+build_container
+description
+
+msg_ok "Completed Successfully!\n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW}Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:5080${CL}"
