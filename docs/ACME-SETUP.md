@@ -307,7 +307,7 @@ Für einen ACME-Client, dessen Quellnetz nicht in der HomeCA-Allowlist steht, we
 
 3. Auf **Save** klicken.
 
-> **Warum HTTP-01?** HomeCA liefert für RFC 8555 eine HTTP-01-Challenge und setzt sie nach der Bestätigung durch den Client automatisch auf `valid`; eine externe Validierung findet nicht statt. HTTP-01 ist daher die passende und einfachste Wahl, weil keine DNS-API-Credentials nötig sind. DNS-01 oder TLS-ALPN-01 passen nicht zu der von HomeCA angebotenen Challenge.
+> **Warum HTTP-01?** HomeCA bietet HTTP-01 für den internen RFC-8555-Server an. Der ACME-Client muss die von HomeCA gelieferte Key-Authorization unter `http://<DNS-Name>/.well-known/acme-challenge/<Token>` ausliefern. Erst wenn HomeCA diesen Inhalt abrufen und prüfen kann, wird die Authorization gültig. Die IP-Allowlist beziehungsweise EAB bleibt weiterhin die Zugangskontrolle für die Kontoerstellung.
 
 ### 3.4 Automation anlegen (optional, aber empfohlen)
 

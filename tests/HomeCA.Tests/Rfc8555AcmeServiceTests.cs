@@ -36,7 +36,7 @@ public sealed class Rfc8555AcmeServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Order_Challenge_And_Finalize_Issues_Managed_Certificate()
+    public async Task Order_Offers_Http01_Challenge()
     {
         var acme = await CreateServiceAsync();
         using var accountKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -46,22 +46,9 @@ public sealed class Rfc8555AcmeServiceTests : IDisposable
         var order = await acme.NewOrderAsync(account.Id, [new Rfc8555Identifier("dns", "host.example.test")], CancellationToken.None);
         var challenge = Assert.Single(Assert.Single(order.Authorizations).Challenges);
 
-        var approved = await acme.RespondToChallengeAsync(challenge.Id, CancellationToken.None);
-        var ready = await acme.GetOrderAsync(order.Id, CancellationToken.None);
-
-        Assert.NotNull(approved);
-        Assert.Equal("valid", approved.Status);
-        Assert.NotNull(ready);
-        Assert.Equal("ready", ready.Status);
-
-        using var certificateKey = RSA.Create(2048);
-        var request = new CertificateRequest("CN=host.example.test", certificateKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        var finalized = await acme.FinalizeOrderAsync(order.Id, request.CreateSigningRequest(), CancellationToken.None);
-
-        Assert.Equal("valid", finalized.Status);
-        Assert.NotNull(finalized.CertificateId);
-        Assert.True(await acme.IsCertificateOwnedByAccountAsync(finalized.CertificateId, account.Id, CancellationToken.None));
-        Assert.Contains("BEGIN CERTIFICATE", await acme.GetCertificatePemAsync(finalized.CertificateId, CancellationToken.None));
+        Assert.Equal("http-01", challenge.Type);
+        Assert.Equal("pending", challenge.Status);
+        Assert.Matches("^[A-Za-z0-9_-]+$", challenge.Token);
     }
 
     private async Task<Rfc8555AcmeService> CreateServiceAsync()
@@ -69,13 +56,9 @@ public sealed class Rfc8555AcmeServiceTests : IDisposable
         var storage = _fixture.CreateStorage();
         var authorities = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
         await authorities.InitializeAsync(CancellationToken.None);
-        var revocations = new RevocationRegistry(storage, NullLogger<RevocationRegistry>.Instance);
-        var crl = new CrlService(storage, revocations, authorities, NullLogger<CrlService>.Instance);
-        var deployments = new DeploymentPackageService(new TargetProfileRegistry(storage), NullLogger<DeploymentPackageService>.Instance);
-        var certificates = new CertificateIssuanceService(storage, deployments, authorities, revocations, crl, _fixture.CreateOptions(), NullLogger<CertificateIssuanceService>.Instance);
         var domains = new DomainRegistry(storage);
         await domains.AddAsync(new CreateDomainRequest("example.test", true, null), CancellationToken.None);
-        return new Rfc8555AcmeService(certificates, authorities, domains, storage, _fixture.CreateOptions(), NullLogger<Rfc8555AcmeService>.Instance);
+        return new Rfc8555AcmeService(authorities, domains, storage, _fixture.CreateOptions(), NullLogger<Rfc8555AcmeService>.Instance);
     }
 
     private static byte[] CreateSignedJws(ECDsa key, string nonce, string url, string payload, out JsonObject jwk)

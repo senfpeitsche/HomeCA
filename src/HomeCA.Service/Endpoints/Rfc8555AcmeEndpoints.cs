@@ -16,6 +16,9 @@ using System.Security.Cryptography.X509Certificates;
 namespace HomeCA.Service.Endpoints;
  static class Rfc8555AcmeEndpoints
 {
+    private const string UnauthorizedProblem = "unauthorized";
+    private const string ServerInternalProblem = "serverInternal";
+    private const string MalformedProblem = "malformed";
     public static void MapRfc8555AcmeEndpoints(this IEndpointRouteBuilder endpoints)
     {
         {
@@ -120,7 +123,7 @@ namespace HomeCA.Service.Endpoints;
                     logger.LogInformation("ACME newAccount: registered/found account {AccountId}, url={Url}", account.Id, accountUrl);
                     return Results.Json(new { status = account.Status, contact = account.Contact, orders = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{account.Id}/orders" }, statusCode: 201);
                 }
-                catch (AcmeProblemException ex) { logger.LogWarning("ACME newAccount error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
+                catch (AcmeProblemException ex) { logger.LogWarning(ex, "ACME newAccount error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
                 catch (Exception ex) { logger.LogError(ex, "ACME newAccount internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
             });
         
@@ -160,7 +163,7 @@ namespace HomeCA.Service.Endpoints;
                     // Verify signature with stored key.
                     var storedJwk = System.Text.Json.Nodes.JsonNode.Parse(account.JwkJson)?.AsObject()!;
                     var alg = jws.ProtectedHeader["alg"]?.GetValue<string>() ?? "ES256";
-                    acme.VerifySignatureWithStoredKey(storedJwk, alg, body);
+                    Rfc8555AcmeService.VerifySignatureWithStoredKey(storedJwk, alg, body);
         
                     var payload = System.Text.Json.Nodes.JsonNode.Parse(jws.Payload)?.AsObject()
                         ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Order payload is required.");
@@ -194,7 +197,7 @@ namespace HomeCA.Service.Endpoints;
                 {
                     var body = await ReadBodyAsync(ctx.Request);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/order/{orderId}";
-                    var jws = acme.VerifyJws(body, expectedUrl);
+                    _ = acme.VerifyJws(body, expectedUrl);
         
                     var order = await acme.GetOrderAsync(orderId, ct);
                     if (order is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Order not found.", 404));
@@ -214,7 +217,7 @@ namespace HomeCA.Service.Endpoints;
                     var body = await ReadBodyAsync(ctx.Request);
                     logger.LogInformation("ACME authz: {AuthzId} from {Remote}", authzId, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/authz/{authzId}";
-                    var jws = acme.VerifyJws(body, expectedUrl);
+                    _ = acme.VerifyJws(body, expectedUrl);
         
                     var authz = await acme.GetAuthorizationAsync(authzId, ct);
                     if (authz is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Authorization not found.", 404));
@@ -249,12 +252,19 @@ namespace HomeCA.Service.Endpoints;
                     logger.LogInformation("ACME challenge: {ChallengeId}, payload={PayloadLen} bytes from {Remote}", challengeId, body.Length, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/chall/{challengeId}";
                     var jws = acme.VerifyJws(body, expectedUrl);
+                    var account = await acme.FindAccountByKidAsync(jws.Kid ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Challenge requests must use an account key."), ct)
+                        ?? throw Rfc8555AcmeService.AcmeProblem("unauthorized", "Account not found.", 403);
+                    var storedJwk = System.Text.Json.Nodes.JsonNode.Parse(account.JwkJson)?.AsObject()
+                        ?? throw Rfc8555AcmeService.AcmeProblem("serverInternal", "Stored account key is invalid.", 500);
+                    var algorithm = jws.ProtectedHeader["alg"]?.GetValue<string>()
+                        ?? throw Rfc8555AcmeService.AcmeProblem("badSignatureAlgorithm", "Missing JWS algorithm.");
+                    Rfc8555AcmeService.VerifySignatureWithStoredKey(storedJwk, algorithm, body);
         
                     Rfc8555Challenge? challenge;
                     if (jws.Payload.Length > 0)
                     {
-                        // Client is responding to the challenge — auto-approve it.
-                        challenge = await acme.RespondToChallengeAsync(challengeId, ct);
+                        // Client has published the key authorization; validate the HTTP-01 resource.
+                        challenge = await acme.RespondToChallengeAsync(challengeId, account.Id, ct);
                     }
                     else
                     {
@@ -323,7 +333,7 @@ namespace HomeCA.Service.Endpoints;
                     var body = await ReadBodyAsync(ctx.Request);
                     logger.LogInformation("ACME cert download: {CertificateId} from {Remote}", certificateId, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/cert/{certificateId}";
-                    var jws = acme.VerifyJws(body, expectedUrl);
+                    _ = acme.VerifyJws(body, expectedUrl);
         
                     var pem = await acme.GetCertificatePemAsync(certificateId, ct);
                     if (pem is null) { logger.LogWarning("ACME cert {CertificateId}: not found", certificateId); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Certificate not found.", 404)); }
@@ -332,7 +342,7 @@ namespace HomeCA.Service.Endpoints;
                     AddAcmeHeaders(ctx, acme);
                     return Results.Text(pem, "application/pem-certificate-chain");
                 }
-                catch (AcmeProblemException ex) { logger.LogWarning("ACME cert download error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
+                catch (AcmeProblemException ex) { logger.LogWarning(ex, "ACME cert download error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
                 catch (Exception ex) { logger.LogError(ex, "ACME cert download internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
             });
         
@@ -364,7 +374,7 @@ namespace HomeCA.Service.Endpoints;
                             ?? throw Rfc8555AcmeService.AcmeProblem("serverInternal", "Stored account key is invalid.", 500);
                         var algorithm = jws.ProtectedHeader["alg"]?.GetValue<string>()
                             ?? throw Rfc8555AcmeService.AcmeProblem("badSignatureAlgorithm", "Missing JWS algorithm.");
-                        acme.VerifySignatureWithStoredKey(storedJwk, algorithm, body);
+                        Rfc8555AcmeService.VerifySignatureWithStoredKey(storedJwk, algorithm, body);
                         if (!await acme.IsCertificateOwnedByAccountAsync(certificateId, account.Id, ct))
                             throw Rfc8555AcmeService.AcmeProblem("unauthorized", "Account does not own this certificate.");
                     }
@@ -476,7 +486,5 @@ namespace HomeCA.Service.Endpoints;
     private sealed record Rfc8555IdentifierDto(string Type, string Value);
     private sealed record Rfc8555ChallengeDetailsDto(string Id, string Type, string Status, DateTimeOffset? ValidatedAt);
     private sealed record Rfc8555AuthorizationDetailsDto(string Id, Rfc8555IdentifierDto Identifier, string Status, DateTimeOffset Expires, IReadOnlyList<Rfc8555ChallengeDetailsDto> Challenges);
-    private sealed record Rfc8555OrderDetailsDto(string Id, string AccountId, IReadOnlyList<Rfc8555IdentifierDto> Identifiers, string Status, DateTimeOffset CreatedAt, DateTimeOffset Expires, string? CertificateId, string? Error, IReadOnlyList<Rfc8555AuthorizationDetailsDto> Authorizations);
     private sealed record Rfc8555AccountOrderDto(string Id, string Status, DateTimeOffset CreatedAt);
-    private sealed record Rfc8555AccountDetailsDto(string Id, string Thumbprint, string[] Contact, string Status, DateTimeOffset CreatedAt, IReadOnlyList<Rfc8555AccountOrderDto> Orders);
 }

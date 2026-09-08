@@ -10,10 +10,10 @@ Configure an allowed issuance zone before requesting certificates. Do not use `/
 
 ## Setup checklist
 
-1. Configure the issuing zone and associate its DNS connector.
-2. Test connector access and a TXT record round trip.
-3. Decide whether the client is covered by the network allowlist or needs EAB.
-4. Configure the ACME client with the RFC 8555 directory URL above.
+1. Configure the issuing zone.
+2. Decide whether the client is covered by the network allowlist or needs EAB.
+3. Configure the ACME client with the RFC 8555 directory URL above.
+4. Choose HTTP-01 for internal issuance, or configure a DNS connector for an external DNS-01 issuer.
 5. Verify the resulting order and certificate in the HomeCA inventory.
 
 ## Client access
@@ -27,6 +27,10 @@ Use a direct client IP address or CIDR network in the allowlist. Do not allowlis
 Associate the issuance zone with a configured DNS connector before using DNS-01. Test the connector and its TXT-record permission first. Keep ACME account and order IDs unchanged when diagnosing client issues.
 
 Before production use, run the connector check and a TXT test from **Settings**. A successful connection alone is not enough: the configured token must be allowed to create and remove records in the selected zone.
+
+## Internal HTTP-01 issuance
+
+For HomeCA's internal RFC 8555 server, configure the client to answer HTTP-01 and expose the key authorization at `http://<DNS-name>/.well-known/acme-challenge/<token>`. HomeCA fetches this URL after the client responds to the ACME challenge; the authorization becomes valid only when the response matches. The client must be reachable from HomeCA, but it does not need public Internet exposure.
 
 Use an external ACME issuer only when a publicly trusted certificate is required. Keep internal HomeCA issuance for services whose clients already trust the HomeCA Root CA.
 

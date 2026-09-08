@@ -16,19 +16,21 @@ namespace HomeCA.Service.Acme;
 /// RFC 8555-compliant ACME server that wraps the existing HomeCA internal issuance pipeline.
 /// Speaks the real ACME wire protocol (JWS-signed requests, nonces, proper resource types)
 /// so that standard clients like acme.sh, certbot, and OPNsense can obtain certificates.
-/// <para>
-/// Because HomeCA is a trusted internal CA, challenge validation is auto-approved: authorizations
-/// move to "valid" immediately, so clients never need to provision DNS or HTTP challenge responses.
-/// </para>
 /// </summary>
 public sealed class Rfc8555AcmeService
 {
-    private readonly CertificateIssuanceService _certificates;
+    private const string Valid = "valid";
+    private const string Invalid = "invalid";
+    private const string Pending = "pending";
+    private const string UnauthorizedProblem = "unauthorized";
+    private const string MalformedProblem = "malformed";
+    private const string BadPublicKeyProblem = "badPublicKey";
     private readonly CertificateAuthorityService _authorities;
     private readonly DomainRegistry _domains;
     private readonly HomeCaStorage _storage;
     private readonly IOptions<HomeCaStorageOptions> _options;
     private readonly ILogger<Rfc8555AcmeService> _logger;
+    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     // Nonce pool — simple set with bounded size, oldest removed when full.
@@ -40,14 +42,12 @@ public sealed class Rfc8555AcmeService
     private readonly string _ordersPath;
 
     public Rfc8555AcmeService(
-        CertificateIssuanceService certificates,
         CertificateAuthorityService authorities,
         DomainRegistry domains,
         HomeCaStorage storage,
         IOptions<HomeCaStorageOptions> options,
         ILogger<Rfc8555AcmeService> logger)
     {
-        _certificates = certificates;
         _authorities = authorities;
         _domains = domains;
         _storage = storage;
@@ -85,14 +85,14 @@ public sealed class Rfc8555AcmeService
     /// </summary>
     public JwsVerificationResult VerifyJws(byte[] body, string expectedUrl)
     {
-        var json = JsonNode.Parse(body) ?? throw AcmeProblem("malformed", "Request body is not valid JSON.");
+        var json = JsonNode.Parse(body) ?? throw AcmeProblem(MalformedProblem, "Request body is not valid JSON.");
 
-        var protectedB64 = json["protected"]?.GetValue<string>() ?? throw AcmeProblem("malformed", "Missing 'protected' header.");
-        var payloadB64 = json["payload"]?.GetValue<string>() ?? throw AcmeProblem("malformed", "Missing 'payload' field.");
-        var signatureB64 = json["signature"]?.GetValue<string>() ?? throw AcmeProblem("malformed", "Missing 'signature' field.");
+        var protectedB64 = json["protected"]?.GetValue<string>() ?? throw AcmeProblem(MalformedProblem, "Missing 'protected' header.");
+        var payloadB64 = json["payload"]?.GetValue<string>() ?? throw AcmeProblem(MalformedProblem, "Missing 'payload' field.");
+        var signatureB64 = json["signature"]?.GetValue<string>() ?? throw AcmeProblem(MalformedProblem, "Missing 'signature' field.");
 
         var protectedBytes = Base64UrlDecode(protectedB64);
-        var header = JsonNode.Parse(protectedBytes)?.AsObject() ?? throw AcmeProblem("malformed", "Protected header is not valid JSON.");
+        var header = JsonNode.Parse(protectedBytes)?.AsObject() ?? throw AcmeProblem(MalformedProblem, "Protected header is not valid JSON.");
 
         // Verify nonce.
         var nonce = header["nonce"]?.GetValue<string>() ?? throw AcmeProblem("badNonce", "Missing nonce in protected header.");
@@ -100,7 +100,7 @@ public sealed class Rfc8555AcmeService
 
         // Verify url.
         var url = header["url"]?.GetValue<string>();
-        if (url != expectedUrl) throw AcmeProblem("unauthorized", $"URL mismatch: expected '{expectedUrl}', got '{url}'.");
+        if (url != expectedUrl) throw AcmeProblem(UnauthorizedProblem, $"URL mismatch: expected '{expectedUrl}', got '{url}'.");
 
         // Determine algorithm.
         var alg = header["alg"]?.GetValue<string>() ?? throw AcmeProblem("badSignatureAlgorithm", "Missing 'alg' in protected header.");
@@ -108,8 +108,8 @@ public sealed class Rfc8555AcmeService
         // Extract the public key — either from 'jwk' (new account) or 'kid' (existing account).
         JsonObject? jwk = header["jwk"]?.AsObject();
         string? kid = header["kid"]?.GetValue<string>();
-        if (jwk is null && kid is null) throw AcmeProblem("malformed", "Protected header must contain 'jwk' or 'kid'.");
-        if (jwk is not null && kid is not null) throw AcmeProblem("malformed", "Protected header must not contain both 'jwk' and 'kid'.");
+        if (jwk is null && kid is null) throw AcmeProblem(MalformedProblem, "Protected header must contain 'jwk' or 'kid'.");
+        if (jwk is not null && kid is not null) throw AcmeProblem(MalformedProblem, "Protected header must not contain both 'jwk' and 'kid'.");
 
         // Verify signature.
         var signatureInput = Encoding.ASCII.GetBytes($"{protectedB64}.{payloadB64}");
@@ -128,12 +128,12 @@ public sealed class Rfc8555AcmeService
     }
 
     /// <summary>Verifies a JWS for POST-as-GET requests (empty payload) using a stored account JWK.</summary>
-    public void VerifySignatureWithStoredKey(JsonObject storedJwk, string alg, byte[] body)
+    public static void VerifySignatureWithStoredKey(JsonObject storedJwk, string alg, byte[] body)
     {
-        var json = JsonNode.Parse(body) ?? throw AcmeProblem("malformed", "Request body is not valid JSON.");
-        var protectedB64 = json["protected"]?.GetValue<string>() ?? throw AcmeProblem("malformed", "Missing 'protected'.");
-        var payloadB64 = json["payload"]?.GetValue<string>() ?? throw AcmeProblem("malformed", "Missing 'payload'.");
-        var signatureB64 = json["signature"]?.GetValue<string>() ?? throw AcmeProblem("malformed", "Missing 'signature'.");
+        var json = JsonNode.Parse(body) ?? throw AcmeProblem(MalformedProblem, "Request body is not valid JSON.");
+        var protectedB64 = json["protected"]?.GetValue<string>() ?? throw AcmeProblem(MalformedProblem, "Missing 'protected'.");
+        var payloadB64 = json["payload"]?.GetValue<string>() ?? throw AcmeProblem(MalformedProblem, "Missing 'payload'.");
+        var signatureB64 = json["signature"]?.GetValue<string>() ?? throw AcmeProblem(MalformedProblem, "Missing 'signature'.");
 
         var signatureInput = Encoding.ASCII.GetBytes($"{protectedB64}.{payloadB64}");
         var signature = Base64UrlDecode(signatureB64);
@@ -142,20 +142,20 @@ public sealed class Rfc8555AcmeService
 
     private static void VerifySignatureWithJwk(JsonObject jwk, string alg, byte[] data, byte[] signature)
     {
-        var kty = jwk["kty"]?.GetValue<string>() ?? throw AcmeProblem("badPublicKey", "Missing 'kty' in JWK.");
+        var kty = jwk["kty"]?.GetValue<string>() ?? throw AcmeProblem(BadPublicKeyProblem, "Missing 'kty' in JWK.");
 
         if (kty == "EC")
         {
             var crv = jwk["crv"]?.GetValue<string>() ?? "P-256";
-            var x = Base64UrlDecode(jwk["x"]?.GetValue<string>() ?? throw AcmeProblem("badPublicKey", "Missing 'x'."));
-            var y = Base64UrlDecode(jwk["y"]?.GetValue<string>() ?? throw AcmeProblem("badPublicKey", "Missing 'y'."));
+            var x = Base64UrlDecode(jwk["x"]?.GetValue<string>() ?? throw AcmeProblem(BadPublicKeyProblem, "Missing 'x'."));
+            var y = Base64UrlDecode(jwk["y"]?.GetValue<string>() ?? throw AcmeProblem(BadPublicKeyProblem, "Missing 'y'."));
 
             var curve = crv switch
             {
                 "P-256" => ECCurve.NamedCurves.nistP256,
                 "P-384" => ECCurve.NamedCurves.nistP384,
                 "P-521" => ECCurve.NamedCurves.nistP521,
-                _ => throw AcmeProblem("badPublicKey", $"Unsupported curve: {crv}")
+                _ => throw AcmeProblem(BadPublicKeyProblem, $"Unsupported curve: {crv}")
             };
             var hashAlg = alg switch
             {
@@ -168,12 +168,12 @@ public sealed class Rfc8555AcmeService
             using var ecdsa = ECDsa.Create(new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } });
             // acme.sh sends the signature in JWS format (r || s, raw integers), need to convert to DER for .NET.
             if (!ecdsa.VerifyData(data, ConvertJwsEcSignatureToDer(signature, x.Length), hashAlg, DSASignatureFormat.Rfc3279DerSequence))
-                throw AcmeProblem("unauthorized", "Invalid JWS signature.");
+                throw AcmeProblem(UnauthorizedProblem, "Invalid JWS signature.");
         }
         else if (kty == "RSA")
         {
-            var n = Base64UrlDecode(jwk["n"]?.GetValue<string>() ?? throw AcmeProblem("badPublicKey", "Missing 'n'."));
-            var e = Base64UrlDecode(jwk["e"]?.GetValue<string>() ?? throw AcmeProblem("badPublicKey", "Missing 'e'."));
+            var n = Base64UrlDecode(jwk["n"]?.GetValue<string>() ?? throw AcmeProblem(BadPublicKeyProblem, "Missing 'n'."));
+            var e = Base64UrlDecode(jwk["e"]?.GetValue<string>() ?? throw AcmeProblem(BadPublicKeyProblem, "Missing 'e'."));
 
             var hashAlg = alg switch
             {
@@ -185,11 +185,11 @@ public sealed class Rfc8555AcmeService
 
             using var rsa = RSA.Create(new RSAParameters { Modulus = n, Exponent = e });
             if (!rsa.VerifyData(data, signature, hashAlg, RSASignaturePadding.Pkcs1))
-                throw AcmeProblem("unauthorized", "Invalid JWS signature.");
+                throw AcmeProblem(UnauthorizedProblem, "Invalid JWS signature.");
         }
         else
         {
-            throw AcmeProblem("badPublicKey", $"Unsupported key type: {kty}");
+            throw AcmeProblem(BadPublicKeyProblem, $"Unsupported key type: {kty}");
         }
     }
 
@@ -233,7 +233,7 @@ public sealed class Rfc8555AcmeService
 
             var id = Guid.NewGuid().ToString("N");
             var contacts = contact is not null ? [contact.StartsWith("mailto:") ? contact : $"mailto:{contact}"] : Array.Empty<string>();
-            var account = new Rfc8555Account(id, thumbprint, contacts, "valid", DateTimeOffset.UtcNow, JsonSerializer.Serialize(jwk));
+            var account = new Rfc8555Account(id, thumbprint, contacts, Valid, DateTimeOffset.UtcNow, JsonSerializer.Serialize(jwk));
             accounts.Add(account);
             await WriteAsync(_accountsPath, accounts, ct);
             _logger.LogInformation("Registered RFC 8555 account {AccountId} (thumbprint {Thumbprint})", id, thumbprint);
@@ -245,7 +245,8 @@ public sealed class Rfc8555AcmeService
     public async Task<Rfc8555Account?> FindAccountByKidAsync(string kid, CancellationToken ct)
     {
         // kid is the full account URL; extract the ID from the last segment.
-        var id = kid.Split('/').Last();
+        var segments = kid.Split('/');
+        var id = segments[^1];
         var accounts = await ReadAsync<List<Rfc8555Account>>(_accountsPath, ct) ?? [];
         return accounts.FirstOrDefault(a => a.Id == id);
     }
@@ -311,8 +312,8 @@ public sealed class Rfc8555AcmeService
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-            var challenge = new Rfc8555Challenge(challengeId, "http-01", token, "pending", null);
-            var authz = new Rfc8555Authorization(authzIds[i], new Rfc8555Identifier("dns", dnsNames[i]), "pending", [challenge], DateTimeOffset.UtcNow.AddDays(7));
+            var challenge = new Rfc8555Challenge(challengeId, "http-01", token, Pending, null);
+            var authz = new Rfc8555Authorization(authzIds[i], new Rfc8555Identifier("dns", dnsNames[i]), Pending, [challenge], DateTimeOffset.UtcNow.AddDays(7));
             authorizations.Add(authz);
         }
 
@@ -322,9 +323,8 @@ public sealed class Rfc8555AcmeService
         try
         {
             var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-            // Orders start as "pending" — they move to "ready" once all authorizations are valid.
-            // acme.sh will POST to the challenge endpoint, which auto-approves and transitions the order.
-            var order = new Rfc8555Order(orderId, accountId, rfcIdentifiers, authorizations, "pending",
+            // Orders start as "pending" and move to "ready" after HTTP-01 validation.
+            var order = new Rfc8555Order(orderId, accountId, rfcIdentifiers, authorizations, Pending,
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(7), null, null);
             orders.Add(order);
             await WriteAsync(_ordersPath, orders, ct);
@@ -344,7 +344,7 @@ public sealed class Rfc8555AcmeService
         if (order is null) return null;
 
         // Dynamically check if order should transition from pending → ready.
-        if (order.Status == "pending" && order.Authorizations.All(a => a.Status == "valid"))
+        if (order.Status == Pending && order.Authorizations.All(a => a.Status == Valid))
         {
             order = order with { Status = "ready" };
             // Persist the transition.
@@ -390,64 +390,77 @@ public sealed class Rfc8555AcmeService
         return orders.SelectMany(o => o.Authorizations).SelectMany(a => a.Challenges).FirstOrDefault(c => c.Id == challengeId);
     }
 
-    /// <summary>
-    /// Responds to a challenge by immediately marking it and its parent authorization as valid.
-    /// If all authorizations for the order are now valid, the order transitions to "ready".
-    /// This is the auto-approval mechanism for HomeCA's trusted internal CA.
-    /// </summary>
-    public async Task<Rfc8555Challenge?> RespondToChallengeAsync(string challengeId, CancellationToken ct)
+    /// <summary>Validates HTTP-01 by fetching the ACME response from the requested identifier.</summary>
+    public async Task<Rfc8555Challenge?> RespondToChallengeAsync(string challengeId, string accountId, CancellationToken ct)
     {
+        Rfc8555Order? sourceOrder = null;
+        Rfc8555Authorization? sourceAuthorization = null;
+        Rfc8555Challenge? sourceChallenge = null;
+
         await _gate.WaitAsync(ct);
         try
         {
             var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-            var modified = false;
-
-            for (var oi = 0; oi < orders.Count; oi++)
-            {
-                var order = orders[oi];
-                for (var ai = 0; ai < order.Authorizations.Count; ai++)
-                {
-                    var authz = order.Authorizations[ai];
-                    for (var ci = 0; ci < authz.Challenges.Count; ci++)
-                    {
-                        if (authz.Challenges[ci].Id != challengeId) continue;
-
-                        // Mark challenge as valid.
-                        var updatedChallenge = authz.Challenges[ci] with { Status = "valid", ValidatedAt = DateTimeOffset.UtcNow };
-                        var updatedChallenges = authz.Challenges.ToList();
-                        updatedChallenges[ci] = updatedChallenge;
-
-                        // Mark authorization as valid.
-                        var updatedAuthz = authz with { Status = "valid", Challenges = updatedChallenges };
-                        var updatedAuthzList = order.Authorizations.ToList();
-                        updatedAuthzList[ai] = updatedAuthz;
-
-                        // Check if all authorizations are now valid → order becomes "ready".
-                        var allValid = updatedAuthzList.All(a => a.Status == "valid");
-                        var updatedOrder = order with
-                        {
-                            Authorizations = updatedAuthzList,
-                            Status = allValid && order.Status == "pending" ? "ready" : order.Status
-                        };
-                        orders[oi] = updatedOrder;
-                        modified = true;
-
-                        _logger.LogInformation("Auto-approved challenge {ChallengeId}, authorization {AuthzId} → valid. Order {OrderId} status: {Status}",
-                            challengeId, authz.Id, order.Id, updatedOrder.Status);
-
-                        if (modified)
-                        {
-                            await WriteAsync(_ordersPath, orders, ct);
-                        }
-                        return updatedChallenge;
-                    }
-                }
-            }
-
-            return null;
+            sourceOrder = orders.FirstOrDefault(order => order.AccountId == accountId && order.Authorizations.Any(authorization => authorization.Challenges.Any(challenge => challenge.Id == challengeId)));
+            sourceAuthorization = sourceOrder?.Authorizations.First(authorization => authorization.Challenges.Any(challenge => challenge.Id == challengeId));
+            sourceChallenge = sourceAuthorization?.Challenges.First(challenge => challenge.Id == challengeId);
         }
         finally { _gate.Release(); }
+
+        if (sourceOrder is null || sourceAuthorization is null || sourceChallenge is null) return null;
+        if (sourceChallenge.Status is Valid or Invalid) return sourceChallenge;
+
+        var account = await GetAccountAsync(accountId, ct) ?? throw AcmeProblem(UnauthorizedProblem, "Account not found.", 403);
+        var expected = $"{sourceChallenge.Token}.{account.Thumbprint}";
+        var valid = await ValidateHttp01Async(sourceAuthorization.Identifier.Value, sourceChallenge.Token, expected, ct);
+
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
+            var orderIndex = orders.FindIndex(order => order.Id == sourceOrder.Id && order.AccountId == accountId);
+            if (orderIndex < 0) return null;
+            var order = orders[orderIndex];
+            var authorizationIndex = order.Authorizations.ToList().FindIndex(authorization => authorization.Id == sourceAuthorization.Id);
+            if (authorizationIndex < 0) return null;
+            var authorization = order.Authorizations[authorizationIndex];
+            var challengeIndex = authorization.Challenges.ToList().FindIndex(challenge => challenge.Id == challengeId);
+            if (challengeIndex < 0) return null;
+
+            var challengeStatus = valid ? Valid : Invalid;
+            var updatedChallenge = authorization.Challenges[challengeIndex] with { Status = challengeStatus, ValidatedAt = DateTimeOffset.UtcNow };
+            var challenges = authorization.Challenges.ToList();
+            challenges[challengeIndex] = updatedChallenge;
+            var authorizations = order.Authorizations.ToList();
+            authorizations[authorizationIndex] = authorization with { Status = challengeStatus, Challenges = challenges };
+            var orderStatus = valid && authorizations.All(item => item.Status == Valid) ? "ready" : order.Status;
+            if (!valid) orderStatus = Invalid;
+            var orderError = valid ? order.Error : "HTTP-01 validation failed.";
+            var updatedOrder = order with { Authorizations = authorizations, Status = orderStatus, Error = orderError };
+            orders[orderIndex] = updatedOrder;
+            await WriteAsync(_ordersPath, orders, ct);
+            _logger.LogInformation("HTTP-01 challenge {ChallengeId} for {Identifier} is {Status}", challengeId, authorization.Identifier.Value, updatedChallenge.Status);
+            return updatedChallenge;
+        }
+        finally { _gate.Release(); }
+    }
+
+    private async Task<bool> ValidateHttp01Async(string identifier, string token, string expected, CancellationToken ct)
+    {
+        try
+        {
+            // NOSONAR: RFC 8555 mandates plain HTTP on port 80 for HTTP-01 validation.
+            var url = new Uri($"http://{identifier}/.well-known/acme-challenge/{token}");
+            using var response = await _httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode) return false;
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+            return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(responseBody.TrimEnd('\r', '\n')), Encoding.UTF8.GetBytes(expected));
+        }
+        catch (HttpRequestException exception)
+        {
+            _logger.LogInformation(exception, "HTTP-01 response for {Identifier} could not be fetched", identifier);
+            return false;
+        }
     }
 
     /// <summary>
@@ -464,7 +477,7 @@ public sealed class Rfc8555AcmeService
             if (index < 0) throw AcmeProblem("orderNotReady", "Order not found.");
             var order = orders[index];
 
-            if (order.Status == "valid") return order;
+            if (order.Status == Valid) return order;
             if (order.Status != "ready")
                 throw AcmeProblem("orderNotReady", $"Order is in status '{order.Status}', expected 'ready'.");
 
@@ -475,7 +488,7 @@ public sealed class Rfc8555AcmeService
             var dnsNames = order.Identifiers.Select(i => i.Value).ToList();
             var certId = await IssueCertificateFromCsrAsync(csr, dnsNames, ct);
 
-            order = order with { Status = "valid", CertificateId = certId };
+            order = order with { Status = Valid, CertificateId = certId };
             orders[index] = order;
             await WriteAsync(_ordersPath, orders, ct);
 
@@ -524,7 +537,7 @@ public sealed class Rfc8555AcmeService
         var authorityPaths = await _authorities.GetDefaultIssuingAsync(ct);
         using var issuer = _authorities.LoadAuthorityCertificate(authorityPaths.IssuingPath);
 
-        var subject = dnsNames.First();
+        var subject = dnsNames[0];
 
         // Build the certificate from the CSR's public key.
         // We create a new CertificateRequest with the CSR's key and our extensions.
@@ -572,15 +585,15 @@ public sealed class Rfc8555AcmeService
         Directory.CreateDirectory(exportPath);
 
         // Save the certificate (without private key — the client holds the key).
-        File.WriteAllBytes(Path.Combine(certificatePath, "certificate.pfx"), cert.Export(X509ContentType.Pkcs12));
+        await File.WriteAllBytesAsync(Path.Combine(certificatePath, "certificate.pfx"), cert.Export(X509ContentType.Pkcs12), ct);
 
         var certPem = cert.ExportCertificatePem();
-        File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
+        await File.WriteAllTextAsync(Path.Combine(exportPath, "certificate.pem"), certPem, ct);
 
         using var root = _authorities.LoadAuthorityCertificate(authorityPaths.RootPath);
         var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
-        File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
-        File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem);
+        await File.WriteAllTextAsync(Path.Combine(exportPath, "chain.pem"), chainPem, ct);
+        await File.WriteAllTextAsync(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem, ct);
 
         _logger.LogInformation("Issued RFC 8555 certificate {CertificateId} for {Subject}", id, subject);
         return id;
@@ -608,7 +621,7 @@ public sealed class Rfc8555AcmeService
         }
         else
         {
-            throw AcmeProblem("badPublicKey", $"Unsupported key type for thumbprint: {kty}");
+            throw AcmeProblem(BadPublicKeyProblem, $"Unsupported key type for thumbprint: {kty}");
         }
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
@@ -660,13 +673,6 @@ public sealed class Rfc8555AcmeService
         if (!File.Exists(path)) return default;
         await using var stream = File.OpenRead(path);
         return await JsonSerializer.DeserializeAsync<T>(stream, cancellationToken: ct);
-    }
-
-    private async Task<T?> ReadLockedAsync<T>(string path, CancellationToken ct)
-    {
-        await _gate.WaitAsync(ct);
-        try { return await ReadAsync<T>(path, ct); }
-        finally { _gate.Release(); }
     }
 
     private static async Task WriteAsync<T>(string path, T value, CancellationToken ct)

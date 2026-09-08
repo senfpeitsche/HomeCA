@@ -50,10 +50,13 @@ acme.sh --issue --server http://homeca.lab.example.com:5080/acme/directory \
   -d node1.lab.example.com --standalone
 ```
 
-HomeCA provides an `http-01` challenge for RFC 8555. Once the client confirms
-it, HomeCA marks the challenge and authorization as `valid`; HomeCA does not
-perform an external HTTP or DNS reachability check. Configure **HTTP-01** at
-the client; public Internet reachability is not required.
+HomeCA provides an `http-01` challenge for RFC 8555. Configure **HTTP-01** at
+the client and serve its key authorization at
+`http://<DNS-name>/.well-known/acme-challenge/<token>`. HomeCA fetches and
+verifies that response before marking the challenge and authorization as
+`valid`. The client only needs to be reachable from HomeCA; public Internet
+reachability is not required. IP allowlisting and EAB continue to control who
+may create an ACME account.
 
 For external issuers, `directoryUrl` is the public CA URL, not a HomeCA URL:
 
@@ -69,8 +72,8 @@ For external issuers, `directoryUrl` is the public CA URL, not a HomeCA URL:
 ## Internal ACME server: simplified API
 
 The simplified API is intended for scripts and curl, not standard ACME clients.
-It issues only names that match an internal issuance zone. Orders immediately
-enter `ready`, because clients are trusted and no challenge is validated.
+It issues only names that match an internal issuance zone. RFC 8555 orders
+enter `ready` after their HTTP-01 challenge is validated.
 
 ### Create an issuance zone
 
