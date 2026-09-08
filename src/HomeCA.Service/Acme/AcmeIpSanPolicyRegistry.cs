@@ -15,7 +15,7 @@ public sealed class AcmeIpSanPolicyRegistry(HomeCaStorage storage)
         await _gate.WaitAsync(ct);
         try
         {
-            var policy = await ReadUnsafeAsync(ct) ?? new(false, []);
+            var policy = await ReadUnsafeAsync(ct) ?? new(false, [], false);
             if (!File.Exists(_path)) await WriteUnsafeAsync(policy, ct);
             return policy;
         }
@@ -27,7 +27,7 @@ public sealed class AcmeIpSanPolicyRegistry(HomeCaStorage storage)
         var networks = NormalizeNetworks(request.AllowedNetworks);
         if (request.Enabled && networks.Length == 0)
             throw new ArgumentException("Add at least one allowed network before enabling automatic ACME IP SANs.");
-        var policy = new AcmeIpSanPolicy(request.Enabled, networks);
+        var policy = new AcmeIpSanPolicy(request.Enabled, networks, request.RevokeSupersededCertificates);
         await _gate.WaitAsync(ct);
         try { await WriteUnsafeAsync(policy, ct); return policy; }
         finally { _gate.Release(); }
@@ -65,5 +65,5 @@ public sealed class AcmeIpSanPolicyRegistry(HomeCaStorage storage)
     }
 }
 
-public sealed record UpdateAcmeIpSanPolicyRequest(bool Enabled, IReadOnlyList<string>? AllowedNetworks);
-public sealed record AcmeIpSanPolicy(bool Enabled, IReadOnlyList<string> AllowedNetworks);
+public sealed record UpdateAcmeIpSanPolicyRequest(bool Enabled, IReadOnlyList<string>? AllowedNetworks, bool RevokeSupersededCertificates = false);
+public sealed record AcmeIpSanPolicy(bool Enabled, IReadOnlyList<string> AllowedNetworks, bool RevokeSupersededCertificates = false);

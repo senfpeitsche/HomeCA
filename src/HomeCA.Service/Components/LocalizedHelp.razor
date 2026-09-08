@@ -1,6 +1,8 @@
 @using HomeCA.Service.Localization
 @inject IHostEnvironment Environment
 @inject IJSRuntime JS
+@inject HomeCA.Service.Infrastructure.HomeCaStorage Storage
+@inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
 
 @if (_html is null)
@@ -33,7 +35,7 @@ else
         var localizedArticle = ReadArticle(locale, Topic);
         var article = localizedArticle ?? ReadArticle(LocaleCatalog.DefaultCulture, Topic);
         _usedFallback = article is not null && locale != LocaleCatalog.DefaultCulture && localizedArticle is null;
-        _html = article is null ? string.Empty : SafeMarkdown.Render(article);
+        _html = article is null ? string.Empty : SafeMarkdown.Render(article.Replace("{{ACME_DIRECTORY_URL}}", AcmeDirectoryUrl()));
         _copyButtonsAttached = false;
     }
 
@@ -49,5 +51,14 @@ else
         if (!LocaleCatalog.HelpTopics.Contains(topic, StringComparer.Ordinal)) return null;
         var path = Path.Combine(Environment.ContentRootPath, "Help", locale, $"{topic}.md");
         return File.Exists(path) ? File.ReadAllText(path) : null;
+    }
+
+    private string AcmeDirectoryUrl()
+    {
+        var configured = Storage.PublicUrl;
+        var baseUrl = Uri.TryCreate(configured, UriKind.Absolute, out var publicUrl)
+            ? publicUrl.AbsoluteUri.TrimEnd('/')
+            : Navigation.BaseUri.TrimEnd('/');
+        return $"{baseUrl}/acme/directory";
     }
 }

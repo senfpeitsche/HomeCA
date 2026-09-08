@@ -494,11 +494,22 @@ public sealed class Rfc8555AcmeService
 
             // Issue the certificate using the CSR's public key — sign with the issuing CA.
             var dnsNames = order.Identifiers.Select(i => i.Value).ToList();
+            var certificatePolicy = await _ipSanPolicy.GetAsync(ct);
             var certId = await IssueCertificateFromCsrAsync(csr, dnsNames, ct);
 
             order = order with { Status = Valid, CertificateId = certId };
             orders[index] = order;
             await WriteAsync(_ordersPath, orders, ct);
+
+            if (certificatePolicy.RevokeSupersededCertificates)
+            {
+                var predecessor = orders.Where(candidate => candidate.Id != order.Id && candidate.AccountId == order.AccountId && candidate.Status == Valid && !string.IsNullOrWhiteSpace(candidate.CertificateId))
+                    .OrderByDescending(candidate => candidate.CreatedAt)
+                    .FirstOrDefault(candidate => candidate.Identifiers.Select(identifier => identifier.Value).Order(StringComparer.OrdinalIgnoreCase)
+                        .SequenceEqual(order.Identifiers.Select(identifier => identifier.Value).Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase));
+                if (predecessor?.CertificateId is { } predecessorId && await _certificates.RevokeAsync(predecessorId, "superseded", ct))
+                    _logger.LogInformation("Revoked superseded ACME certificate {CertificateId} after renewal order {OrderId}", predecessorId, order.Id);
+            }
 
             _logger.LogInformation("Finalized RFC 8555 order {OrderId}, issued certificate {CertificateId}", orderId, certId);
             return order;

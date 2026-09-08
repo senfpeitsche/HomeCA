@@ -870,4 +870,9 @@
   <data name="AcmeIpSanNetworksHelper" xml:space="preserve"><value>One IP address or CIDR network per line, for example 192.168.10.0/24 or fd00::/8.</value></data>
   <data name="SaveAcmeIpSanPolicy" xml:space="preserve"><value>Save IP SAN policy</value></data>
   <data name="AcmeIpSanPolicySaved" xml:space="preserve"><value>ACME IP SAN policy saved.</value></data>
+  <data name="RevokedCertificates" xml:space="preserve"><value>Revoked certificates</value></data>
+  <data name="AcmeRevokeSuperseded" xml:space="preserve"><value>Revoke replaced ACME certificates after renewal</value></data>
+  <data name="AcmeRevokeSupersededHelper" xml:space="preserve"><value>After a successful renewal, revokes the prior certificate of the same ACME account with identical DNS identifiers. Enable only after deployments reliably switch to the replacement certificate.</value></data>
+  <data name="NavExternalAcme" xml:space="preserve"><value>External ACME</value></data>
+  <data name="ExternalAcmeTitle" xml:space="preserve"><value>External ACME issuers</value></data>
 </root>

@@ -1,47 +1,68 @@
-# Configure ACME
+# ACME in practice
 
-HomeCA provides an RFC 8555-compatible directory for standard ACME clients.
+ACME automates issuance and renewal. Use the **internal HomeCA ACME server** for managed internal services such as Proxmox, Traefik, or Caddy. Use an **external ACME issuer** such as Let's Encrypt only when an Internet-facing service needs public browser trust.
+
+## Choose the correct URL
+
+Standard ACME clients always need the RFC 8555 directory:
 
 ```text
-http://HOMECA:5080/acme/directory
+{{ACME_DIRECTORY_URL}}
 ```
 
-Configure an allowed issuance zone before requesting certificates. Do not use `/api/v1/acme/` as the RFC 8555 directory URL.
+Generally this is `https://<HomeCA-host>:5443/acme/directory`; behind a reverse proxy it is normally `https://<HomeCA-host>/acme/directory`.
 
-## Setup checklist
+> Do **not** use `/api/v1/acme/...` in Proxmox, Caddy, Traefik, Certbot, or acme.sh. These clients require `/acme/directory`.
 
-1. Configure the issuing zone.
-2. Decide whether the client is covered by the network allowlist or needs EAB.
-3. Configure the ACME client with the RFC 8555 directory URL above.
-4. Choose HTTP-01 for internal issuance, or configure a DNS connector for an external DNS-01 issuer.
-5. Verify the resulting order and certificate in the HomeCA inventory.
+When HomeCA HTTPS uses its own Root CA, the ACME client must trust that Root CA already. Install it first from **Trust**.
 
-## Client access
+## Scenario: Proxmox or an internal service
 
-Allowlisted client networks can create accounts without External Account Binding (EAB). For every other client, create an individual EAB credential in HomeCA and copy the displayed Key ID and HMAC key immediately; the HMAC key is shown only once.
+1. The Root CA and TLS Issuing CA must be active.
+2. Under **Domains**, create an issuance zone and enable internal issuance, such as `int.example.org`.
+3. Configure the directory URL in the client and select **HTTP-01**.
+4. HomeCA must reach the target name on port 80. The client serves:
 
-Use a direct client IP address or CIDR network in the allowlist. Do not allowlist a reverse-proxy address because that would grant every client behind it access.
+```text
+http://<DNS-name>/.well-known/acme-challenge/<token>
+```
 
-## DNS-01 issuance
+5. The client installs the certificate and reloads its service.
 
-Associate the issuance zone with a configured DNS connector before using DNS-01. Test the connector and its TXT-record permission first. Keep ACME account and order IDs unchanged when diagnosing client issues.
+No public Internet exposure is required. Behind a reverse proxy, `/.well-known/acme-challenge/` must not be blocked or redirected.
 
-Before production use, run the connector check and a TXT test from **Settings**. A successful connection alone is not enough: the configured token must be allowed to create and remove records in the selected zone.
+## Client access: allowlist or EAB
 
-## Internal HTTP-01 issuance
+- For a fixed internal client, add its **direct** IP address or CIDR network to the ACME client allowlist.
+- For Proxmox, containers, or changing client addresses, create a dedicated **EAB** credential. Copy the Key ID and HMAC key into the client's secret store immediately; the HMAC key is shown only once.
 
-For HomeCA's internal RFC 8555 server, configure the client to answer HTTP-01 and expose the key authorization at `http://<DNS-name>/.well-known/acme-challenge/<token>`. HomeCA fetches this URL after the client responds to the ACME challenge; the authorization becomes valid only when the response matches. The client must be reachable from HomeCA, but it does not need public Internet exposure.
+Never broadly allowlist a reverse-proxy address. It would give all clients behind that proxy access without EAB.
 
-Use an external ACME issuer only when a publicly trusted certificate is required. Keep internal HomeCA issuance for services whose clients already trust the HomeCA Root CA.
+After a test, the order under **ACME** must be `valid`. The issued certificate appears under **Certificates**.
 
-Store EAB HMAC keys in the ACME client's protected secret store; do not place them in shell history or shared configuration files.
+## Scenario: publicly trusted certificates
 
-Request names only from zones that are explicitly enabled for the selected issuer or internal issuance policy.
+Register an external issuer under **ACME**, for example:
 
-After a successful order, verify the resulting certificate inventory entry and deploy it through the same controlled process as other TLS certificates.
+```text
+https://acme-v02.api.letsencrypt.org/directory
+```
 
-When an order fails, inspect the challenge status and DNS connector result before creating a new account or credential.
+Assign a DNS connector and test its permission and TXT round trip before the first order. The connector needs permission to create and remove `_acme-challenge` TXT records in the zone.
 
-Allow DNS propagation time before retrying a DNS-01 challenge; avoid leaving diagnostic TXT records behind after testing.
+## IP SANs and renewal
 
-Record the ACME account, order, and connector involved in a failure so that investigation remains reproducible.
+The ACME policy can contain allowed IP networks. When enabled, HomeCA adds only A and AAAA addresses of validated DNS names that fall inside those CIDR networks. Arbitrary client-requested IP addresses are never accepted.
+
+A renewal issues a new certificate. The predecessor normally remains valid until expiry. The policy can optionally revoke the matching predecessor after a successful renewal. Revoked certificates remain visible for audit and CRL purposes in **Revoked certificates**.
+
+## Diagnose failures quickly
+
+| Symptom | Check first |
+| --- | --- |
+| Account cannot be created | direct client IP in allowlist, or EAB Key ID/HMAC key |
+| Order remains `pending` | DNS resolution, port 80, and challenge path from the HomeCA host |
+| HTTPS to directory fails | HomeCA Root CA in the client trust store |
+| External order fails | DNS connector test, zone, and TXT permission |
+
+Do not create another account or EAB credential first when diagnosing a failure. Open the existing order in HomeCA; account, order, and challenge status provide the evidence you need.

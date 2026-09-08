@@ -1,43 +1,68 @@
-# ACME einrichten
+# ACME in der Praxis
 
-HomeCA stellt ein RFC-8555-kompatibles Verzeichnis für Standard-ACME-Clients bereit.
+ACME automatisiert Ausstellung und Erneuerung. Nutze den **internen HomeCA-ACME-Server** für verwaltete interne Dienste wie Proxmox, Traefik oder Caddy. Nutze einen **externen ACME-Aussteller** wie Let's Encrypt nur, wenn Browser im öffentlichen Internet dem Dienst vertrauen müssen.
+
+## Die richtige URL wählen
+
+Standard-ACME-Clients benötigen immer das RFC-8555-Directory:
 
 ```text
-http://HOMECA:5080/acme/directory
+{{ACME_DIRECTORY_URL}}
 ```
 
-Lege vor der Ausstellung eine erlaubte Zone an. Verwende `/api/v1/acme/` nicht als RFC-8555-Directory-URL.
+Allgemein lautet sie `https://<HomeCA-Host>:5443/acme/directory`, hinter einem Reverse Proxy meist `https://<HomeCA-Host>/acme/directory`.
 
-## Einrichtungscheckliste
+> Verwende in Proxmox, Caddy, Traefik, Certbot oder acme.sh **nicht** `/api/v1/acme/...`. Diese Clients benötigen `/acme/directory`.
 
-1. Ausstellungszone konfigurieren und ihren DNS-Connector verknüpfen.
-2. Connector-Zugang und einen TXT-Record-Roundtrip testen.
-3. Entscheiden, ob der Client durch die Netzwerk-Allowlist abgedeckt ist oder EAB benötigt.
-4. Den ACME-Client mit der oben genannten RFC-8555-Directory-URL konfigurieren.
-5. Den resultierenden Auftrag und das Zertifikat im HomeCA-Inventar prüfen.
+Wenn HomeCA HTTPS mit seiner eigenen Root-CA verwendet, muss der ACME-Client dieser Root-CA bereits vertrauen. Installiere sie zuerst unter **Vertrauen**.
 
-## Client-Zugang
+## Szenario: Proxmox oder interner Dienst
 
-Client-Netze auf der Allowlist können Konten ohne External Account Binding (EAB) anlegen. Für jeden anderen Client einen individuellen EAB-Zugang in HomeCA erzeugen und die angezeigte Key-ID sowie den HMAC-Key sofort kopieren; der HMAC-Key wird nur einmal angezeigt.
+1. Root- und TLS-Issuing-CA müssen aktiv sein.
+2. Lege unter **Domains** eine Ausstellungszone an und aktiviere die interne Ausstellung, etwa `int.zikke.org`.
+3. Konfiguriere im Client die Directory-URL und **HTTP-01**.
+4. HomeCA muss den Zielnamen auf Port 80 erreichen. Der Client stellt dort bereit:
 
-In der Allowlist nur direkte Client-IP-Adressen oder CIDR-Netze eintragen. Keine Reverse-Proxy-Adresse freigeben, da dies allen dahinterliegenden Clients Zugang gewähren würde.
+```text
+http://<DNS-Name>/.well-known/acme-challenge/<Token>
+```
 
-## DNS-01-Ausstellung
+5. Der Client installiert das Zertifikat und lädt seinen Dienst neu.
 
-Die Ausstellungszone vor DNS-01 mit einem eingerichteten DNS-Connector verknüpfen. Zuerst den Connector und seine Berechtigung zum Anlegen von TXT-Records testen. ACME-Konto- und Auftrags-IDs bei der Fehlersuche unverändert verwenden.
+Eine Freigabe ins öffentliche Internet ist nicht nötig. Hinter einem Reverse Proxy darf `/.well-known/acme-challenge/` nicht blockiert oder umgeleitet werden.
 
-Vor dem produktiven Einsatz den Connector-Check und einen TXT-Test unter **Einstellungen** ausführen. Eine erfolgreiche Verbindung allein genügt nicht: Das konfigurierte Token muss Records in der gewählten Zone anlegen und entfernen dürfen.
+## Clientzugang: Allowlist oder EAB
 
-Einen externen ACME-Issuer nur verwenden, wenn ein öffentlich vertrauenswürdiges Zertifikat benötigt wird. Die interne HomeCA-Ausstellung für Dienste beibehalten, deren Clients der HomeCA-Root-CA bereits vertrauen.
+- Für einen festen internen Client trägst du seine **direkte** IP-Adresse oder sein CIDR-Netz in die ACME-Client-Allowlist ein.
+- Für Proxmox, Container oder wechselnde Client-Adressen erzeugst du einen eigenen **EAB**-Zugang. Key-ID und HMAC-Key sofort in den Secret-Store des Clients kopieren; der HMAC-Key wird nur einmal angezeigt.
 
-EAB-HMAC-Keys im geschützten Secret-Store des ACME-Clients ablegen, nicht in Shell-Verlauf oder gemeinsam genutzten Konfigurationsdateien.
+Die Adresse eines Reverse Proxys niemals pauschal allowlisten. Das würde allen Clients hinter dem Proxy Zugang ohne EAB geben.
 
-Nur Namen aus Zonen anfordern, die für den gewählten Issuer oder die interne Ausstellungsrichtlinie ausdrücklich aktiviert sind.
+Nach einem Test muss der Auftrag in HomeCA unter **ACME** den Status `valid` haben. Das ausgestellte Zertifikat erscheint unter **Zertifikate**.
 
-Nach einer erfolgreichen Bestellung den resultierenden Zertifikatseintrag im Inventar prüfen und ihn über denselben kontrollierten Prozess wie andere TLS-Zertifikate ausrollen.
+## Szenario: Öffentlich vertrauenswürdige Zertifikate
 
-Wenn ein Auftrag fehlschlägt, zuerst Challenge-Status und DNS-Connector-Ergebnis prüfen, bevor ein neues Konto oder ein neuer Zugang angelegt wird.
+Registriere unter **ACME** einen externen Aussteller, etwa mit:
 
-Bei DNS-01-Challenges Zeit für DNS-Propagation einplanen und nach Tests keine Diagnose-TXT-Records zurücklassen.
+```text
+https://acme-v02.api.letsencrypt.org/directory
+```
 
-Bei einem Fehler das beteiligte ACME-Konto, den Auftrag und den Connector dokumentieren, damit die Analyse reproduzierbar bleibt.
+Verknüpfe einen DNS-Connector und teste Berechtigung sowie TXT-Roundtrip vor der ersten Bestellung. Der Connector benötigt Rechte, `_acme-challenge`-TXT-Records in der Zone anzulegen und zu entfernen.
+
+## IP-SANs und Erneuerung
+
+Die ACME-Richtlinie kann erlaubte IP-Netze enthalten. Bei aktivierter Funktion ergänzt HomeCA nur A-/AAAA-Adressen der validierten DNS-Namen, die in diesen CIDR-Netzen liegen. Frei angeforderte IP-Adressen werden nie übernommen.
+
+Eine Erneuerung stellt ein neues Zertifikat aus. Der Vorgänger bleibt normalerweise bis zum Ablauf gültig. Optional kann die Richtlinie den passenden Vorgänger nach erfolgreicher Erneuerung widerrufen. Gesperrte Zertifikate bleiben für Audit und CRL in **Gesperrte Zertifikate** sichtbar.
+
+## Fehler schnell eingrenzen
+
+| Symptom | Zuerst prüfen |
+| --- | --- |
+| Konto kann nicht angelegt werden | direkte Client-IP in der Allowlist oder EAB-Key-ID/HMAC-Key |
+| Auftrag bleibt `pending` | DNS-Auflösung, Port 80 und Challenge-Pfad vom HomeCA-Host |
+| HTTPS zum Directory schlägt fehl | HomeCA-Root-CA im Trust Store des Clients |
+| Externer Auftrag scheitert | DNS-Connector-Test, Zone und TXT-Berechtigung |
+
+Erzeuge bei Fehlern nicht sofort ein neues Konto oder neue EAB-Zugangsdaten. Öffne zuerst den vorhandenen Auftrag in HomeCA; Account-, Order- und Challenge-Status liefern die nötigen Hinweise.

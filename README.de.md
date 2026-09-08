@@ -31,7 +31,7 @@ vermeiden möchten.
 - Ausstellung von TLS- und mTLS-Zertifikaten mit DNS- und IP-SANs
 - Signierung von SSH-Host- und Benutzerzertifikaten
 - Interner ACME-Server zur automatischen Zertifikatsbereitstellung im internen Netz, mit optionalen IP-SANs aus aufgelösten validierten DNS-Namen innerhalb erlaubter Netze
-- Externer ACME-Client (z. B. Let's Encrypt) mit DNS-01 über Technitium oder Hetzner DNS
+- Separater Bereich **External ACME** für öffentliche ACME-Aussteller und deren DNS-01-Zertifikate (z. B. Let's Encrypt) über Technitium oder Hetzner DNS
 - 11 Zielsystemprofile: Proxmox, OPNsense, IIS/RDP, UniFi, HAProxy, Cisco, Huawei, Synology, TeamCity, Home Assistant und generisches TLS
 - Exportformate: PEM, Schlüssel, Chain, Fullchain, Bundle (HAProxy), PFX mit ausstellender CA sowie vollständige Deployment-Pakete als ZIP
 - CRL-Erzeugung und HTTP-Verteilung mit CDP-Erweiterung in ausgestellten Zertifikaten
