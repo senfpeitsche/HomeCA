@@ -1,30 +1,27 @@
 @inherits LayoutComponentBase
 @using System.Reflection
 @inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+@inject IJSRuntime JS
 
-<MudThemeProvider Theme="@_theme" @bind-IsDarkMode="_isDarkMode" />
+<MudThemeProvider @ref="_themeProvider" Theme="@_theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
-@* Lets brand images pick the matching variant *@
+@* Read by the brand images and the appearance menu *@
 <CascadingValue Value="_isDarkMode" Name="IsDarkMode">
-    @Body
+    <CascadingValue Value="_themeContext" Name="Theme">
+        @Body
+    </CascadingValue>
 </CascadingValue>
-<MudTooltip Text="@ThemeToggleLabel">
-    <MudIconButton Class="theme-toggle"
-                   Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                   Color="Color.Inherit"
-                   aria-label="@ThemeToggleLabel"
-                   OnClick="ToggleDarkMode" />
-</MudTooltip>
-<MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4 mb-2" Style="opacity: 0.5;">
-    HomeCA @_version
-</MudText>
+<footer class="app-footer">
+    <MudText Typo="Typo.caption">HomeCA @_version</MudText>
+</footer>
 
 @code {
     private string _version = string.Empty;
     private bool _isDarkMode;
-    private string ThemeToggleLabel => _isDarkMode ? Text["EnableLightTheme"] : Text["EnableDarkTheme"];
+    private MudThemeProvider? _themeProvider;
+    private ThemeContext _themeContext = null!;
 
     private readonly MudTheme _theme = new()
     {
@@ -84,7 +81,57 @@
         var informational = Assembly.GetEntryAssembly()?
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
         _version = informational.Split('+')[0];
+        _themeContext = new ThemeContext { SetPreferenceAsync = ApplyPreferenceAsync };
     }
 
-    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // localStorage is unreachable during prerender, so the stored preference
+        // can only be read once the circuit is live.
+        var stored = await JS.InvokeAsync<string?>("homeca.getThemePreference");
+        _themeContext.Preference = ThemeContext.Parse(stored);
+
+        // Track the browser even when it is not the active preference: switching
+        // to System later should then apply immediately rather than after a reload.
+        if (_themeProvider is not null)
+        {
+            await _themeProvider.WatchSystemDarkModeAsync(OnSystemThemeChangedAsync);
+        }
+
+        await ResolveAsync(persist: false);
+    }
+
+    private async Task ApplyPreferenceAsync(ThemePreference preference)
+    {
+        _themeContext.Preference = preference;
+        await ResolveAsync(persist: true);
+    }
+
+    private async Task OnSystemThemeChangedAsync(bool systemIsDark)
+    {
+        if (_themeContext.Preference != ThemePreference.System) return;
+        _isDarkMode = systemIsDark;
+        _themeContext.IsDark = systemIsDark;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ResolveAsync(bool persist)
+    {
+        _isDarkMode = _themeContext.Preference switch
+        {
+            ThemePreference.Light => false,
+            ThemePreference.Dark => true,
+            _ => _themeProvider is not null && await _themeProvider.GetSystemDarkModeAsync()
+        };
+        _themeContext.IsDark = _isDarkMode;
+
+        if (persist)
+        {
+            await JS.InvokeVoidAsync("homeca.setThemePreference", ThemeContext.Serialize(_themeContext.Preference));
+        }
+
+        StateHasChanged();
+    }
 }

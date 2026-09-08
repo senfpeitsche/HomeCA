@@ -101,10 +101,13 @@ var localizationOptions = new RequestLocalizationOptions
     FallBackToParentCultures = false,
     FallBackToParentUICultures = false
 };
-// A user choice wins; an absent, malformed, or unsupported cookie falls back to English.
+// Order matters: an explicit choice from the language menu wins, and only when
+// no cookie is present does the browser's Accept-Language header get a say.
+// Anything unsupported still falls back to English via DefaultRequestCulture.
 localizationOptions.RequestCultureProviders =
 [
-    new CookieRequestCultureProvider { CookieName = CookieRequestCultureProvider.DefaultCookieName }
+    new CookieRequestCultureProvider { CookieName = CookieRequestCultureProvider.DefaultCookieName },
+    new AcceptLanguageHeaderRequestCultureProvider()
 ];
 
 // ── Load the persisted public URL, if available ─────────────────────────────

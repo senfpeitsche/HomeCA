@@ -15,11 +15,20 @@
   <data name="CopyCode" xml:space="preserve">
     <value>Code kopieren</value>
   </data>
-  <data name="EnableLightTheme" xml:space="preserve">
-    <value>Helles Design aktivieren</value>
+  <data name="ConfirmSignOut" xml:space="preserve">
+    <value>Klicken Sie erneut, um sich abzumelden. Zum Verwalten dieser PKI ist danach eine erneute Anmeldung nötig.</value>
   </data>
-  <data name="EnableDarkTheme" xml:space="preserve">
-    <value>Dunkles Design aktivieren</value>
+  <data name="AppearanceLabel" xml:space="preserve">
+    <value>Darstellung</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Hell</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Dunkel</value>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>System</value>
   </data>
   <data name="PageNotFound" xml:space="preserve">
     <value>Seite nicht gefunden</value>

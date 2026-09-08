@@ -1,0 +1,49 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+<MudMenu Icon="@ActiveIcon"
+         Color="Color.Inherit"
+         Dense="true"
+         AnchorOrigin="Origin.BottomRight"
+         TransformOrigin="Origin.TopRight"
+         AriaLabel="@Text["AppearanceLabel"]">
+    @foreach (var option in Options)
+    {
+        <MudMenuItem Icon="@option.Icon" OnClick="@(() => SelectAsync(option.Preference))">
+            <div class="appearance-option">
+                <span>@option.Label</span>
+                @if (Theme?.Preference == option.Preference)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Primary" />
+                }
+            </div>
+        </MudMenuItem>
+    }
+</MudMenu>
+
+@code {
+    [CascadingParameter(Name = "Theme")] private ThemeContext? Theme { get; set; }
+
+    private sealed record Option(ThemePreference Preference, string Icon, string Label);
+
+    private Option[] Options =>
+    [
+        new(ThemePreference.Light, Icons.Material.Filled.LightMode, Text["ThemeLight"]),
+        new(ThemePreference.Dark, Icons.Material.Filled.DarkMode, Text["ThemeDark"]),
+        new(ThemePreference.System, Icons.Material.Filled.BrightnessAuto, Text["ThemeSystem"])
+    ];
+
+    // Reflects what is on screen rather than what was chosen, so System shows the
+    // resolved sun or moon instead of a state the user cannot see.
+    private string ActiveIcon => Theme?.Preference switch
+    {
+        ThemePreference.Light => Icons.Material.Filled.LightMode,
+        ThemePreference.Dark => Icons.Material.Filled.DarkMode,
+        _ => Icons.Material.Filled.BrightnessAuto
+    };
+
+    private async Task SelectAsync(ThemePreference preference)
+    {
+        if (Theme is null) return;
+        await Theme.SetPreferenceAsync(preference);
+    }
+}

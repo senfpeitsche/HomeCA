@@ -14,7 +14,7 @@
 @if (string.IsNullOrEmpty(_token))
 {
     <main class="login-shell">
-        <LanguageSelector />
+        <AppearanceControls />
         <MudPaper Class="login-card" Elevation="0">
             <MudText Typo="Typo.overline" Class="signal-text">@Text["LoginSignalText"]</MudText>
             <MudText Typo="Typo.h2" Class="service-title">
@@ -66,7 +66,7 @@
 else if (_mustChangePassword)
 {
     <main class="login-shell">
-        <LanguageSelector />
+        <AppearanceControls />
         <MudPaper Class="login-card" Elevation="0">
             <MudText Typo="Typo.overline" Class="signal-text">@Text["LoginSignalText"]</MudText>
             <MudText Typo="Typo.h2" Class="service-title">
@@ -106,15 +106,20 @@ else
                     </MudTooltip>
                 }
                 <MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="@Text["RefreshAriaLabel"]" OnClick="LoadAllAsync" Disabled="_busy" />
-                <LanguageSelector />
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="Logout">@Text["LogoutButton"]</MudButton>
+                <AppearanceControls />
+                <MudTooltip Text="@(_confirmLogout ? Text["ConfirmSignOut"] : Text["LogoutButton"])">
+                    <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                                   Color="@(_confirmLogout ? Color.Warning : Color.Inherit)"
+                                   aria-label="@(_confirmLogout ? Text["ConfirmSignOut"] : Text["LogoutButton"])"
+                                   OnClick="Logout" />
+                </MudTooltip>
             </MudStack>
         </MudAppBar>
         <MudDrawer Open="true" Variant="DrawerVariant.Responsive" Elevation="0" Class="nav-rail">
             <MudNavMenu>
                 @foreach (var entry in Nav)
                 {
-                    <MudNavLink Class="@NavClass(entry.Key)" OnClick="@(() => _section = entry.Key)">@entry.Value</MudNavLink>
+                    <MudNavLink Class="@NavClass(entry.Key)" OnClick="@(() => Navigate(entry.Key))">@entry.Value</MudNavLink>
                 }
             </MudNavMenu>
         </MudDrawer>
@@ -236,7 +241,8 @@ else
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private string? _token, _loginUser, _loginPassword, _loginError, _pageError, _connectorCheckMessage, _editingConnectorId, _editingDomainName, _editingAuthorityId, _editingProfileId, _deleteAuthorityId, _deleteProfileId, _deleteCertificateId;
     private string _section = "overview";
-    private bool _busy, _loading, _loginValid, _mustChangePassword, _showSetupWizard;
+    private void Navigate(string section) { _section = section; _confirmLogout = false; }
+    private bool _busy, _loading, _loginValid, _mustChangePassword, _showSetupWizard, _confirmLogout;
     private string _setupPhase = "initial";
     private bool _isFirstLogin = true;
     private List<DnsCheckResult> _dnsCheckResults = [];
@@ -478,10 +484,12 @@ else
         catch { _loginError = Text["LoginProcessingFailed"]; }
         finally { _busy = false; }
     }
+    // Click-twice, as the destructive actions do; the icon turns amber meanwhile.
     private async Task Logout()
     {
+        if (!_confirmLogout) { _confirmLogout = true; Snackbar.Add(Text["ConfirmSignOut"], Severity.Warning); return; }
         await JS.InvokeVoidAsync("homeca.clearBrowserSession");
-        _token = null; _loginPassword = null; _section = "overview"; _mustChangePassword = false; _currentPassword = ""; _newPassword = ""; _confirmPassword = ""; _changePasswordError = null; _changePasswordSuccess = null;
+        _token = null; _loginPassword = null; _section = "overview"; _mustChangePassword = false; _currentPassword = ""; _newPassword = ""; _confirmPassword = ""; _changePasswordError = null; _changePasswordSuccess = null; _confirmLogout = false;
         ClearData(); Snackbar.Add(Text["SignedOut"], Severity.Info);
     }
     private void ClearData() { _certificates=[]; _authorities=[]; _domains=[]; _connectors=[]; _profiles=[]; _plans=[]; _issuers=[]; _warnings=[]; _revocations=[]; _rfc8555Accounts=[]; _rfc8555Orders=[]; _externalCerts=[]; _sshCertificates=[]; _selectedProfileId = ""; }
