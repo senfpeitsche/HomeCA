@@ -6,7 +6,10 @@
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
-@Body
+@* Lets brand images pick the matching variant *@
+<CascadingValue Value="_isDarkMode" Name="IsDarkMode">
+    @Body
+</CascadingValue>
 <MudTooltip Text="@ThemeToggleLabel">
     <MudIconButton Class="theme-toggle"
                    Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
@@ -27,9 +30,10 @@
     {
         PaletteLight = new PaletteLight
         {
-            Primary = "#594AE2",
+            // Brand hues from design/, lightness-adjusted to clear 4.5:1 on Surface.
+            Primary = "#024381",
             Secondary = "#64748B",
-            Tertiary = "#0EA5E9",
+            Tertiary = "#048484",
             AppbarBackground = "#FFFFFF",
             AppbarText = "#1E293B",
             DrawerBackground = "#FFFFFF",
@@ -41,16 +45,17 @@
             Divider = "#E2E8F0",
             ActionDefault = "#475569",
             ActionDisabled = "#CBD5E1",
-            Success = "#2563EB",
+            Success = "#278834",
+            // Brand amber is 1.73:1 on white and goes olive when darkened.
             Warning = "#D97706",
             Error = "#DC2626",
             Info = "#0284C7"
         },
         PaletteDark = new PaletteDark
         {
-            Primary = "#AFA7FF",
+            Primary = "#047FF5",
             Secondary = "#94A3B8",
-            Tertiary = "#38BDF8",
+            Tertiary = "#049595",
             AppbarBackground = "#0F172A",
             AppbarText = "#F8FAFC",
             DrawerBackground = "#0F172A",
@@ -62,8 +67,9 @@
             Divider = "#334155",
             ActionDefault = "#CBD5E1",
             ActionDisabled = "#475569",
-            Success = "#60A5FA",
-            Warning = "#FBBF24",
+            // Brand green and amber are already legible here, so used unmodified.
+            Success = "#30A63F",
+            Warning = "#FCBA03",
             Error = "#F87171",
             Info = "#38BDF8"
         },

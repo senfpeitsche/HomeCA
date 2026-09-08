@@ -17,7 +17,9 @@
         <LanguageSelector />
         <MudPaper Class="login-card" Elevation="0">
             <MudText Typo="Typo.overline" Class="signal-text">@Text["LoginSignalText"]</MudText>
-            <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
+            <MudText Typo="Typo.h2" Class="service-title">
+                <img src="@WideLogo" width="720" height="229" alt="HomeCA" class="service-logo" />
+            </MudText>
             <MudText Class="mud-text-secondary">@Text["LoginSubtitle"]</MudText>
             @if (_isFirstLogin)
             {
@@ -67,7 +69,9 @@ else if (_mustChangePassword)
         <LanguageSelector />
         <MudPaper Class="login-card" Elevation="0">
             <MudText Typo="Typo.overline" Class="signal-text">@Text["LoginSignalText"]</MudText>
-            <MudText Typo="Typo.h2" Class="service-title">HomeCA</MudText>
+            <MudText Typo="Typo.h2" Class="service-title">
+                <img src="@WideLogo" width="720" height="229" alt="HomeCA" class="service-logo" />
+            </MudText>
             <MudText Class="mud-text-secondary">@Text["ChangePasswordDescription"]</MudText>
             <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">@Text["DefaultCredentialsHint"]</MudAlert>
             <MudForm @ref="_changePasswordForm" Class="form-stack" @bind-IsValid="_changePasswordValid">
@@ -89,7 +93,8 @@ else
 {
     <MudLayout>
         <MudAppBar Elevation="0" Class="app-bar">
-            <MudText Typo="Typo.h5" Class="app-name">HomeCA <span>@Text["AppNameSuffix"]</span></MudText>
+            <img src="@BarLogo" width="323" height="96" alt="HomeCA" class="app-logo" />
+            <MudText Typo="Typo.h5" Class="app-name"><span>@Text["AppNameSuffix"]</span></MudText>
             <MudSpacer />
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0" Wrap="Wrap.NoWrap" Class="app-bar-actions">
                 @if (_updateAvailable && !string.IsNullOrEmpty(_latestVersion))
@@ -221,6 +226,11 @@ else
 }
 
 @code {
+    // The navy wordmark is only 1.8:1 on the dark surface, hence two renderings.
+    [CascadingParameter(Name = "IsDarkMode")] private bool IsDarkMode { get; set; }
+    private string WideLogo => IsDarkMode ? "brand/logo-wide-dark.png" : "brand/logo-wide.png";
+    private string BarLogo => IsDarkMode ? "brand/logo-dark.png" : "brand/logo.png";
+
     private (string Key, string Value)[] Nav => [("overview", Text["NavOverview"]), ("certificates", Text["NavCertificates"]), ("authorities", Text["NavAuthorities"]), ("acme", Text["NavAcme"]), ("automation", Text["NavAutomation"]), ("settings", Text["NavSettings"]), ("profiles", Text["NavProfiles"]), ("operations", Text["NavOperations"]), ("help", Text["NavHelp"])];
     private const string Tls = "TLS", ClientUsage = "mTLS", Ecc = "ECC", Rsa = "RSA", RootAuthority = "root", IntermediateAuthority = "intermediate", HostKind = "host", UserKind = "user", Hetzner = "hetzner", Technitium = "technitium", Unspecified = "unspecified", KeyCompromise = "keyCompromise", CessationOfOperation = "cessationOfOperation", smtp = "smtp", m365 = "m365";
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
