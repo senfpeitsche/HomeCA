@@ -1,3 +1,16 @@
+<p align="center">
+  <img src="docs/assets/banner.png" alt="HomeCA — self-hosted minimal PKI for homelabs" width="820" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/senfpeitsche/HomeCA/releases"><img src="https://img.shields.io/github/v/release/senfpeitsche/HomeCA?style=flat&color=024381&label=release" alt="Latest release" /></a>
+  <a href="https://github.com/senfpeitsche/HomeCA/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/senfpeitsche/HomeCA/ci.yml?style=flat&label=build" alt="Build status" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/senfpeitsche/HomeCA?style=flat&color=024381" alt="MIT licence" /></a>
+  <a href="https://github.com/senfpeitsche/HomeCA"><img src="https://img.shields.io/github/stars/senfpeitsche/HomeCA?style=flat&color=049595&logo=github&logoColor=white" alt="GitHub stars" /></a>
+  <a href="https://github.com/senfpeitsche/HomeCA/commits/main"><img src="https://img.shields.io/github/last-commit/senfpeitsche/HomeCA?style=flat&color=049595" alt="Last commit" /></a>
+  <a href="https://dotnet.microsoft.com/download/dotnet/10.0"><img src="https://img.shields.io/badge/.NET-10-024381?style=flat&logo=dotnet&logoColor=white" alt=".NET 10" /></a>
+</p>
+
 # HomeCA
 
 [Deutsch](README.de.md) · English

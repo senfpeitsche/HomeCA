@@ -1,7 +1,7 @@
 ---
 version: alpha
 colors:
-  primary: "#594AE2"
+  primary: "#024381"
   canvas: "#F8FAFC"
   surface: "#FFFFFF"
   ink: "#1E293B"
@@ -22,11 +22,11 @@ components:
 
 ## Overview
 
-HomeCA is a focused local-administration surface for homelab operators. It follows MudBlazor's familiar application shell with a quiet slate workspace and a restrained indigo primary action; it should feel like a dependable local administration tool, not a branded cloud dashboard.
+HomeCA is a focused local-administration surface for homelab operators. It follows MudBlazor's familiar application shell with a quiet slate workspace and a restrained navy primary action; it should feel like a dependable local administration tool, not a branded cloud dashboard.
 
 ## Colors
 
-Indigo marks the primary action and active navigation. Slate carries secondary information and chrome. Success uses blue rather than green; warnings, errors and information retain distinct semantic tones. The light and dark palettes preserve this hierarchy.
+Navy marks the primary action and active navigation, teal the tertiary accent. Slate carries secondary information and chrome. Warnings, errors, success and information retain distinct semantic tones. The light and dark palettes preserve this hierarchy; accents are taken from the brand set in `design/` and adjusted in lightness until they clear 4.5:1 against their surface.
 
 ## Typography
 
@@ -50,4 +50,4 @@ Use MudBlazor components and their default control hierarchy. The global theme t
 
 ## Do's and Don'ts
 
-Do keep sensitive data out of persistent browser storage. Do not use green in the interface; use the defined blue success tone instead.
+Do keep sensitive data out of persistent browser storage. Reserve green for success; it is a semantic tone, not decoration.

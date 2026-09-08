@@ -16,12 +16,15 @@ html, body { min-height: 100%; background: var(--mud-palette-background); color:
 .login-card { width: min(100%, 44rem); padding: 3rem; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); }
 .service-title, .page-title { color: var(--mud-palette-text-primary); }
 .login-card .service-title { font-size: 3.1rem; margin: .25rem 0 .5rem; }
+/* block, not inline: .service-title is also a text heading in SetupWizard. */
+.service-logo { display: block; width: min(100%, 22.5rem); height: auto; }
 .signal-text, .section-kicker { color: var(--mud-palette-primary); font-weight: 700; letter-spacing: .1em; }
 .form-stack { display: grid; gap: 1rem; margin-top: 1.5rem; }
 .mud-input-control.language-selector { flex: 0 0 7.5rem; inline-size: 7.5rem; min-inline-size: 7.5rem; width: 7.5rem; }
 .login-shell > .language-selector { position: fixed; top: 1rem; right: 1rem; z-index: 1; }
 
 .app-bar { background: var(--mud-palette-appbar-background); color: var(--mud-palette-appbar-text); min-height: 4rem; border-bottom: 1px solid var(--mud-palette-divider); }
+.app-logo { display: block; height: 2rem; width: auto; }
 .app-name { letter-spacing: .01em; font-weight: 600; }
 .app-name span { color: var(--mud-palette-text-secondary); font-size: .65rem; letter-spacing: .12em; margin-left: .5rem; }
 .nav-rail { background: var(--mud-palette-drawer-background); color: var(--mud-palette-drawer-text); width: 15rem; border-right: 1px solid var(--mud-palette-divider); }
