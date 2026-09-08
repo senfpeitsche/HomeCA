@@ -139,6 +139,8 @@ msg_ok "HomeCA ${RESOLVED_TAG} deployed"
 # ── Update systemd unit (in case it changed) ────────────────────────
 msg_info "Refreshing release-bundled systemd unit …"
 install -m 0644 "$RELEASE_DIR/bundle/deploy/systemd/homeca.service" /etc/systemd/system/homeca.service
+# Repeated from homeca-install.sh so an installation predating that fix recovers.
+install -d -o root -g root -m 0755 /etc/systemd/system/homeca.service.d
 systemctl daemon-reload
 msg_ok "systemd unit updated"
 

@@ -16,6 +16,7 @@ DATA_DIR="/var/lib/homeca"
 BACKUP_DIR="/var/backups/homeca"
 CONFIG_DIR="/etc/homeca"
 SERVICE_FILE="/etc/systemd/system/homeca.service"
+SERVICE_DROPIN_DIR="/etc/systemd/system/homeca.service.d"
 
 gh_resolve_latest_tag() {
   curl -fsSI "https://github.com/${GH_REPO}/releases/latest" 2>/dev/null \
@@ -99,6 +100,8 @@ fi
 msg_info "Setting up directories …"
 install -d -o root   -g root   -m 0755 "$APP_DIR"
 install -d -o homeca -g homeca -m 0750 "$DATA_DIR" "$BACKUP_DIR" "$CONFIG_DIR"
+# Listed in the unit's ReadWritePaths; systemd fails to start when it is missing.
+install -d -o root   -g root   -m 0755 "$SERVICE_DROPIN_DIR"
 msg_ok "Directories ready"
 
 # ── Backup encryption key ───────────────────────────────────────────
