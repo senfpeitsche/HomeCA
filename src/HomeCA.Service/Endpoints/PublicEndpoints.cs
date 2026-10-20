@@ -86,15 +86,20 @@ namespace HomeCA.Service.Endpoints;
         endpoints.MapPost("/api/v1/login", async (LoginRequest request, HttpContext context, LocalAdministrationService administration, LoginRateLimiter rateLimiter, ILogger<global::Program> logger, CancellationToken ct) =>
         {
             var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            if (rateLimiter.IsBlocked(ip))
+            if (!rateLimiter.TryBeginAttempt(ip))
             {
                 logger.LogWarning("Login attempt rejected because the rate limit is active for {RemoteIpAddress}", ip);
                 return Results.Problem("Too many failed login attempts. Try again later.", statusCode: 429);
             }
-            var loginResponse = await administration.LoginAsync(request, ct);
-            if (loginResponse is null) { rateLimiter.RecordFailure(ip); return Results.Unauthorized(); }
-            rateLimiter.RecordSuccess(ip);
-            return Results.Ok(new { accessToken = loginResponse.AccessToken, expiresInSeconds = loginResponse.ExpiresInSeconds, mustChangePassword = loginResponse.MustChangePassword });
+            bool? succeeded = null;
+            try
+            {
+                var loginResponse = await administration.LoginAsync(request, ct);
+                succeeded = loginResponse is not null;
+                if (loginResponse is null) return Results.Unauthorized();
+                return Results.Ok(new { accessToken = loginResponse.AccessToken, expiresInSeconds = loginResponse.ExpiresInSeconds, mustChangePassword = loginResponse.MustChangePassword });
+            }
+            finally { rateLimiter.CompleteAttempt(ip, succeeded); }
         });
 
         endpoints.MapPost("/api/v1/ui-session", async (HttpContext context, LocalAdministrationService administration, BrowserSessionService browserSessions, CancellationToken ct) =>

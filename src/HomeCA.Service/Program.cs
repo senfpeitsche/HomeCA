@@ -30,6 +30,7 @@ builder.Services
 builder.Services.AddSingleton<HomeCaStorage>();
 builder.Services.AddSingleton<HomeCaInternalHttpClient>();
 builder.Services.AddSingleton<SetupStateService>();
+builder.Services.AddSingleton<TlsActivationService>();
 builder.Services.AddSingleton<LocalAdministrationService>();
 builder.Services.AddSingleton<BrowserSessionService>();
 builder.Services.AddHttpContextAccessor();
@@ -89,9 +90,13 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Add(IPAddress.IPv6Loopback);
 });
 
-ConfigureTlsCertificateChain(builder);
+var tlsChainError = ConfigureTlsCertificateChain(builder);
 
 var app = builder.Build();
+// Logging is only available once the host is built; report the TLS problem through it so it
+// reaches the journal with level and category instead of bare stderr.
+if (tlsChainError is not null)
+    app.Logger.LogWarning(tlsChainError, "HomeCA could not configure the TLS certificate chain; Kestrel serves only the leaf certificate");
 
 var supportedCultures = LocaleCatalog.Cultures.ToList();
 var localizationOptions = new RequestLocalizationOptions
@@ -129,6 +134,22 @@ localizationOptions.RequestCultureProviders =
 }
 
 app.UseForwardedHeaders();
+// With TLS active, plain HTTP stays open only for CRLs, trust bootstrap, health and ACME;
+// the UI, login and management API are redirected to HTTPS.
+if (PlainHttpPolicy.TryGetHttpsPort(Environment.GetEnvironmentVariable("ASPNETCORE_URLS"), out var httpsPort))
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.IsHttps || PlainHttpPolicy.IsAllowedOverPlainHttp(context.Request.Path))
+        {
+            await next(context);
+            return;
+        }
+        var target = Microsoft.AspNetCore.Http.Extensions.UriHelper.BuildAbsolute(
+            "https", new HostString(context.Request.Host.Host, httpsPort), context.Request.PathBase, context.Request.Path, context.Request.QueryString);
+        context.Response.Redirect(target, permanent: false, preserveMethod: true);
+    });
+}
 app.UseRequestLocalization(localizationOptions);
 app.UseStaticFiles();
 app.UseAntiforgery();
@@ -163,36 +184,30 @@ app.MapRazorComponents<App>()
 
 await app.RunAsync();
 
-static void ConfigureTlsCertificateChain(WebApplicationBuilder builder)
+static Exception? ConfigureTlsCertificateChain(WebApplicationBuilder builder)
 {
     var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-    if (string.IsNullOrWhiteSpace(urls) || !urls.Contains("https://", StringComparison.OrdinalIgnoreCase)) return;
+    if (string.IsNullOrWhiteSpace(urls) || !urls.Contains("https://", StringComparison.OrdinalIgnoreCase)) return null;
 
     var configurationPath = builder.Configuration.GetValue<string>($"{HomeCaStorageOptions.SectionName}:ConfigurationPath")
         ?? HomeCaStorageOptions.DefaultConfigurationPath;
     var tlsConfigPath = HomeCaStorageOptions.GetConfigurationFilePath(configurationPath, "tls.json");
-    if (!File.Exists(tlsConfigPath)) return;
+    if (!File.Exists(tlsConfigPath)) return null;
 
     try
     {
-        var tlsConfig = System.Text.Json.JsonSerializer.Deserialize<TlsConfigDto>(File.ReadAllText(tlsConfigPath), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        if (string.IsNullOrWhiteSpace(tlsConfig?.PfxPath) || !File.Exists(tlsConfig.PfxPath)) return;
+        var tlsConfig = System.Text.Json.JsonSerializer.Deserialize<TlsConfiguration>(File.ReadAllText(tlsConfigPath), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (string.IsNullOrWhiteSpace(tlsConfig?.PfxPath) || !File.Exists(tlsConfig.PfxPath)) return null;
 
-        var certificateDirectory = Path.GetDirectoryName(tlsConfig.PfxPath);
-        var certificatesDirectory = certificateDirectory is null ? null : Path.GetDirectoryName(certificateDirectory);
-        var storageRoot = certificatesDirectory is null ? null : Path.GetDirectoryName(certificatesDirectory);
-        if (certificateDirectory is null || storageRoot is null) return;
-
-        var certificateId = Path.GetFileName(certificateDirectory);
-        var chainPath = Path.Combine(storageRoot, "exports", certificateId, "chain.pem");
-        if (!File.Exists(chainPath)) return;
+        var chainPath = ResolveTlsChainPath(tlsConfig.PfxPath);
+        if (chainPath is null) return null;
 
         var serverCertificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(tlsConfig.PfxPath, password: null);
         var exportedChain = new System.Security.Cryptography.X509Certificates.X509Certificate2Collection();
         exportedChain.ImportFromPemFile(chainPath);
         var issuingCertificate = exportedChain.FirstOrDefault(certificate =>
             string.Equals(certificate.Subject, serverCertificate.Issuer, StringComparison.OrdinalIgnoreCase));
-        if (issuingCertificate is null) return;
+        if (issuingCertificate is null) return null;
 
         // Kestrel's certificate path alone loads only the leaf certificate. Supply
         // the leaf and its issuer explicitly; the root CA must not be sent.
@@ -201,16 +216,31 @@ static void ConfigureTlsCertificateChain(WebApplicationBuilder builder)
             serverCertificate,
             issuingCertificate
         };
-        builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(endpoint => endpoint.UseHttps(https =>
+        // HTTPS defaults apply only to https:// endpoints; the HTTP listener kept for CRLs stays plain.
+        builder.WebHost.ConfigureKestrel(options => options.ConfigureHttpsDefaults(https =>
         {
             https.ServerCertificate = serverCertificate;
             https.ServerCertificateChain = serverChain;
-        })));
+        }));
+        return null;
     }
     catch (Exception exception)
     {
-        Console.Error.WriteLine($"HomeCA could not configure the TLS certificate chain: {exception.Message}");
+        return exception;
     }
 }
 
-record TlsConfigDto(string? HttpsUrl, string? PfxPath, string? PublicUrl, string? Hostname);
+// The chain lives next to the stable TLS PFX; older installations reference the issued
+// certificate directly, whose chain is in exports/{id}.
+static string? ResolveTlsChainPath(string pfxPath)
+{
+    var certificateDirectory = Path.GetDirectoryName(pfxPath);
+    if (certificateDirectory is null) return null;
+    var adjacentChain = Path.Combine(certificateDirectory, "chain.pem");
+    if (File.Exists(adjacentChain)) return adjacentChain;
+
+    var storageRoot = Path.GetDirectoryName(Path.GetDirectoryName(certificateDirectory));
+    if (storageRoot is null) return null;
+    var exportedChain = Path.Combine(storageRoot, "exports", Path.GetFileName(certificateDirectory), "chain.pem");
+    return File.Exists(exportedChain) ? exportedChain : null;
+}

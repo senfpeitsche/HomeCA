@@ -28,6 +28,54 @@ public sealed class LocalAdministrationServiceTests : IDisposable
         Assert.False(afterChange.MustChangePassword);
     }
 
+    [Fact]
+    public async Task Password_Change_Ends_All_Other_Sessions()
+    {
+        var service = CreateService();
+        await service.EnsureDefaultAdministratorAsync(CancellationToken.None);
+        var current = await service.LoginAsync(new LoginRequest("admin", "admin"), CancellationToken.None);
+        var other = await service.LoginAsync(new LoginRequest("admin", "admin"), CancellationToken.None);
+
+        Assert.True(await service.ChangePasswordAsync(current!.AccessToken, new ChangePasswordRequest("admin", "a-secure-new-password"), CancellationToken.None));
+
+        Assert.True((await service.ValidateSessionAsync(current.AccessToken, CancellationToken.None)).IsValid);
+        Assert.False((await service.ValidateSessionAsync(other!.AccessToken, CancellationToken.None)).IsValid);
+        Assert.Null(await service.LoginAsync(new LoginRequest("admin", "admin"), CancellationToken.None));
+        // A restarted service reads the same state from disk.
+        var restarted = CreateService();
+        Assert.True((await restarted.ValidateSessionAsync(current.AccessToken, CancellationToken.None)).IsValid);
+        Assert.False((await restarted.ValidateSessionAsync(other.AccessToken, CancellationToken.None)).IsValid);
+        Assert.NotNull(await restarted.LoginAsync(new LoginRequest("admin", "a-secure-new-password"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Wrong_User_Name_Is_Rejected()
+    {
+        var service = CreateService();
+        await service.EnsureDefaultAdministratorAsync(CancellationToken.None);
+
+        Assert.Null(await service.LoginAsync(new LoginRequest("root", "admin"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Audit_Log_Returns_Written_Events_And_Filters_By_Action()
+    {
+        var service = CreateService();
+        await service.EnsureDefaultAdministratorAsync(CancellationToken.None);
+        Assert.Null(await service.LoginAsync(new LoginRequest("admin", "wrong"), CancellationToken.None));
+        Assert.NotNull(await service.LoginAsync(new LoginRequest("admin", "admin"), CancellationToken.None));
+
+        var all = await service.ReadAuditLogAsync();
+        var failed = await service.ReadAuditLogAsync(action: "login_failed");
+
+        Assert.Equal(3, all.Count);
+        Assert.All(all, entry => Assert.Equal("admin", entry.Subject));
+        Assert.All(all, entry => Assert.True(entry.OccurredAt > DateTimeOffset.UtcNow.AddMinutes(-5)));
+        Assert.Equal("administrator.login", all[0].Action);
+        var entry = Assert.Single(failed);
+        Assert.Equal("administrator.login_failed", entry.Action);
+    }
+
     private LocalAdministrationService CreateService() => new(
         _fixture.CreateStorage(),
         new TestHostEnvironment(),

@@ -87,5 +87,38 @@ public sealed class CrlServiceTests : IDisposable
         return CrlNumber.GetInstance(Asn1Object.FromByteArray(extension.GetOctets())).Value;
     }
 
+    [Fact]
+    public async Task Repeated_Revocation_Keeps_The_Original_Date_But_Updates_The_Reason()
+    {
+        var revocations = new RevocationRegistry(_fixture.CreateStorage(), NullLogger<RevocationRegistry>.Instance);
+        var first = await revocations.RevokeAsync("0A1B", "superseded", CancellationToken.None, "ca-1");
+        await Task.Delay(20);
+
+        var second = await revocations.RevokeAsync("0a1b", "keyCompromise", CancellationToken.None);
+
+        Assert.Equal(first.RevokedAt, second.RevokedAt);
+        Assert.Equal("keyCompromise", second.Reason);
+        Assert.Equal("ca-1", second.AuthorityId);
+        Assert.Single(await revocations.ListAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RenewExpiringAsync_Continues_After_A_Broken_Authority()
+    {
+        var storage = _fixture.CreateStorage();
+        var authorities = new CertificateAuthorityService(storage, NullLogger<CertificateAuthorityService>.Instance);
+        var crl = new CrlService(storage, new RevocationRegistry(storage, NullLogger<RevocationRegistry>.Instance), authorities, NullLogger<CrlService>.Instance);
+        await authorities.InitializeAsync(CancellationToken.None);
+        var root = (await authorities.ListAsync(CancellationToken.None)).Single(authority => authority.Type == "root");
+        var broken = await authorities.CreateAsync(new CreateAuthorityRequest("Broken CA", "CN=Broken CA", "intermediate", root.Id, 365, "ECC", 7), CancellationToken.None);
+        File.WriteAllBytes(Path.Combine(storage.RootPath, "authorities", broken.Id, "authority.pfx"), [1, 2, 3]);
+
+        var renewed = await crl.RenewExpiringAsync(CancellationToken.None);
+
+        Assert.Equal(2, renewed);
+        foreach (var authority in (await authorities.ListAsync(CancellationToken.None)).Where(authority => authority.Id != broken.Id))
+            Assert.True(File.Exists(Path.Combine(storage.RootPath, "crl", $"{authority.Id}.crl")));
+    }
+
     public void Dispose() => _fixture.Dispose();
 }

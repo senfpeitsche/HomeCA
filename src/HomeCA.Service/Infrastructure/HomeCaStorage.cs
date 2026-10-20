@@ -26,6 +26,7 @@ public sealed class HomeCaStorage
     public string CaKeyPath => _options.CaKeyPath;
     public string ConfigurationPath => Path.GetFullPath(_options.ConfigurationPath);
     public string? PublicUrl => _options.PublicUrl;
+    public string? CrlDistributionBaseUrl => _options.CrlDistributionBaseUrl;
 
     public string GetConfigurationFilePath(string fileName) => HomeCaStorageOptions.GetConfigurationFilePath(_options.ConfigurationPath, fileName);
 
@@ -60,34 +61,86 @@ public sealed class HomeCaStorage
         }
 
         Directory.CreateDirectory(_options.BackupPath);
-        var name = $"homeca-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.hcab";
+        var createdAt = DateTimeOffset.UtcNow;
+        // Milliseconds keep two backups in the same second apart; CreateNew never overwrites one.
+        var name = $"homeca-{createdAt:yyyyMMddHHmmssfff}.hcab";
         var target = Path.Combine(_options.BackupPath, name);
-        var archivePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.zip");
 
-        try
+        // The archive is built in memory: a temporary plaintext ZIP on disk would expose the CA
+        // keys (and survive a crash) until it was deleted.
+        var plaintext = await Task.Run(() => CreateArchive(cancellationToken), cancellationToken);
+        var nonce = RandomNumberGenerator.GetBytes(12);
+        var ciphertext = new byte[plaintext.Length];
+        var tag = new byte[16];
+        using (var cipher = new AesGcm(key, tag.Length))
         {
-            await Task.Run(() => ZipFile.CreateFromDirectory(_options.RootPath, archivePath, CompressionLevel.SmallestSize, false), cancellationToken);
-            var plaintext = await File.ReadAllBytesAsync(archivePath, cancellationToken);
-            var nonce = RandomNumberGenerator.GetBytes(12);
-            var ciphertext = new byte[plaintext.Length];
-            var tag = new byte[16];
-            using (var cipher = new AesGcm(key, tag.Length))
-            {
-                cipher.Encrypt(nonce, plaintext, ciphertext, tag, BackupMagic);
-            }
+            cipher.Encrypt(nonce, plaintext, ciphertext, tag, BackupMagic);
+        }
+        CryptographicOperations.ZeroMemory(plaintext);
 
-            await using var output = File.Create(target);
+        var temporaryTarget = target + ".partial";
+        await using (var output = new FileStream(temporaryTarget, FileMode.CreateNew, FileAccess.Write))
+        {
             await output.WriteAsync(BackupMagic, cancellationToken);
             await output.WriteAsync(nonce, cancellationToken);
             await output.WriteAsync(tag, cancellationToken);
             await output.WriteAsync(ciphertext, cancellationToken);
-            _logger.LogInformation("Created encrypted backup {BackupFile}", target);
-            return new BackupDescriptor(name, target, DateTimeOffset.UtcNow);
         }
-        finally
+        // A backup that is listed must be complete.
+        File.Move(temporaryTarget, target, overwrite: false);
+        _logger.LogInformation("Created encrypted backup {BackupFile}", target);
+        return new BackupDescriptor(name, target, createdAt);
+    }
+
+    /// <summary>
+    /// Zips the data directory while the service keeps running. State files are replaced atomically
+    /// via rename, so each file is read whole; in-flight ".tmp" files are skipped, and a file replaced
+    /// or removed while it is read is retried or left out.
+    /// </summary>
+    internal byte[] CreateArchive(CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
-            File.Delete(archivePath);
+            foreach (var path in Directory.EnumerateFiles(_options.RootPath, "*", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
+                var content = TryReadStable(path);
+                if (content is null)
+                {
+                    _logger.LogWarning("Skipped {Path} in the backup because it disappeared while being read", path);
+                    continue;
+                }
+                var entryName = Path.GetRelativePath(_options.RootPath, path).Replace('\\', '/');
+                var entry = archive.CreateEntry(entryName, CompressionLevel.SmallestSize);
+                using var entryStream = entry.Open();
+                entryStream.Write(content);
+            }
         }
+        return buffer.ToArray();
+    }
+
+    private static byte[]? TryReadStable(string path)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var copy = new MemoryStream();
+                stream.CopyTo(copy);
+                return copy.ToArray();
+            }
+            catch (FileNotFoundException) { return null; }
+            catch (DirectoryNotFoundException) { return null; }
+            catch (IOException) when (attempt < 2)
+            {
+                // Windows reports a file that is being replaced as locked; try again shortly.
+                Thread.Sleep(50);
+            }
+        }
+        return null;
     }
 
     public async Task<BackupVerificationResult> VerifyBackupAsync(string fileName, CancellationToken cancellationToken)
@@ -102,9 +155,13 @@ public sealed class HomeCaStorage
         var nonce = payload.AsSpan(BackupMagic.Length, 12); var tag = payload.AsSpan(BackupMagic.Length + 12, 16); var encrypted = payload.AsSpan(BackupMagic.Length + 28);
         var plaintext = new byte[encrypted.Length];
         using (var cipher = new AesGcm(key, tag.Length)) cipher.Decrypt(nonce, encrypted, tag, plaintext, BackupMagic);
-        var temporaryPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.zip");
-        try { await File.WriteAllBytesAsync(temporaryPath, plaintext, cancellationToken); using var archive = ZipFile.OpenRead(temporaryPath); return new BackupVerificationResult(safeName, true, archive.Entries.Count); }
-        finally { File.Delete(temporaryPath); }
+        // Inspect the archive in memory; the decrypted content contains the CA keys.
+        try
+        {
+            using var archive = new ZipArchive(new MemoryStream(plaintext, writable: false), ZipArchiveMode.Read);
+            return new BackupVerificationResult(safeName, true, archive.Entries.Count);
+        }
+        finally { CryptographicOperations.ZeroMemory(plaintext); }
     }
 
     private void EnsureLayout()

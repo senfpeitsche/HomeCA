@@ -10,14 +10,21 @@ using HomeCA.Service.Revocation;
 using HomeCA.Service.Deployments;
 using HomeCA.Service.Automation;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography.X509Certificates;
 
 namespace HomeCA.Service.Endpoints;
  static class CertificateEndpoints
 {
     public static void MapCertificateEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>();
-        
+        var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>()
+            .AddEndpointFilter(async (context, next) =>
+                // Certificate and SSH IDs are hex strings. They become path segments below the data
+                // directory, so anything else (e.g. "..", or "..\" on Windows) is rejected up front.
+                context.HttpContext.Request.RouteValues.TryGetValue("id", out var id) && !IsCertificateId(id as string)
+                    ? Results.NotFound()
+                    : await next(context));
+
         api.MapGet("/certificates", async (HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
         {
             var search = httpRequest.Query["search"].FirstOrDefault();
@@ -43,7 +50,8 @@ namespace HomeCA.Service.Endpoints;
         api.MapPost("/certificates/{id}/revoke", async (string id, HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
         {
             var reason = httpRequest.Query["reason"].FirstOrDefault() ?? "unspecified";
-            return await certificates.RevokeAsync(id, reason, ct) ? Results.NoContent() : Results.NotFound();
+            try { return await certificates.RevokeAsync(id, reason, ct) ? Results.NoContent() : Results.NotFound(); }
+            catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
         });
         api.MapGet("/certificates/{id}/export/pem", async (string id, HomeCaStorage storage) =>
         {
@@ -93,11 +101,22 @@ namespace HomeCA.Service.Endpoints;
         {
             var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
             if (!File.Exists(pfxPath)) return Results.NotFound();
-            using var certificate = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(pfxPath);
-            var chainPath = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
-            var bytes = CertificatePfxExporter.ExportWithIssuingCertificate(certificate, chainPath, request.Password);
-            var name = CertificateDownloadName(storage, id);
-            return Results.File(bytes, "application/x-pkcs12", $"{name}.pfx");
+            if (string.IsNullOrEmpty(request.Password))
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["A PFX password is required."] });
+            X509Certificate2 certificate;
+            try { certificate = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(pfxPath); }
+            catch (InvalidOperationException)
+            {
+                // ACME clients generate and keep their own key; HomeCA only retains the certificate.
+                return Results.Conflict(new { detail = "HomeCA does not hold the private key of this certificate (for example an ACME certificate), so no PFX can be exported." });
+            }
+            using (certificate)
+            {
+                var chainPath = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
+                var bytes = CertificatePfxExporter.ExportWithIssuingCertificate(certificate, chainPath, request.Password);
+                var name = CertificateDownloadName(storage, id);
+                return Results.File(bytes, "application/x-pkcs12", $"{name}.pfx");
+            }
         });
         
         // SSH
@@ -133,6 +152,9 @@ namespace HomeCA.Service.Endpoints;
         
         // Domains
     }
+
+    internal static bool IsCertificateId(string? id) =>
+        !string.IsNullOrEmpty(id) && id.Length <= 64 && id.All(Uri.IsHexDigit);
 
     private static string CertificateDownloadName(HomeCaStorage storage, string id)
     {

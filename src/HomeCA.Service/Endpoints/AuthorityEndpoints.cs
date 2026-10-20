@@ -20,7 +20,9 @@ namespace HomeCA.Service.Endpoints;
         
         api.MapPost("/authorities/initialize", async (CertificateAuthorityService authorities, SetupStateService setupState, CancellationToken ct) =>
         {
-            var result = await authorities.InitializeAsync(ct);
+            AuthorityInventory result;
+            try { result = await authorities.InitializeAsync(ct); }
+            catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
             // CA eingerichtet → Wizard ist fertig (TLS ist optional, kann über Einstellungen nachgeholt werden)
             await setupState.AdvanceAsync(SetupPhase.PasswordChanged, ct);
             await setupState.SkipWizardAsync(ct);

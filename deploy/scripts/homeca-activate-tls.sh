@@ -19,6 +19,13 @@ fi
 HTTPS_URL=$(grep -oP '"httpsUrl"\s*:\s*"\K[^"]+' "$TLS_CONFIG")
 PFX_PATH=$(grep -oP '"pfxPath"\s*:\s*"\K[^"]+' "$TLS_CONFIG")
 PUBLIC_URL=$(grep -oP '"publicUrl"\s*:\s*"\K[^"]+' "$TLS_CONFIG")
+HOSTNAME_VALUE=$(grep -oP '"hostname"\s*:\s*"\K[^"]+' "$TLS_CONFIG" || true)
+# Plain HTTP stays enabled for CRL distribution points, trust bootstrap and ACME clients.
+HTTP_URL=$(grep -oP '"httpUrl"\s*:\s*"\K[^"]+' "$TLS_CONFIG" || echo "http://0.0.0.0:5080")
+CRL_BASE_URL=$(grep -oP '"crlBaseUrl"\s*:\s*"\K[^"]+' "$TLS_CONFIG" || true)
+if [[ -z "$CRL_BASE_URL" && -n "$HOSTNAME_VALUE" ]]; then
+  CRL_BASE_URL="http://${HOSTNAME_VALUE}:5080"
+fi
 
 if [[ -z "$HTTPS_URL" || -z "$PFX_PATH" ]]; then
   echo "ERROR: Invalid TLS configuration in $TLS_CONFIG" >&2
@@ -34,10 +41,13 @@ echo "Creating systemd override for HTTPS …"
 mkdir -p "$OVERRIDE_DIR"
 cat > "${OVERRIDE_DIR}/tls.conf" << EOF
 [Service]
-Environment=ASPNETCORE_URLS=${HTTPS_URL}
+Environment=ASPNETCORE_URLS=${HTTP_URL};${HTTPS_URL}
 Environment=ASPNETCORE_Kestrel__Certificates__Default__Path=${PFX_PATH}
 Environment=Storage__PublicUrl=${PUBLIC_URL}
 EOF
+if [[ -n "$CRL_BASE_URL" ]]; then
+  echo "Environment=Storage__CrlBaseUrl=${CRL_BASE_URL}" >> "${OVERRIDE_DIR}/tls.conf"
+fi
 
 echo "Reloading systemd and restarting HomeCA …"
 systemctl daemon-reload

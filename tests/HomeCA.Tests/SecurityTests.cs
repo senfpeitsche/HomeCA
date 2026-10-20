@@ -78,6 +78,49 @@ public sealed class SecurityTests
     }
 
     [Fact]
+    public async Task LoginRateLimiter_Counts_Parallel_Attempts_Before_They_Finish()
+    {
+        var limiter = new LoginRateLimiter();
+        var ip = "10.0.0.4";
+
+        // All attempts reserve their slot before any of them reports a failure.
+        var reserved = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() => limiter.TryBeginAttempt(ip))));
+        Assert.Equal(5, reserved.Count(allowed => allowed));
+
+        for (var i = 0; i < 5; i++) limiter.CompleteAttempt(ip, succeeded: false);
+        Assert.True(limiter.IsBlocked(ip));
+        Assert.False(limiter.TryBeginAttempt(ip));
+    }
+
+    [Fact]
+    public void LoginRateLimiter_Aborted_Attempt_Neither_Counts_Nor_Blocks()
+    {
+        var limiter = new LoginRateLimiter();
+        var ip = "10.0.0.5";
+
+        for (var i = 0; i < 10; i++)
+        {
+            Assert.True(limiter.TryBeginAttempt(ip));
+            limiter.CompleteAttempt(ip, succeeded: null);
+        }
+
+        Assert.False(limiter.IsBlocked(ip));
+    }
+
+    [Fact]
+    public void LoginRateLimiter_Sweep_Drops_Idle_Addresses()
+    {
+        var limiter = new LoginRateLimiter();
+        Assert.True(limiter.TryBeginAttempt("10.0.0.6"));
+        limiter.CompleteAttempt("10.0.0.6", succeeded: true);
+        limiter.RecordFailure("10.0.0.7");
+
+        limiter.Sweep();
+
+        Assert.Equal(1, limiter.TrackedAddressCount);
+    }
+
+    [Fact]
     public async Task ValidateSession_Rejects_Malformed_BearerToken_Without_Throwing()
     {
         using var fixture = new TestFixture();

@@ -21,6 +21,10 @@ public sealed class ExternalAcmeService(
 {
     private readonly string _accountRoot = Path.Combine(storage.RootPath, "state", "acme-accounts");
     private readonly string _externalCertRoot = Path.Combine(storage.RootPath, "external-certificates");
+    // Two first orders for the same issuer would otherwise both register an account and the
+    // second key file would overwrite the first.
+    private readonly SemaphoreSlim _accountGate = new(1, 1);
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Requests a certificate from an external ACME CA using DNS-01 validation.</summary>
     public async Task<ExternalAcmeResult> RequestCertificateAsync(ExternalAcmeOrderRequest request, CancellationToken ct)
@@ -28,6 +32,28 @@ public sealed class ExternalAcmeService(
         if (string.IsNullOrWhiteSpace(request.IssuerId)) throw new ArgumentException("An external ACME issuer is required.");
         if (request.DnsNames.Count == 0) throw new ArgumentException("At least one DNS name is required.");
         if (request.DnsNames.Any(name => name.Contains('*'))) throw new ArgumentException("Wildcard certificates are not supported.");
+        if (request.PropagationDelaySeconds is < 0 or > 600) throw new ArgumentException("The DNS propagation delay must be between 0 and 600 seconds.");
+
+        try
+        {
+            return await RequestCertificateCoreAsync(request, ct);
+        }
+        catch (AcmeException exception)
+        {
+            // Certes reports protocol errors with its own exception types; surface them as a
+            // conflict with the server's explanation instead of an opaque 500.
+            logger.LogWarning(exception, "External ACME order for {DnsNames} was rejected", string.Join(", ", request.DnsNames));
+            throw new InvalidOperationException($"The ACME server rejected the request: {exception.Message}", exception);
+        }
+        catch (TimeoutException exception)
+        {
+            logger.LogWarning(exception, "External ACME order for {DnsNames} timed out", string.Join(", ", request.DnsNames));
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+    }
+
+    private async Task<ExternalAcmeResult> RequestCertificateCoreAsync(ExternalAcmeOrderRequest request, CancellationToken ct)
+    {
 
         var issuer = (await issuers.ListAsync(ct)).FirstOrDefault(i => i.Id == request.IssuerId)
             ?? throw new ArgumentException($"External ACME issuer '{request.IssuerId}' not found.");
@@ -84,7 +110,16 @@ public sealed class ExternalAcmeService(
             var orderResource = await WaitForOrderAsync(order, ct);
             if (orderResource.Status == OrderStatus.Invalid)
             {
-                throw new InvalidOperationException("ACME order validation failed. Check DNS records and try again.");
+                var reasons = new List<string>();
+                foreach (var record in challengeRecords)
+                {
+                    var challenge = await record.Challenge.Resource();
+                    if (challenge.Status != ChallengeStatus.Invalid) continue;
+                    var reason = challenge.Error?.Detail ?? challenge.Error?.Type ?? "no reason given";
+                    logger.LogWarning("DNS-01 challenge for {RecordName} is invalid: {Reason}", record.RecordName, reason);
+                    reasons.Add($"{record.RecordName}: {reason}");
+                }
+                throw new InvalidOperationException(DescribeFailedValidation(reasons));
             }
 
             // Generate CSR and finalize
@@ -120,18 +155,31 @@ public sealed class ExternalAcmeService(
         }
         finally
         {
-            // Always clean up DNS records
-            foreach (var record in challengeRecords)
+            await CleanupTxtRecordsAsync(dnsImplementation, dnsSettings, challengeRecords.Select(record => (record.RecordName, record.Value)).ToList());
+        }
+    }
+
+    internal static string DescribeFailedValidation(IReadOnlyList<string> reasons) => reasons.Count == 0
+        ? "ACME order validation failed. Check DNS records and try again."
+        : $"ACME order validation failed: {string.Join("; ", reasons)}";
+
+    /// <summary>
+    /// Removes challenge TXT records. Deliberately ignores the request token: when the client
+    /// disconnects or the order fails, the records must still be removed.
+    /// </summary>
+    internal async Task CleanupTxtRecordsAsync(IDnsConnector dns, ConnectorSettings settings, IReadOnlyList<(string RecordName, string Value)> records)
+    {
+        using var timeout = new CancellationTokenSource(CleanupTimeout);
+        foreach (var (recordName, value) in records)
+        {
+            try
             {
-                try
-                {
-                    logger.LogInformation("Cleaning up TXT record {RecordName}", record.RecordName);
-                    await dnsImplementation.DeleteTxtRecordAsync(dnsSettings, record.RecordName, record.Value, ct);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to clean up TXT record {RecordName}", record.RecordName);
-                }
+                logger.LogInformation("Cleaning up TXT record {RecordName}", recordName);
+                await dns.DeleteTxtRecordAsync(settings, recordName, value, timeout.Token);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to clean up TXT record {RecordName}; remove it manually", recordName);
             }
         }
     }
@@ -147,8 +195,17 @@ public sealed class ExternalAcmeService(
             {
                 var metadataPath = Path.Combine(dir, "metadata.json");
                 if (!File.Exists(metadataPath)) return null;
-                var metadata = JsonSerializer.Deserialize<ExternalAcmeOrderMetadata>(File.ReadAllText(metadataPath));
-                return metadata is null ? null : new ExternalAcmeCertificateItem(metadata.Id, metadata.DnsNames, metadata.IssuerName, metadata.CreatedAt, metadata.OutputPath);
+                try
+                {
+                    var metadata = JsonSerializer.Deserialize<ExternalAcmeOrderMetadata>(File.ReadAllText(metadataPath));
+                    return metadata is null ? null : new ExternalAcmeCertificateItem(metadata.Id, metadata.DnsNames, metadata.IssuerName, metadata.CreatedAt, metadata.OutputPath);
+                }
+                catch (JsonException exception)
+                {
+                    // One damaged entry must not hide all other certificates.
+                    logger.LogWarning(exception, "Skipping unreadable external certificate metadata {Path}", metadataPath);
+                    return null;
+                }
             })
             .Where(item => item is not null)
             .Cast<ExternalAcmeCertificateItem>()
@@ -163,18 +220,26 @@ public sealed class ExternalAcmeService(
         IODirectory.CreateDirectory(_accountRoot);
         var keyPath = Path.Combine(_accountRoot, $"{issuer.Id}.pem");
 
-        if (File.Exists(keyPath))
+        await _accountGate.WaitAsync(ct);
+        try
         {
-            var existingKey = KeyFactory.FromPem(await File.ReadAllTextAsync(keyPath, ct));
-            return new AcmeContext(new Uri(issuer.DirectoryUrl), existingKey);
-        }
+            if (File.Exists(keyPath))
+            {
+                var existingKey = KeyFactory.FromPem(await File.ReadAllTextAsync(keyPath, ct));
+                return new AcmeContext(new Uri(issuer.DirectoryUrl), existingKey);
+            }
 
-        // Create new account
-        var acme = new AcmeContext(new Uri(issuer.DirectoryUrl));
-        await acme.NewAccount($"homeca-{issuer.Id}@localhost", true);
-        await File.WriteAllTextAsync(keyPath, acme.AccountKey.ToPem(), ct);
-        logger.LogInformation("Created new ACME account for issuer {IssuerName}", issuer.Name);
-        return acme;
+            // Create new account
+            var acme = new AcmeContext(new Uri(issuer.DirectoryUrl));
+            await acme.NewAccount($"homeca-{issuer.Id}@localhost", true);
+            // The account exists at the CA now; never lose its key to a cancelled or torn write.
+            var temporaryPath = keyPath + ".tmp";
+            await File.WriteAllTextAsync(temporaryPath, acme.AccountKey.ToPem(), CancellationToken.None);
+            File.Move(temporaryPath, keyPath, true);
+            logger.LogInformation("Created new ACME account for issuer {IssuerName}", issuer.Name);
+            return acme;
+        }
+        finally { _accountGate.Release(); }
     }
 
     private static async Task<Order> WaitForOrderAsync(IOrderContext order, CancellationToken ct)

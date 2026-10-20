@@ -19,11 +19,19 @@ namespace HomeCA.Service.Endpoints;
         var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>();
         
         api.MapGet("/renewal-plans", async (RenewalPlanRegistry plans, CancellationToken ct) => Results.Ok(await plans.ListAsync(ct)));
-        api.MapPost("/renewal-plans", async (CreateRenewalPlanRequest body, RenewalPlanRegistry plans, CancellationToken ct) => Results.Ok(await plans.AddAsync(body, ct)));
+        api.MapPost("/renewal-plans", async (CreateRenewalPlanRequest body, RenewalPlanRegistry plans, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await plans.AddAsync(body, ct)); }
+            catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["renewalPlan"] = [exception.Message] }); }
+        });
         api.MapPut("/renewal-plans/{id}", async (string id, UpdateRenewalPlanRequest body, RenewalPlanRegistry plans, CancellationToken ct) =>
         {
-            var plan = await plans.UpdateAsync(id, body, ct);
-            return plan is null ? Results.NotFound() : Results.Ok(plan);
+            try
+            {
+                var plan = await plans.UpdateAsync(id, body, ct);
+                return plan is null ? Results.NotFound() : Results.Ok(plan);
+            }
+            catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["renewalPlan"] = [exception.Message] }); }
         });
         api.MapDelete("/renewal-plans/{id}", async (string id, RenewalPlanRegistry plans, CancellationToken ct) => await plans.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
         

@@ -24,6 +24,36 @@ public sealed class BackupTests : IDisposable
     }
 
     [Fact]
+    public void Archive_Contains_State_Files_But_Not_In_Flight_Temporary_Files()
+    {
+        var storage = _fixture.CreateStorage();
+        File.WriteAllText(Path.Combine(_fixture.RootPath, "state", "renewal-plans.json"), "[1]");
+        File.WriteAllText(Path.Combine(_fixture.RootPath, "state", "renewal-plans.json.tmp"), "[1, 2");
+
+        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(storage.CreateArchive(CancellationToken.None)));
+
+        var entry = archive.GetEntry("state/renewal-plans.json");
+        Assert.NotNull(entry);
+        using var reader = new StreamReader(entry.Open());
+        Assert.Equal("[1]", reader.ReadToEnd());
+        Assert.DoesNotContain(archive.Entries, candidate => candidate.FullName.EndsWith(".tmp", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Backups_Created_In_Quick_Succession_Do_Not_Overwrite_Each_Other()
+    {
+        var storage = _fixture.CreateStorage();
+
+        var first = await storage.CreateBackupAsync(CancellationToken.None);
+        await Task.Delay(5);
+        var second = await storage.CreateBackupAsync(CancellationToken.None);
+
+        Assert.NotEqual(first.FileName, second.FileName);
+        Assert.True((await storage.VerifyBackupAsync(first.FileName, CancellationToken.None)).IsValid);
+        Assert.True((await storage.VerifyBackupAsync(second.FileName, CancellationToken.None)).IsValid);
+    }
+
+    [Fact]
     public async Task Verify_Rejects_Invalid_Filename()
     {
         var storage = _fixture.CreateStorage();

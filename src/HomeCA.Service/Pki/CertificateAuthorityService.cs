@@ -70,8 +70,20 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             .ToList();
     }
 
-    public async Task<string?> FindIssuingIdBySubjectAsync(string subject, CancellationToken ct) =>
-        (await ReadAsync(ct)).SingleOrDefault(x => x.Type == "intermediate" && x.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase))?.Id;
+    /// <summary>
+    /// Finds the intermediate CA that issued a certificate. Matching uses the certificate's Authority Key
+    /// Identifier, because an issuing-CA rotation may reuse the subject of the previous CA.
+    /// </summary>
+    public async Task<string?> FindIssuingIdAsync(X509Certificate2 certificate, CancellationToken ct)
+    {
+        var matches = (await ReadAsync(ct))
+            .Where(x => x.Type == "intermediate")
+            .Where(x => IsIssuedBy(certificate, x, GetSubjectKeyIdentifier(x)))
+            .ToList();
+        if (matches.Count > 1)
+            logger.LogWarning("Certificate {SerialNumber} matches {Count} issuing CAs by subject only; its issuer is ambiguous", certificate.SerialNumber, matches.Count);
+        return matches.Count == 1 ? matches[0].Id : null;
+    }
 
     /// <summary>Returns the active root CA certificate (public part only) for trust distribution. No authentication required.</summary>
     public async Task<AuthorityCertificateExport?> GetTrustAnchorAsync(string format, CancellationToken ct)
@@ -284,23 +296,42 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
     {
         var certificates = Path.Combine(storage.RootPath, "certificates");
         if (!Directory.Exists(certificates)) return false;
+        var authorityKeyId = GetSubjectKeyIdentifier(authority);
         return Directory.EnumerateFiles(certificates, "certificate.pfx", SearchOption.AllDirectories).Any(path =>
         {
             using var certificate = X509CertificateLoader.LoadPkcs12FromFile(path, null);
-            return certificate.Issuer.Equals(authority.Subject, StringComparison.OrdinalIgnoreCase);
+            return IsIssuedBy(certificate, authority, authorityKeyId);
         });
     }
     private (int Count, DateTime? LatestExpiry) GetIssuedCertificateExpiry(AuthorityState authority)
     {
         var certificates = Path.Combine(storage.RootPath, "certificates");
         if (!Directory.Exists(certificates)) return (0, null);
+        var authorityKeyId = GetSubjectKeyIdentifier(authority);
         var matching = new List<DateTime>();
         foreach (var path in Directory.EnumerateFiles(certificates, "certificate.pfx", SearchOption.AllDirectories))
         {
             using var certificate = X509CertificateLoader.LoadPkcs12FromFile(path, null);
-            if (certificate.Issuer.Equals(authority.Subject, StringComparison.OrdinalIgnoreCase)) matching.Add(certificate.NotAfter);
+            if (IsIssuedBy(certificate, authority, authorityKeyId)) matching.Add(certificate.NotAfter);
         }
         return (matching.Count, matching.Count == 0 ? null : matching.Max());
+    }
+    private byte[]? GetSubjectKeyIdentifier(AuthorityState authority)
+    {
+        using var certificate = Load(authority);
+        return certificate.Extensions["2.5.29.14"] is { } extension
+            ? new X509SubjectKeyIdentifierExtension(extension, extension.Critical).SubjectKeyIdentifierBytes.ToArray()
+            : null;
+    }
+    /// <summary>Compares AKI with the CA's SKI; only certificates without these identifiers fall back to the issuer DN.</summary>
+    private static bool IsIssuedBy(X509Certificate2 certificate, AuthorityState authority, byte[]? authorityKeyId)
+    {
+        var keyId = certificate.Extensions["2.5.29.35"] is { } extension
+            ? new X509AuthorityKeyIdentifierExtension(extension.RawData, extension.Critical).KeyIdentifier?.ToArray()
+            : null;
+        return keyId is not null && authorityKeyId is not null
+            ? keyId.AsSpan().SequenceEqual(authorityKeyId)
+            : certificate.Issuer.Equals(authority.Subject, StringComparison.OrdinalIgnoreCase);
     }
     private string PathFor(string id) => Path.Combine(_root, id, "authority.pfx");
     private static CertificateAuthorityInventoryItem ToItem(AuthorityState x) => new(x.Id, x.Name, x.Type, x.Subject, x.ExpiresAt, x.ParentId, x.IsActive, x.IsRevoked, x.CrlValidityDays, x.IsDefaultIssuing);
@@ -319,7 +350,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
         if (parent is not null)
             request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(parent, true, false));
-        var publicUrl = storage.PublicUrl?.TrimEnd('/');
+        var publicUrl = storage.CrlDistributionBaseUrl;
         if (parent is not null && parentId is not null && !string.IsNullOrWhiteSpace(publicUrl))
             request.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{parentId}"));
         var from = DateTimeOffset.UtcNow.AddMinutes(-5); var until = DateTimeOffset.UtcNow.AddDays(x.ValidityDays);

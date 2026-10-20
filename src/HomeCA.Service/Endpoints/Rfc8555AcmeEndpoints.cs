@@ -34,6 +34,18 @@ namespace HomeCA.Service.Endpoints;
             IResult AcmeProblemResult(AcmeProblemException ex) => Results.Json(
                 new { type = $"urn:ietf:params:acme:error:{ex.ProblemType}", detail = ex.Message, status = ex.StatusCode },
                 statusCode: ex.StatusCode, contentType: "application/problem+json");
+
+            // Unexpected failures are logged with their stack trace; the client only gets a generic
+            // message so file paths and other internals do not leak to unauthenticated callers.
+            IResult InternalError(HttpContext ctx, Rfc8555AcmeService acme, ILogger logger, Exception ex, string operation)
+            {
+                if (ex is OperationCanceledException && ctx.RequestAborted.IsCancellationRequested)
+                    logger.LogDebug("ACME {Operation} was cancelled by the client", operation);
+                else
+                    logger.LogError(ex, "ACME {Operation} failed with an internal error", operation);
+                AddAcmeHeaders(ctx, acme);
+                return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem(ServerInternalProblem, "An internal error occurred. See the HomeCA log for details.", 500));
+            }
         
             // Directory
             endpoints.MapGet("/acme/directory", (HttpRequest req, Rfc8555AcmeService acme) =>
@@ -74,7 +86,7 @@ namespace HomeCA.Service.Endpoints;
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
-                    logger.LogInformation("ACME newAccount: received {Bytes} bytes from {Remote}", body.Length, ctx.Connection.RemoteIpAddress);
+                    logger.LogDebug("ACME newAccount: received {Bytes} bytes from {Remote}", body.Length, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/new-acct";
                     var jws = acme.VerifyJws(body, expectedUrl);
         
@@ -124,7 +136,7 @@ namespace HomeCA.Service.Endpoints;
                     return Results.Json(new { status = account.Status, contact = account.Contact, orders = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{account.Id}/orders" }, statusCode: 201);
                 }
                 catch (AcmeProblemException ex) { logger.LogWarning(ex, "ACME newAccount error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { logger.LogError(ex, "ACME newAccount internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "newAccount"); }
             });
         
             // Account lookup (POST-as-GET)
@@ -134,16 +146,14 @@ namespace HomeCA.Service.Endpoints;
                 {
                     var body = await ReadBodyAsync(ctx.Request);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{accountId}";
-                    var jws = acme.VerifyJws(body, expectedUrl);
-        
-                    var account = await acme.FindAccountByKidAsync(jws.Kid ?? $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{accountId}", ct);
-                    if (account is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("accountDoesNotExist", "Account not found."));
-        
+                    var (_, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+                    if (account.Id != accountId) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("unauthorized", "The account URL does not match the signing account.", 403));
+
                     AddAcmeHeaders(ctx, acme, expectedUrl);
                     return Results.Json(new { status = account.Status, contact = account.Contact, orders = $"{AcmeBaseUrl(ctx.Request)}/acme/acct/{account.Id}/orders" });
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "account lookup"); }
             });
         
             // newOrder
@@ -152,19 +162,10 @@ namespace HomeCA.Service.Endpoints;
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
-                    logger.LogInformation("ACME newOrder: received {Bytes} bytes from {Remote}", body.Length, ctx.Connection.RemoteIpAddress);
+                    logger.LogDebug("ACME newOrder: received {Bytes} bytes from {Remote}", body.Length, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/new-order";
-                    var jws = acme.VerifyJws(body, expectedUrl);
-        
-                    // Resolve account from kid.
-                    var account = jws.Kid is not null ? await acme.FindAccountByKidAsync(jws.Kid, ct) : null;
-                    if (account is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("unauthorized", "Account not found. Use 'kid' in protected header."));
-        
-                    // Verify signature with stored key.
-                    var storedJwk = System.Text.Json.Nodes.JsonNode.Parse(account.JwkJson)?.AsObject()!;
-                    var alg = jws.ProtectedHeader["alg"]?.GetValue<string>() ?? "ES256";
-                    Rfc8555AcmeService.VerifySignatureWithStoredKey(storedJwk, alg, body);
-        
+                    var (jws, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+
                     var payload = System.Text.Json.Nodes.JsonNode.Parse(jws.Payload)?.AsObject()
                         ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Order payload is required.");
         
@@ -187,26 +188,26 @@ namespace HomeCA.Service.Endpoints;
                     return Results.Json(FormatOrder(order, b), statusCode: 201);
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "newOrder"); }
             });
         
             // Order (POST-as-GET)
-            endpoints.MapPost("/acme/order/{orderId}", async (string orderId, HttpContext ctx, Rfc8555AcmeService acme, CancellationToken ct) =>
+            endpoints.MapPost("/acme/order/{orderId}", async (string orderId, HttpContext ctx, Rfc8555AcmeService acme, ILogger<global::Program> logger, CancellationToken ct) =>
             {
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/order/{orderId}";
-                    _ = acme.VerifyJws(body, expectedUrl);
-        
-                    var order = await acme.GetOrderAsync(orderId, ct);
+                    var (_, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+
+                    var order = await acme.GetOrderAsync(orderId, ct, account.Id);
                     if (order is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Order not found.", 404));
         
                     AddAcmeHeaders(ctx, acme, expectedUrl);
                     return Results.Json(FormatOrder(order, AcmeBaseUrl(ctx.Request)));
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "order lookup"); }
             });
         
             // Authorization (POST-as-GET)
@@ -215,14 +216,14 @@ namespace HomeCA.Service.Endpoints;
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
-                    logger.LogInformation("ACME authz: {AuthzId} from {Remote}", authzId, ctx.Connection.RemoteIpAddress);
+                    logger.LogDebug("ACME authz: {AuthzId} from {Remote}", authzId, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/authz/{authzId}";
-                    _ = acme.VerifyJws(body, expectedUrl);
-        
-                    var authz = await acme.GetAuthorizationAsync(authzId, ct);
+                    var (_, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+
+                    var authz = await acme.GetAuthorizationAsync(authzId, account.Id, ct);
                     if (authz is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Authorization not found.", 404));
         
-                    logger.LogInformation("ACME authz {AuthzId}: identifier={Value}, status={Status}", authzId, authz.Identifier.Value, authz.Status);
+                    logger.LogDebug("ACME authz {AuthzId}: identifier={Value}, status={Status}", authzId, authz.Identifier.Value, authz.Status);
                     var b = AcmeBaseUrl(ctx.Request);
                     AddAcmeHeaders(ctx, acme);
                     return Results.Json(new
@@ -240,7 +241,7 @@ namespace HomeCA.Service.Endpoints;
                     });
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "authorization lookup"); }
             });
         
             // Challenge (respond to / POST-as-GET)
@@ -249,17 +250,10 @@ namespace HomeCA.Service.Endpoints;
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
-                    logger.LogInformation("ACME challenge: {ChallengeId}, payload={PayloadLen} bytes from {Remote}", challengeId, body.Length, ctx.Connection.RemoteIpAddress);
+                    logger.LogDebug("ACME challenge: {ChallengeId}, payload={PayloadLen} bytes from {Remote}", challengeId, body.Length, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/chall/{challengeId}";
-                    var jws = acme.VerifyJws(body, expectedUrl);
-                    var account = await acme.FindAccountByKidAsync(jws.Kid ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Challenge requests must use an account key."), ct)
-                        ?? throw Rfc8555AcmeService.AcmeProblem("unauthorized", "Account not found.", 403);
-                    var storedJwk = System.Text.Json.Nodes.JsonNode.Parse(account.JwkJson)?.AsObject()
-                        ?? throw Rfc8555AcmeService.AcmeProblem("serverInternal", "Stored account key is invalid.", 500);
-                    var algorithm = jws.ProtectedHeader["alg"]?.GetValue<string>()
-                        ?? throw Rfc8555AcmeService.AcmeProblem("badSignatureAlgorithm", "Missing JWS algorithm.");
-                    Rfc8555AcmeService.VerifySignatureWithStoredKey(storedJwk, algorithm, body);
-        
+                    var (jws, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+
                     Rfc8555Challenge? challenge;
                     if (jws.Payload.Length > 0)
                     {
@@ -269,7 +263,7 @@ namespace HomeCA.Service.Endpoints;
                     else
                     {
                         // POST-as-GET — just return current status.
-                        challenge = await acme.GetChallengeAsync(challengeId, ct);
+                        challenge = await acme.GetChallengeAsync(challengeId, account.Id, ct);
                     }
                     if (challenge is null) return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Challenge not found.", 404));
         
@@ -287,7 +281,7 @@ namespace HomeCA.Service.Endpoints;
                     return Results.Json(result);
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "challenge"); }
             });
         
             // Finalize
@@ -296,10 +290,10 @@ namespace HomeCA.Service.Endpoints;
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
-                    logger.LogInformation("ACME finalize: order {OrderId} from {Remote}", orderId, ctx.Connection.RemoteIpAddress);
+                    logger.LogDebug("ACME finalize: order {OrderId} from {Remote}", orderId, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/order/{orderId}/finalize";
-                    var jws = acme.VerifyJws(body, expectedUrl);
-        
+                    var (jws, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+
                     var payload = System.Text.Json.Nodes.JsonNode.Parse(jws.Payload)?.AsObject()
                         ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Finalize payload is required.");
         
@@ -307,22 +301,20 @@ namespace HomeCA.Service.Endpoints;
                         ?? throw Rfc8555AcmeService.AcmeProblem("malformed", "Missing 'csr' in finalize payload.");
         
                     var csrDer = Rfc8555AcmeService.Base64UrlDecode(csrB64);
-                    var order = await acme.FinalizeOrderAsync(orderId, csrDer, ct);
+                    var order = await acme.FinalizeOrderAsync(orderId, account.Id, csrDer, ct);
         
                     var b = AcmeBaseUrl(ctx.Request);
                     var orderUrl = $"{b}/acme/order/{order.Id}";
                     AddAcmeHeaders(ctx, acme, orderUrl);
         
                     var formatted = FormatOrder(order, b);
-                    var jsonForLog = System.Text.Json.JsonSerializer.Serialize(formatted);
-                    logger.LogInformation("ACME finalize response body: {Json}", jsonForLog);
-                    logger.LogInformation("ACME finalize response: order {OrderId}, status={Status}, certId={CertId}, certUrl={CertUrl}",
+                    logger.LogDebug("ACME finalize response: order {OrderId}, status={Status}, certId={CertId}, certUrl={CertUrl}",
                         order.Id, order.Status, order.CertificateId ?? "null",
                         order.CertificateId is not null ? $"{b}/acme/cert/{order.CertificateId}" : "null");
                     return Results.Json(formatted);
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "finalize"); }
             });
         
             // Certificate download (POST-as-GET)
@@ -331,19 +323,21 @@ namespace HomeCA.Service.Endpoints;
                 try
                 {
                     var body = await ReadBodyAsync(ctx.Request);
-                    logger.LogInformation("ACME cert download: {CertificateId} from {Remote}", certificateId, ctx.Connection.RemoteIpAddress);
+                    logger.LogDebug("ACME cert download: {CertificateId} from {Remote}", certificateId, ctx.Connection.RemoteIpAddress);
                     var expectedUrl = $"{AcmeBaseUrl(ctx.Request)}/acme/cert/{certificateId}";
-                    _ = acme.VerifyJws(body, expectedUrl);
-        
+                    var (_, account) = await acme.VerifyAccountRequestAsync(body, expectedUrl, ct);
+                    if (!await acme.IsCertificateOwnedByAccountAsync(certificateId, account.Id, ct))
+                        return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Certificate not found.", 404));
+
                     var pem = await acme.GetCertificatePemAsync(certificateId, ct);
                     if (pem is null) { logger.LogWarning("ACME cert {CertificateId}: not found", certificateId); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("malformed", "Certificate not found.", 404)); }
         
-                    logger.LogInformation("ACME cert {CertificateId}: returning {Len} bytes PEM", certificateId, pem.Length);
+                    logger.LogDebug("ACME cert {CertificateId}: returning {Len} bytes PEM", certificateId, pem.Length);
                     AddAcmeHeaders(ctx, acme);
                     return Results.Text(pem, "application/pem-certificate-chain");
                 }
                 catch (AcmeProblemException ex) { logger.LogWarning(ex, "ACME cert download error: {Type} — {Detail}", ex.ProblemType, ex.Message); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { logger.LogError(ex, "ACME cert download internal error"); AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "certificate download"); }
             });
         
             // revokeCert
@@ -363,7 +357,7 @@ namespace HomeCA.Service.Endpoints;
                     if (!acme.IsManagedCertificate(certificate))
                         throw Rfc8555AcmeService.AcmeProblem("malformed", "Certificate was not issued by this ACME server.");
 
-                    var certificateId = certificate.SerialNumber.ToLowerInvariant();
+                    var certificateId = Rfc8555AcmeService.CertificateIdFromSerialNumber(certificate.SerialNumber);
                     if (jws.Kid is not null)
                     {
                         var account = await acme.FindAccountByKidAsync(jws.Kid, ct);
@@ -384,7 +378,7 @@ namespace HomeCA.Service.Endpoints;
                     }
 
                     var reason = ParseRevocationReason(payload["reason"]);
-                    var authorityId = await authorities.FindIssuingIdBySubjectAsync(certificate.Issuer, ct);
+                    var authorityId = await authorities.FindIssuingIdAsync(certificate, ct);
                     if (authorityId is null)
                         throw Rfc8555AcmeService.AcmeProblem("malformed", "Certificate issuer is not an active issuing CA.");
 
@@ -395,7 +389,7 @@ namespace HomeCA.Service.Endpoints;
                     return Results.Ok();
                 }
                 catch (AcmeProblemException ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(ex); }
-                catch (Exception ex) { AddAcmeHeaders(ctx, acme); return AcmeProblemResult(Rfc8555AcmeService.AcmeProblem("serverInternal", ex.Message, 500)); }
+                catch (Exception ex) { return InternalError(ctx, acme, logger, ex, "revokeCert"); }
             });
         
             // keyChange (stub — not supported)

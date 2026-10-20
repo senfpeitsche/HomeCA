@@ -1,3 +1,4 @@
+using HomeCA.Service.Acme;
 using HomeCA.Service.Pki;
 using HomeCA.Service.Deployments;
 using HomeCA.Service.Profiles;
@@ -236,6 +237,57 @@ public sealed class CertificateIssuanceTests : IDisposable
 
         Assert.True(File.Exists(path));
         Assert.NotEmpty(File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public async Task Revocation_Assigns_Issuer_By_Key_After_Rotation_With_Same_Subject()
+    {
+        var (authorities, certificates) = await SetupAsync();
+        var all = await authorities.ListAsync(CancellationToken.None);
+        var root = all.Single(a => a.Type == "root");
+        var previous = all.Single(a => a.Type == "intermediate");
+        var before = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["before.example.com"], [], 90), CancellationToken.None);
+        // The UI pre-fills the rotation with the subject of the initial issuing CA.
+        var rotation = await authorities.RotateIntermediateAsync(
+            new RotateIntermediateRequest("TLS Issuing CA 2", previous.Subject, root.Id, 1825, "ECC", 7), CancellationToken.None);
+        var after = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["after.example.com"], [], 90), CancellationToken.None);
+
+        Assert.True(await certificates.RevokeAsync(before.Id, "superseded", CancellationToken.None));
+        Assert.True(await certificates.RevokeAsync(after.Id, "superseded", CancellationToken.None));
+
+        var records = await new RevocationRegistry(_fixture.CreateStorage(), NullLogger<RevocationRegistry>.Instance).ListAsync(CancellationToken.None);
+        Assert.Equal(previous.Id, records.Single(r => Rfc8555AcmeService.CertificateIdFromSerialNumber(r.SerialNumber) == before.Id).AuthorityId);
+        Assert.Equal(rotation.ReplacementAuthority.Id, records.Single(r => Rfc8555AcmeService.CertificateIdFromSerialNumber(r.SerialNumber) == after.Id).AuthorityId);
+        Assert.Equal(1, rotation.DependentCertificateCount);
+    }
+
+    [Fact]
+    public async Task Concurrent_Issuance_Records_Every_Certificate_In_The_Inventory_File()
+    {
+        var (_, certificates) = await SetupAsync();
+
+        var issued = await Task.WhenAll(Enumerable.Range(0, 12).Select(index =>
+            Task.Run(() => certificates.IssueAsync(new IssueCertificateRequest("TLS", [$"host{index}.example.com"], [], 30), CancellationToken.None))));
+
+        // Read the file directly: ListAsync reconciles missing entries from disk and would hide lost updates.
+        var inventory = System.Text.Json.JsonSerializer.Deserialize<List<CertificateInventoryItem>>(
+            File.ReadAllText(Path.Combine(_fixture.RootPath, "certificates", "inventory.json")))!;
+        Assert.All(issued, result => Assert.Contains(inventory, item => item.Id == result.Id));
+    }
+
+    [Fact]
+    public async Task Renewal_Request_Keeps_Target_Profile_And_Sans()
+    {
+        var (_, certificates) = await SetupAsync();
+        var original = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["proxmox.example.com"], ["192.168.1.20"], 90, TargetProfileId: "proxmox"), CancellationToken.None);
+
+        var renewal = HomeCA.Service.Automation.RenewalBackgroundService.BuildRenewalRequest(_fixture.CreateStorage(), original.Id);
+
+        Assert.NotNull(renewal);
+        Assert.Equal("proxmox", renewal.TargetProfileId);
+        Assert.Equal(["proxmox.example.com"], renewal.DnsNames);
+        Assert.Equal(["192.168.1.20"], renewal.IpAddresses);
+        Assert.Equal(90, renewal.ValidityDays);
     }
 
     public void Dispose() => _fixture.Dispose();

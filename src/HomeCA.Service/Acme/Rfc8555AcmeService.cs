@@ -34,8 +34,10 @@ public sealed class Rfc8555AcmeService
     private readonly HomeCaStorage _storage;
     private readonly IOptions<HomeCaStorageOptions> _options;
     private readonly ILogger<Rfc8555AcmeService> _logger;
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private readonly HttpClient _httpClient;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    // Orders whose certificate is being issued outside _gate.
+    private readonly ConcurrentDictionary<string, byte> _finalizing = new();
 
     // Nonce pool — simple set with bounded size, oldest removed when full.
     private readonly ConcurrentDictionary<string, DateTimeOffset> _nonces = new();
@@ -53,7 +55,22 @@ public sealed class Rfc8555AcmeService
         HomeCaStorage storage,
         IOptions<HomeCaStorageOptions> options,
         ILogger<Rfc8555AcmeService> logger)
+        : this(authorities, certificates, ipSanPolicy, domains, storage, options, logger, new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
     {
+    }
+
+    /// <summary>Allows tests to supply the HTTP client used for HTTP-01 validation.</summary>
+    internal Rfc8555AcmeService(
+        CertificateAuthorityService authorities,
+        CertificateIssuanceService certificates,
+        AcmeIpSanPolicyRegistry ipSanPolicy,
+        DomainRegistry domains,
+        HomeCaStorage storage,
+        IOptions<HomeCaStorageOptions> options,
+        ILogger<Rfc8555AcmeService> logger,
+        HttpClient http01Client)
+    {
+        _httpClient = http01Client;
         _authorities = authorities;
         _certificates = certificates;
         _ipSanPolicy = ipSanPolicy;
@@ -92,6 +109,19 @@ public sealed class Rfc8555AcmeService
     /// and the account key thumbprint.
     /// </summary>
     public JwsVerificationResult VerifyJws(byte[] body, string expectedUrl)
+    {
+        try
+        {
+            return VerifyJwsCore(body, expectedUrl);
+        }
+        catch (Exception exception) when (exception is JsonException or FormatException or InvalidOperationException or ArgumentException)
+        {
+            // Broken JSON, a non-string member or invalid base64url is a client error, not a server fault.
+            throw AcmeProblem(MalformedProblem, "The JWS request is malformed.");
+        }
+    }
+
+    private JwsVerificationResult VerifyJwsCore(byte[] body, string expectedUrl)
     {
         var json = JsonNode.Parse(body) ?? throw AcmeProblem(MalformedProblem, "Request body is not valid JSON.");
 
@@ -148,6 +178,22 @@ public sealed class Rfc8555AcmeService
         VerifySignatureWithJwk(storedJwk, alg, signatureInput, signature);
     }
 
+    /// <summary>
+    /// Verifies a request that must be signed by an existing account ('kid'), including the
+    /// signature against the stored account key. <see cref="VerifyJws"/> alone does not
+    /// authenticate 'kid' requests.
+    /// </summary>
+    public async Task<(JwsVerificationResult Jws, Rfc8555Account Account)> VerifyAccountRequestAsync(byte[] body, string expectedUrl, CancellationToken ct)
+    {
+        var jws = VerifyJws(body, expectedUrl);
+        if (jws.Kid is null) throw AcmeProblem(MalformedProblem, "This request must be signed with an account key ('kid').");
+        var account = await FindAccountByKidAsync(jws.Kid, ct) ?? throw AcmeProblem("accountDoesNotExist", "Account not found.", 400);
+        var storedJwk = JsonNode.Parse(account.JwkJson)?.AsObject() ?? throw AcmeProblem("serverInternal", "Stored account key is invalid.", 500);
+        // VerifyJws guarantees that 'alg' is present.
+        VerifySignatureWithStoredKey(storedJwk, jws.ProtectedHeader["alg"]!.GetValue<string>(), body);
+        return (jws, account);
+    }
+
     private static void VerifySignatureWithJwk(JsonObject jwk, string alg, byte[] data, byte[] signature)
     {
         var kty = jwk["kty"]?.GetValue<string>() ?? throw AcmeProblem(BadPublicKeyProblem, "Missing 'kty' in JWK.");
@@ -173,10 +219,16 @@ public sealed class Rfc8555AcmeService
                 _ => throw AcmeProblem("badSignatureAlgorithm", $"Unsupported EC algorithm: {alg}")
             };
 
-            using var ecdsa = ECDsa.Create(new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } });
-            // acme.sh sends the signature in JWS format (r || s, raw integers), need to convert to DER for .NET.
-            if (!ecdsa.VerifyData(data, ConvertJwsEcSignatureToDer(signature, x.Length), hashAlg, DSASignatureFormat.Rfc3279DerSequence))
-                throw AcmeProblem(UnauthorizedProblem, "Invalid JWS signature.");
+            ECDsa ecdsa;
+            try { ecdsa = ECDsa.Create(new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } }); }
+            catch (CryptographicException) { throw AcmeProblem(BadPublicKeyProblem, "The JWK is not a valid point on the curve."); }
+            using (ecdsa)
+            {
+                // JWS (RFC 7518 §3.4) uses the fixed-size r || s encoding, which .NET verifies directly.
+                // Converting it to DER broke on r or s values with a leading zero byte.
+                if (!ecdsa.VerifyData(data, signature, hashAlg, DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
+                    throw AcmeProblem(UnauthorizedProblem, "Invalid JWS signature.");
+            }
         }
         else if (kty == "RSA")
         {
@@ -199,27 +251,6 @@ public sealed class Rfc8555AcmeService
         {
             throw AcmeProblem(BadPublicKeyProblem, $"Unsupported key type: {kty}");
         }
-    }
-
-    /// <summary>Converts a raw (r || s) EC signature from JWS to DER SEQUENCE format.</summary>
-    private static byte[] ConvertJwsEcSignatureToDer(byte[] raw, int componentLength)
-    {
-        if (raw.Length != componentLength * 2)
-        {
-            // Might already be DER, or use half the raw length.
-            componentLength = raw.Length / 2;
-        }
-
-        var r = raw.AsSpan(0, componentLength);
-        var s = raw.AsSpan(componentLength);
-
-        var writer = new AsnWriter(AsnEncodingRules.DER);
-        using (writer.PushSequence())
-        {
-            writer.WriteIntegerUnsigned(r);
-            writer.WriteIntegerUnsigned(s);
-        }
-        return writer.Encode();
     }
 
     // ───────────────────────────── Account operations ───────────────────────────
@@ -342,13 +373,14 @@ public sealed class Rfc8555AcmeService
         finally { _gate.Release(); }
     }
 
-    public async Task<Rfc8555Order?> GetOrderAsync(string orderId, CancellationToken ct)
+    /// <summary>Returns an order; when <paramref name="accountId"/> is given, only an order owned by that account.</summary>
+    public async Task<Rfc8555Order?> GetOrderAsync(string orderId, CancellationToken ct, string? accountId = null)
     {
         await _gate.WaitAsync(ct);
         try
         {
         var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-        var order = orders.FirstOrDefault(o => o.Id == orderId);
+        var order = orders.FirstOrDefault(o => o.Id == orderId && (accountId is null || o.AccountId == accountId));
         if (order is null) return null;
 
         // Dynamically check if order should transition from pending → ready.
@@ -386,16 +418,16 @@ public sealed class Rfc8555AcmeService
         finally { _gate.Release(); }
     }
 
-    public async Task<Rfc8555Authorization?> GetAuthorizationAsync(string authzId, CancellationToken ct)
+    public async Task<Rfc8555Authorization?> GetAuthorizationAsync(string authzId, string accountId, CancellationToken ct)
     {
         var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-        return orders.SelectMany(o => o.Authorizations).FirstOrDefault(a => a.Id == authzId);
+        return orders.Where(o => o.AccountId == accountId).SelectMany(o => o.Authorizations).FirstOrDefault(a => a.Id == authzId);
     }
 
-    public async Task<Rfc8555Challenge?> GetChallengeAsync(string challengeId, CancellationToken ct)
+    public async Task<Rfc8555Challenge?> GetChallengeAsync(string challengeId, string accountId, CancellationToken ct)
     {
         var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-        return orders.SelectMany(o => o.Authorizations).SelectMany(a => a.Challenges).FirstOrDefault(c => c.Id == challengeId);
+        return orders.Where(o => o.AccountId == accountId).SelectMany(o => o.Authorizations).SelectMany(a => a.Challenges).FirstOrDefault(c => c.Id == challengeId);
     }
 
     /// <summary>Validates HTTP-01 by fetching the ACME response from the requested identifier.</summary>
@@ -464,7 +496,10 @@ public sealed class Rfc8555AcmeService
             var responseBody = await response.Content.ReadAsStringAsync(ct);
             return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(responseBody.TrimEnd('\r', '\n')), Encoding.UTF8.GetBytes(expected));
         }
-        catch (HttpRequestException exception)
+        // A timeout surfaces as TaskCanceledException; hosts that silently drop packets are common
+        // in homelabs and must fail the challenge instead of the request.
+        catch (Exception exception) when (exception is HttpRequestException or UriFormatException
+            || exception is TaskCanceledException && !ct.IsCancellationRequested)
         {
             _logger.LogInformation(exception, "HTTP-01 response for {Identifier} could not be fetched", identifier);
             return false;
@@ -475,46 +510,107 @@ public sealed class Rfc8555AcmeService
     /// Finalizes an order by signing a certificate from the client-submitted CSR.
     /// The CSR's SANs must match the order identifiers.
     /// </summary>
-    public async Task<Rfc8555Order> FinalizeOrderAsync(string orderId, byte[] csrDer, CancellationToken ct)
+    public async Task<Rfc8555Order> FinalizeOrderAsync(string orderId, string accountId, byte[] csrDer, CancellationToken ct)
     {
+        Rfc8555Order order;
         await _gate.WaitAsync(ct);
         try
         {
             var orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
-            var index = orders.FindIndex(o => o.Id == orderId);
-            if (index < 0) throw AcmeProblem("orderNotReady", "Order not found.");
-            var order = orders[index];
+            // Another account's order is reported as missing so order IDs cannot be probed.
+            order = orders.FirstOrDefault(o => o.Id == orderId && o.AccountId == accountId)
+                ?? throw AcmeProblem("orderNotReady", "Order not found.");
 
             if (order.Status == Valid) return order;
             if (order.Status != "ready")
                 throw AcmeProblem("orderNotReady", $"Order is in status '{order.Status}', expected 'ready'.");
+            if (!_finalizing.TryAdd(orderId, 0))
+                throw AcmeProblem("orderNotReady", "The order is already being finalized.");
+        }
+        finally { _gate.Release(); }
 
-            // Parse the CSR to extract SANs.
-            var csr = CertificateRequest.LoadSigningRequest(csrDer, HashAlgorithmName.SHA256, CertificateRequestLoadOptions.UnsafeLoadCertificateExtensions);
-
-            // Issue the certificate using the CSR's public key — sign with the issuing CA.
+        // Issuance (CA key use, optional DNS lookups for IP SANs) runs outside the global ACME
+        // lock so one slow finalize does not stall every other ACME client. _finalizing keeps a
+        // concurrent finalize of the same order out.
+        try
+        {
+            var csr = LoadCsr(csrDer);
             var dnsNames = order.Identifiers.Select(i => i.Value).ToList();
+            ValidateCsrIdentifiers(csr, dnsNames);
             var certificatePolicy = await _ipSanPolicy.GetAsync(ct);
             var certId = await IssueCertificateFromCsrAsync(csr, dnsNames, ct);
 
-            order = order with { Status = Valid, CertificateId = certId };
-            orders[index] = order;
-            await WriteAsync(_ordersPath, orders, ct);
+            List<Rfc8555Order> orders;
+            await _gate.WaitAsync(ct);
+            try
+            {
+                orders = await ReadAsync<List<Rfc8555Order>>(_ordersPath, ct) ?? [];
+                var index = orders.FindIndex(o => o.Id == orderId);
+                if (index < 0) throw AcmeProblem("orderNotReady", "The order was deleted while it was being finalized.");
+                order = orders[index] with { Status = Valid, CertificateId = certId };
+                orders[index] = order;
+                await WriteAsync(_ordersPath, orders, ct);
+            }
+            finally { _gate.Release(); }
+            _logger.LogInformation("Finalized RFC 8555 order {OrderId}, issued certificate {CertificateId}", orderId, certId);
 
             if (certificatePolicy.RevokeSupersededCertificates)
             {
-                var predecessor = orders.Where(candidate => candidate.Id != order.Id && candidate.AccountId == order.AccountId && candidate.Status == Valid && !string.IsNullOrWhiteSpace(candidate.CertificateId))
+                var finalized = order;
+                var predecessor = orders.Where(candidate => candidate.Id != finalized.Id && candidate.AccountId == finalized.AccountId && candidate.Status == Valid && !string.IsNullOrWhiteSpace(candidate.CertificateId))
                     .OrderByDescending(candidate => candidate.CreatedAt)
                     .FirstOrDefault(candidate => candidate.Identifiers.Select(identifier => identifier.Value).Order(StringComparer.OrdinalIgnoreCase)
-                        .SequenceEqual(order.Identifiers.Select(identifier => identifier.Value).Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase));
-                if (predecessor?.CertificateId is { } predecessorId && await _certificates.RevokeAsync(predecessorId, "superseded", ct))
-                    _logger.LogInformation("Revoked superseded ACME certificate {CertificateId} after renewal order {OrderId}", predecessorId, order.Id);
+                        .SequenceEqual(finalized.Identifiers.Select(identifier => identifier.Value).Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase));
+                try
+                {
+                    if (predecessor?.CertificateId is { } predecessorId && await _certificates.RevokeAsync(predecessorId, "superseded", ct))
+                        _logger.LogInformation("Revoked superseded ACME certificate {CertificateId} after renewal order {OrderId}", predecessorId, order.Id);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // The new certificate is issued and recorded; failing the request now would make
+                    // the client retry an order that is already valid.
+                    _logger.LogError(exception, "Could not revoke the superseded certificate {CertificateId} after order {OrderId}", predecessor?.CertificateId, order.Id);
+                }
             }
 
-            _logger.LogInformation("Finalized RFC 8555 order {OrderId}, issued certificate {CertificateId}", orderId, certId);
             return order;
         }
-        finally { _gate.Release(); }
+        finally { _finalizing.TryRemove(orderId, out _); }
+    }
+
+    private static CertificateRequest LoadCsr(byte[] csrDer)
+    {
+        try
+        {
+            // The default load options verify the CSR signature (proof of key possession).
+            return CertificateRequest.LoadSigningRequest(csrDer, HashAlgorithmName.SHA256, CertificateRequestLoadOptions.UnsafeLoadCertificateExtensions);
+        }
+        catch (CryptographicException exception)
+        {
+            throw AcmeProblem("badCSR", $"The CSR could not be parsed or its signature is invalid: {exception.Message}");
+        }
+    }
+
+    /// <summary>RFC 8555 §7.4: the CSR must request exactly the identifiers of the order.</summary>
+    internal static void ValidateCsrIdentifiers(CertificateRequest csr, IReadOnlyCollection<string> orderNames)
+    {
+        var expected = orderNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var requested = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var extension in csr.CertificateExtensions.Where(extension => extension.Oid?.Value == "2.5.29.17"))
+            foreach (var name in new X509SubjectAlternativeNameExtension(extension.RawData, extension.Critical).EnumerateDnsNames())
+                requested.Add(name.TrimEnd('.'));
+        var commonName = csr.SubjectName.EnumerateRelativeDistinguishedNames()
+            .Where(rdn => rdn.GetSingleElementType().Value == "2.5.4.3")
+            .Select(rdn => rdn.GetSingleElementValue())
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        if (requested.Count == 0 && commonName is null)
+            throw AcmeProblem("badCSR", "The CSR does not name any identifier.");
+        if (requested.Count > 0 && !requested.SetEquals(expected))
+            throw AcmeProblem("badCSR", $"The CSR requests [{string.Join(", ", requested)}] but the order is for [{string.Join(", ", expected)}].");
+        if (commonName is not null && !expected.Contains(commonName.TrimEnd('.')))
+            throw AcmeProblem("badCSR", $"The CSR common name '{commonName}' is not an identifier of the order.");
     }
 
     /// <summary>Returns the certificate chain as PEM for the given certificate ID.</summary>
@@ -532,7 +628,7 @@ public sealed class Rfc8555AcmeService
     /// </summary>
     public bool IsManagedCertificate(X509Certificate2 certificate)
     {
-        var certificateId = certificate.SerialNumber.ToLowerInvariant();
+        var certificateId = CertificateIdFromSerialNumber(certificate.SerialNumber);
         var path = Path.Combine(_storage.RootPath, "certificates", certificateId, "certificate.pfx");
         if (!File.Exists(path)) return false;
 
@@ -556,6 +652,11 @@ public sealed class Rfc8555AcmeService
         var authorityPaths = await _authorities.GetDefaultIssuingAsync(ct);
         using var issuer = _authorities.LoadAuthorityCertificate(authorityPaths.IssuingPath);
 
+        var notAfter = DateTimeOffset.UtcNow.AddDays(365);
+        // Same rule as internal issuance: a leaf must not outlive its issuing CA.
+        if (issuer.NotAfter <= notAfter)
+            throw new InvalidOperationException($"The issuing CA expires on {issuer.NotAfter:yyyy-MM-dd}; rotate it before issuing ACME certificates.");
+
         var subject = dnsNames[0];
 
         // Build the certificate from the CSR's public key.
@@ -568,8 +669,10 @@ public sealed class Rfc8555AcmeService
             HashAlgorithmName.SHA256);
 
         certRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
+        // KeyEncipherment is only meaningful for RSA keys (RSA key transport).
+        var isRsaKey = pubKey.Oid.Value == "1.2.840.113549.1.1.1";
         certRequest.CertificateExtensions.Add(new X509KeyUsageExtension(
-            X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
+            X509KeyUsageFlags.DigitalSignature | (isRsaKey ? X509KeyUsageFlags.KeyEncipherment : X509KeyUsageFlags.None), true));
         certRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(
             new OidCollection { new("1.3.6.1.5.5.7.3.1") }, true));
 
@@ -599,13 +702,13 @@ public sealed class Rfc8555AcmeService
         certRequest.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(pubKey, false));
         certRequest.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
 
-        var publicUrl = _options.Value.PublicUrl?.TrimEnd('/');
+        var publicUrl = _options.Value.CrlDistributionBaseUrl;
         if (!string.IsNullOrEmpty(publicUrl))
-            certRequest.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/latest"));
+            // Pin the CRL of the actual issuer; "latest" would follow the default CA after a rotation.
+            certRequest.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{authorityPaths.Id}"));
 
         var serial = RandomNumberGenerator.GetBytes(16);
         var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var notAfter = DateTimeOffset.UtcNow.AddDays(365);
 
         using var issuerEcc = issuer.GetECDsaPrivateKey();
         using var issuerRsa = issuerEcc is null ? issuer.GetRSAPrivateKey() : null;
@@ -665,6 +768,17 @@ public sealed class Rfc8555AcmeService
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         return Base64UrlEncode(hash);
+    }
+
+    /// <summary>
+    /// Maps an X.509 serial number to the certificate ID. IDs are the hex form of the 16 random serial
+    /// bytes, while the DER INTEGER carries an extra leading 00 byte when the first random byte has its
+    /// high bit set.
+    /// </summary>
+    public static string CertificateIdFromSerialNumber(string serialNumber)
+    {
+        var id = serialNumber.ToLowerInvariant();
+        return id.Length == 34 && id.StartsWith("00", StringComparison.Ordinal) ? id[2..] : id;
     }
 
     public static string Base64UrlEncode(byte[] data) =>

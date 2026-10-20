@@ -115,7 +115,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
 
         logger.LogInformation("Revoking certificate {CertificateId} (serial {SerialNumber}), reason: {Reason}", id, serialNumber, reason);
 
-        var authorityId = await authorities.FindIssuingIdBySubjectAsync(certificate.Issuer, cancellationToken);
+        var authorityId = await authorities.FindIssuingIdAsync(certificate, cancellationToken);
         await revocations.RevokeAsync(serialNumber, reason, cancellationToken, authorityId);
 
         try
@@ -165,7 +165,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         certificateRequest.CertificateExtensions.Add(san.Build());
         certificateRequest.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(certificateRequest.PublicKey, false));
         certificateRequest.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
-        var publicUrl = options.Value.PublicUrl?.TrimEnd('/');
+        var publicUrl = options.Value.CrlDistributionBaseUrl;
         if (!string.IsNullOrEmpty(publicUrl))
         {
             certificateRequest.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{authorityPaths.Id}"));
@@ -215,39 +215,46 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
     private async Task<List<CertificateInventoryItem>> LoadInventoryAsync(CancellationToken ct)
     {
         await _inventoryGate.WaitAsync(ct);
-        try
-        {
-            var items = new List<CertificateInventoryItem>();
-            if (File.Exists(_inventoryPath))
-            {
-                await using var stream = File.OpenRead(_inventoryPath);
-                items = await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(stream, cancellationToken: ct) ?? [];
-            }
-            if (!Directory.Exists(_certificateRoot)) return items;
-
-            // ACME certificates are retained without a private key. Older versions
-            // wrote those files but did not add an inventory entry; reconcile any
-            // retained certificate missing from the index on every inventory load.
-            var knownIds = items.Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var changed = false;
-            foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
-            {
-                var pfxPath = Path.Combine(directory, "certificate.pfx"); if (!File.Exists(pfxPath)) continue;
-                var id = Path.GetFileName(directory);
-                if (knownIds.Contains(id)) continue;
-                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
-                items.Add(new(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, id)));
-                changed = true;
-            }
-            if (changed || !File.Exists(_inventoryPath)) await WriteInventoryAsync(items, ct);
-            return items;
-        }
+        try { return await LoadInventoryUnsafeAsync(ct); }
         finally { _inventoryGate.Release(); }
+    }
+    /// <summary>Reads and reconciles the inventory; the caller must hold <c>_inventoryGate</c>.</summary>
+    private async Task<List<CertificateInventoryItem>> LoadInventoryUnsafeAsync(CancellationToken ct)
+    {
+        var items = new List<CertificateInventoryItem>();
+        if (File.Exists(_inventoryPath))
+        {
+            await using var stream = File.OpenRead(_inventoryPath);
+            items = await JsonSerializer.DeserializeAsync<List<CertificateInventoryItem>>(stream, cancellationToken: ct) ?? [];
+        }
+        if (!Directory.Exists(_certificateRoot)) return items;
+
+        // ACME certificates are retained without a private key. Older versions
+        // wrote those files but did not add an inventory entry; reconcile any
+        // retained certificate missing from the index on every inventory load.
+        var knownIds = items.Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var directory in Directory.EnumerateDirectories(_certificateRoot))
+        {
+            var pfxPath = Path.Combine(directory, "certificate.pfx"); if (!File.Exists(pfxPath)) continue;
+            var id = Path.GetFileName(directory);
+            if (knownIds.Contains(id)) continue;
+            using var certificate = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, null);
+            items.Add(new(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", Path.Combine(_exportRoot, id)));
+            changed = true;
+        }
+        if (changed || !File.Exists(_inventoryPath)) await WriteInventoryAsync(items, ct);
+        return items;
     }
     private async Task AddToInventoryAsync(CertificateInventoryItem item, CancellationToken ct)
     {
-        var items = await LoadInventoryAsync(ct); await _inventoryGate.WaitAsync(ct);
-        try { items.RemoveAll(x => x.Id == item.Id); items.Add(item); await WriteInventoryAsync(items, ct); }
+        // Read-modify-write under one lock; releasing it in between let concurrent issuances overwrite each other.
+        await _inventoryGate.WaitAsync(ct);
+        try
+        {
+            var items = await LoadInventoryUnsafeAsync(ct);
+            items.RemoveAll(x => x.Id == item.Id); items.Add(item); await WriteInventoryAsync(items, ct);
+        }
         finally { _inventoryGate.Release(); }
     }
     private async Task WriteInventoryAsync(List<CertificateInventoryItem> items, CancellationToken ct)

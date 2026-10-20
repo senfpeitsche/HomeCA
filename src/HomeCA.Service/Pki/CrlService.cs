@@ -56,13 +56,16 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
             var signatureAlgorithm = ecdsa is not null ? "SHA384WITHECDSA" : "SHA384WITHRSA";
             var signer = new Asn1SignatureFactory(signatureAlgorithm, privateKey);
             var crl = generator.Generate(signer);
-            await File.WriteAllBytesAsync(path, crl.GetEncoded(), cancellationToken);
+            // The CRL is served publicly; replace it atomically so readers never see a partial file.
+            var temporaryPath = path + ".tmp";
+            await File.WriteAllBytesAsync(temporaryPath, crl.GetEncoded(), cancellationToken);
+            File.Move(temporaryPath, path, true);
             logger.LogInformation("Generated CRL with {Count} entries at {Path}", revocationRecords.Count, path);
             return path;
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not InvalidOperationException)
         {
-            logger.LogError(ex, "Failed to generate CRL");
+            logger.LogError(ex, "Failed to generate CRL for authority {AuthorityId}", authorityId);
             throw;
         }
         finally { _gate.Release(); }
@@ -108,8 +111,18 @@ public sealed class CrlService(HomeCaStorage storage, RevocationRegistry revocat
                     logger.LogWarning(exception, "CRL at {Path} could not be read and will be regenerated", path);
                 }
             }
-            await GenerateAsync(authority.Id, cancellationToken);
-            renewed++;
+            try
+            {
+                await GenerateAsync(authority.Id, cancellationToken);
+                renewed++;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // One broken authority must not keep the CRLs of all others (and the certificate
+                // renewals that run after this step) from being processed.
+                // GenerateAsync already logged the stack trace for unexpected failures.
+                logger.LogWarning("Scheduled CRL renewal failed for authority {AuthorityId}: {Reason}; continuing with the remaining authorities", authority.Id, exception.Message);
+            }
         }
         return renewed;
     }

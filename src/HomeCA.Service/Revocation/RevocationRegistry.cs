@@ -24,7 +24,10 @@ public sealed class RevocationRegistry(HomeCaStorage storage, ILogger<Revocation
         try
         {
             var records = (await ReadUnsafeAsync(cancellationToken)).ToList();
-            var record = new RevocationRecord(serialNumber, reason, DateTimeOffset.UtcNow, authorityId);
+            // A repeated revocation may change the reason (e.g. to keyCompromise), but the
+            // revocation date in the CRL must stay the date of the first revocation.
+            var existing = records.FirstOrDefault(item => item.SerialNumber.Equals(serialNumber, StringComparison.OrdinalIgnoreCase));
+            var record = new RevocationRecord(serialNumber, reason, existing?.RevokedAt ?? DateTimeOffset.UtcNow, authorityId ?? existing?.AuthorityId);
             records.RemoveAll(item => item.SerialNumber.Equals(serialNumber, StringComparison.OrdinalIgnoreCase));
             records.Add(record);
             await WriteAtomicAsync(records, cancellationToken);

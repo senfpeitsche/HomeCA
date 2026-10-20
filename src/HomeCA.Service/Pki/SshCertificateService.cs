@@ -9,10 +9,10 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
     private readonly string _certificateRoot = Path.Combine(storage.RootPath, "certificates", "ssh");
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public Task<List<SshCertificateInventoryItem>> ListAsync(CancellationToken cancellationToken)
+    public async Task<List<SshCertificateInventoryItem>> ListAsync(CancellationToken cancellationToken)
     {
         var items = new List<SshCertificateInventoryItem>();
-        if (!Directory.Exists(_certificateRoot)) return Task.FromResult(items);
+        if (!Directory.Exists(_certificateRoot)) return items;
 
         foreach (var certFile in Directory.EnumerateFiles(_certificateRoot, "*-cert.pub"))
         {
@@ -20,22 +20,25 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
             var id = fileName.Replace("-cert", "", StringComparison.Ordinal);
             try
             {
-                var info = new FileInfo(certFile);
-                var firstLine = File.ReadLines(certFile).FirstOrDefault() ?? "";
-                var keyType = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "unknown";
-                var isHost = keyType.Contains("ssh-", StringComparison.OrdinalIgnoreCase) && ParseCertificateField(certFile, "Type")?.Contains("host", StringComparison.OrdinalIgnoreCase) == true;
-                var identity = ParseCertificateField(certFile, "Key ID") ?? id;
-                var principals = ParseCertificateField(certFile, "Principals") ?? "";
-                var validUntil = ParseCertificateField(certFile, "Valid");
-                items.Add(new SshCertificateInventoryItem(id, isHost ? "host" : "user", identity.Trim('"'), principals, info.CreationTimeUtc, validUntil));
+                // One ssh-keygen call per certificate; it used to be started once per field.
+                var fields = await ReadCertificateFieldsAsync(certFile, cancellationToken);
+                if (fields is null)
+                {
+                    logger.LogWarning("Could not read SSH certificate {CertificateFile} with ssh-keygen", certFile);
+                    continue;
+                }
+                var isHost = fields.GetValueOrDefault("Type")?.Contains("host certificate", StringComparison.OrdinalIgnoreCase) == true;
+                var identity = fields.GetValueOrDefault("Key ID") ?? id;
+                var principals = fields.GetValueOrDefault("Principals") ?? "";
+                items.Add(new SshCertificateInventoryItem(id, isHost ? "host" : "user", identity.Trim('"'), principals, new FileInfo(certFile).CreationTimeUtc, fields.GetValueOrDefault("Valid")));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Could not parse SSH certificate {CertificateFile}", certFile);
             }
         }
 
-        return Task.FromResult(items.OrderByDescending(i => i.IssuedAt).ToList());
+        return items.OrderByDescending(i => i.IssuedAt).ToList();
     }
 
     public Task<SshCaPublicKey?> GetCaPublicKeyAsync(string kind, CancellationToken cancellationToken)
@@ -58,13 +61,24 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
     {
         var certPath = Path.Combine(_certificateRoot, $"{id}-cert.pub");
         if (!File.Exists(certPath)) return false;
-        var kind = ParseCertificateField(certPath, "Type")?.Contains("host", StringComparison.OrdinalIgnoreCase) == true ? "ssh-host" : "ssh-user";
+        var fields = await ReadCertificateFieldsAsync(certPath, cancellationToken)
+            ?? throw new InvalidOperationException("The SSH certificate could not be read with ssh-keygen.");
+        var kind = fields.GetValueOrDefault("Type")?.Contains("host certificate", StringComparison.OrdinalIgnoreCase) == true ? "ssh-host" : "ssh-user";
         var krlPath = Path.Combine(_authorityRoot, kind, "revoked.krl");
-        var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardError = true, UseShellExecute = false };
-        start.ArgumentList.Add("-k"); start.ArgumentList.Add("-f"); start.ArgumentList.Add(krlPath); start.ArgumentList.Add("-s"); start.ArgumentList.Add(Path.Combine(_authorityRoot, kind, "ca.pub")); start.ArgumentList.Add(certPath);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Unable to start ssh-keygen.");
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0) throw new InvalidOperationException(await process.StandardError.ReadToEndAsync(cancellationToken));
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardError = true, UseShellExecute = false };
+            start.ArgumentList.Add("-k");
+            // Without -u, ssh-keygen replaces the KRL and silently un-revokes every earlier certificate.
+            if (File.Exists(krlPath)) start.ArgumentList.Add("-u");
+            start.ArgumentList.Add("-f"); start.ArgumentList.Add(krlPath); start.ArgumentList.Add("-s"); start.ArgumentList.Add(Path.Combine(_authorityRoot, kind, "ca.pub")); start.ArgumentList.Add(certPath);
+            using var process = Process.Start(start) ?? throw new InvalidOperationException("Unable to start ssh-keygen.");
+            var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            if (process.ExitCode != 0) throw new InvalidOperationException(await stderr);
+        }
+        finally { _gate.Release(); }
         logger.LogInformation("Revoked SSH certificate {CertificateId} in {KrlPath}", id, krlPath);
         return true;
     }
@@ -76,28 +90,53 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
         return File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
     }
 
-    private static string? ParseCertificateField(string certFile, string fieldName)
+    /// <summary>Reads all fields of "ssh-keygen -L"; returns null when ssh-keygen fails.</summary>
+    private static async Task<Dictionary<string, string>?> ReadCertificateFieldsAsync(string certFile, CancellationToken cancellationToken)
     {
-        try
+        var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        start.ArgumentList.Add("-L"); start.ArgumentList.Add("-f"); start.ArgumentList.Add(certFile);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Unable to start ssh-keygen.");
+        var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var error = process.StandardError.ReadToEndAsync(cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        try { await process.WaitForExitAsync(timeout.Token); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-            start.ArgumentList.Add("-L"); start.ArgumentList.Add("-f"); start.ArgumentList.Add(certFile);
-            using var process = Process.Start(start);
-            if (process is null) return null;
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(5000);
-            foreach (var line in output.Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (trimmed.StartsWith(fieldName, StringComparison.OrdinalIgnoreCase))
-                {
-                    var colonIndex = trimmed.IndexOf(':');
-                    if (colonIndex >= 0) return trimmed[(colonIndex + 1)..].Trim();
-                }
-            }
+            process.Kill(true);
+            return null;
         }
-        catch { }
-        return null;
+        await error;
+        return process.ExitCode == 0 ? ParseCertificateFields(await output) : null;
+    }
+
+    /// <summary>
+    /// Parses "ssh-keygen -L" output. Multi-value fields such as Principals list their values on
+    /// further-indented lines below the field name; those are joined with commas.
+    /// </summary>
+    internal static Dictionary<string, string> ParseCertificateFields(string output)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fieldIndent = -1;
+        string? current = null;
+        foreach (var line in output.Replace("\r", "").Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var indent = line.Length - line.TrimStart().Length;
+            if (indent == 0) continue; // "<file>:" header
+            var trimmed = line.Trim();
+            if (fieldIndent < 0) fieldIndent = indent;
+            if (indent > fieldIndent && current is not null)
+            {
+                fields[current] = fields[current].Length == 0 ? trimmed : $"{fields[current]},{trimmed}";
+                continue;
+            }
+            var colonIndex = trimmed.IndexOf(':');
+            if (colonIndex <= 0) continue;
+            current = trimmed[..colonIndex].Trim();
+            fields[current] = trimmed[(colonIndex + 1)..].Trim();
+        }
+        return fields;
     }
 
     public async Task<SshIssueResult> IssueAsync(SshIssueRequest request, CancellationToken cancellationToken)
@@ -127,10 +166,12 @@ public sealed class SshCertificateService(HomeCaStorage storage, ILogger<SshCert
             if (authority == "ssh-host") start.ArgumentList.Add("-h");
             start.ArgumentList.Add(publicKeyPath);
             using var process = Process.Start(start) ?? throw new InvalidOperationException("Unable to start ssh-keygen.");
+            // Drain stderr while waiting; a full pipe would otherwise block ssh-keygen.
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
             if (process.ExitCode != 0)
             {
-                var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+                var stderr = await stderrTask;
                 logger.LogError("ssh-keygen failed with exit code {ExitCode}: {StdErr}", process.ExitCode, stderr);
                 throw new InvalidOperationException(stderr);
             }
