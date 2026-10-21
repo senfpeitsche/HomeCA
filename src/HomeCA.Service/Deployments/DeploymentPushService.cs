@@ -18,7 +18,7 @@ public sealed class DeploymentPushService(
     /// <summary>Exit code of the agent when another run holds its lock.</summary>
     public const int AgentBusyExitCode = 75;
 
-    private static readonly TimeSpan PushTimeout = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan PushTimeout = TimeSpan.FromMinutes(10);
     // A run that was already going may have fetched the manifest before the renewal; try again once it ended.
     internal TimeSpan BusyRetryDelay { get; init; } = TimeSpan.FromSeconds(30);
     private const int BusyAttempts = 4;

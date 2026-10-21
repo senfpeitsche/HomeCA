@@ -97,7 +97,7 @@
 
                 <MudGrid Spacing="2">
                     <MudItem xs="12" sm="8"><MudTextField @bind-Value="_probeHost" Label="@Text["DeploymentHost"]" HelperText="@Text["DeploymentHostHelper"]" Disabled="@(Target is not null)" /></MudItem>
-                    <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_probePort" Label="@Text["DeploymentPort"]" Min="1" Max="65535" Disabled="@(Target is not null)" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_probePort" Label="@Text["DeploymentPort"]" HelperText="@Text["DeploymentPortHelper"]" Min="1" Max="65535" Disabled="@(Target is not null)" /></MudItem>
                 </MudGrid>
                 <MudTextField @bind-Value="_homeCaUrl" Label="@Text["SshHomeCaUrl"]" HelperText="@Text["SshHomeCaUrlHelper"]" Error="@HomeCaUrlIsLocal" ErrorText="@Text["SshHomeCaUrlLocal"]" />
                 <MudCheckBox T="bool" @bind-Value="_installRootCa" Label="@Text["SshInstallRootCa"]" Disabled="@(_facts.TrustStore == "none")" />
@@ -195,6 +195,8 @@
     {
         var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        // The default 100 seconds would abort a slower setup, e.g. on Windows, and cancel it on the device too.
+        client.Timeout = SshSetupService.SetupTimeout + TimeSpan.FromMinutes(1);
         return client;
     }
 
@@ -253,6 +255,8 @@
         _name = _suggestion.Name;
         _probeHost = _host.Trim();
         _issueProfileId = _suggestion.ProfileIds.FirstOrDefault() ?? "";
+        // A Windows host with Remote Desktop but no IIS serves its certificate on the RDP port, not on 443.
+        if (_suggestion.ProfileIds.Contains("rdp") && !_suggestion.ProfileIds.Contains("iis")) _probePort = DeploymentProbeService.RdpPort;
         _issueDnsNames = string.Join(", ", _suggestion.DnsNames);
         _issueIpAddresses = string.Join(", ", _suggestion.IpAddresses);
         if (_suggestion.CertificateId is { } id && Certificates.Any(certificate => certificate.Key == id)) _certificateId = id;

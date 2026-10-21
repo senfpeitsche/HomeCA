@@ -904,6 +904,7 @@
   <data name="DeploymentHost" xml:space="preserve"><value>Host to check (optional)</value></data>
   <data name="DeploymentHostHelper" xml:space="preserve"><value>HomeCA connects here to check which certificate the device serves.</value></data>
   <data name="DeploymentPort" xml:space="preserve"><value>TLS port</value></data>
+  <data name="DeploymentPortHelper" xml:space="preserve"><value>Port on which the device serves the certificate, e.g. 443 for HTTPS or 3389 for RDP. Not the SSH port.</value></data>
   <data name="DeploymentWebhook" xml:space="preserve"><value>Webhook after renewal (optional)</value></data>
   <data name="DeploymentWebhookHelper" xml:space="preserve"><value>HomeCA sends a JSON POST without secrets when the certificate was renewed.</value></data>
   <data name="DeploymentTargets" xml:space="preserve"><value>Targets</value></data>

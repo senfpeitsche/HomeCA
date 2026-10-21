@@ -222,6 +222,48 @@ public sealed class DeploymentTargetTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Rdp_probe_requests_tls_and_accepts_the_negotiation_response()
+    {
+        // X.224 connection confirm with RDP_NEG_RSP selecting PROTOCOL_HYBRID (CredSSP over TLS).
+        var stream = new ScriptedStream([0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x02, 0x1f, 0x08, 0x00, 0x02, 0x00, 0x00, 0x00]);
+
+        await DeploymentProbeService.NegotiateRdpTlsAsync(stream, CancellationToken.None);
+
+        var sent = stream.Written.ToArray();
+        Assert.Equal(19, sent.Length);
+        Assert.Equal(0xe0, sent[5]);
+        Assert.Equal(0x03, sent[15]);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x03, 0x00, 0x08, 0x00, 0x05, 0x00, 0x00, 0x00 }, "does not offer TLS (failure code 5)")]
+    [InlineData(new byte[] { 0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x02, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00 }, "selected a protocol without TLS")]
+    [InlineData(new byte[] { (byte)'H', (byte)'T', (byte)'T', (byte)'P', (byte)'/', (byte)'1' }, "not with RDP")]
+    public async Task Rdp_probe_reports_servers_that_do_not_offer_tls(byte[] response, string expected)
+    {
+        var exception = await Assert.ThrowsAsync<IOException>(() => DeploymentProbeService.NegotiateRdpTlsAsync(new ScriptedStream(response), CancellationToken.None));
+
+        Assert.Contains(expected, exception.Message);
+    }
+
+    /// <summary>Answers reads from a fixed response and records what the probe writes.</summary>
+    private sealed class ScriptedStream(byte[] response) : Stream
+    {
+        private readonly MemoryStream _response = new(response);
+        public MemoryStream Written { get; } = new();
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => _response.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => Written.Write(buffer, offset, count);
+    }
+
     internal sealed class SingleClientFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);

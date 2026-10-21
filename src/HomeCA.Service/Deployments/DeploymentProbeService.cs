@@ -91,6 +91,7 @@ public sealed class DeploymentProbeService(HomeCaStorage storage, DeploymentTarg
         timeout.CancelAfter(Timeout);
         using var client = new TcpClient();
         await client.ConnectAsync(host, port, timeout.Token);
+        if (port == RdpPort) await NegotiateRdpTlsAsync(client.GetStream(), timeout.Token);
         X509Certificate2? served = null;
         await using var stream = new SslStream(client.GetStream(), false, (_, certificate, _, _) =>
         {
@@ -110,5 +111,33 @@ public sealed class DeploymentProbeService(HomeCaStorage storage, DeploymentTarg
             throw new IOException($"Port {port} answered, but not with TLS ({exception.Message}).", exception);
         }
         return served;
+    }
+
+    internal const int RdpPort = 3389;
+
+    /// <summary>
+    /// RDP starts TLS only after an X.224 connection request (MS-RDPBCGR 2.2.1.1), so the probe asks for TLS or
+    /// CredSSP like a client would and returns once the server agreed; the TLS handshake follows on the same stream.
+    /// </summary>
+    internal static async Task NegotiateRdpTlsAsync(Stream stream, CancellationToken ct)
+    {
+        byte[] request =
+        [
+            0x03, 0x00, 0x00, 0x13,                         // TPKT, 19 bytes
+            0x0e, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00,       // X.224 connection request
+            0x01, 0x00, 0x08, 0x00, 0x03, 0x00, 0x00, 0x00  // RDP_NEG_REQ: PROTOCOL_SSL | PROTOCOL_HYBRID
+        ];
+        await stream.WriteAsync(request, ct);
+        var header = new byte[4];
+        await stream.ReadExactlyAsync(header, ct);
+        var length = (header[2] << 8) | header[3];
+        if (header[0] != 0x03 || length < 11 || length > 64) throw new IOException($"Port {RdpPort} answered, but not with RDP.");
+        var body = new byte[length - 4];
+        await stream.ReadExactlyAsync(body, ct);
+        // X.224 connection confirm, then RDP_NEG_RSP (2) with the selected protocol or RDP_NEG_FAILURE (3).
+        if ((body[1] & 0xf0) != 0xd0) throw new IOException($"Port {RdpPort} answered, but not with RDP.");
+        if (body.Length < 15 || body[7] != 0x02)
+            throw new IOException($"The RDP server on port {RdpPort} does not offer TLS{(body.Length >= 15 && body[7] == 0x03 ? $" (failure code {body[11]})" : string.Empty)}.");
+        if (body[11] is not (0x01 or 0x02 or 0x08)) throw new IOException($"The RDP server on port {RdpPort} selected a protocol without TLS.");
     }
 }

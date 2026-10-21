@@ -904,6 +904,7 @@
   <data name="DeploymentHost" xml:space="preserve"><value>Zu prüfender Host (optional)</value></data>
   <data name="DeploymentHostHelper" xml:space="preserve"><value>HomeCA verbindet sich hierhin, um zu prüfen, welches Zertifikat das Gerät ausliefert.</value></data>
   <data name="DeploymentPort" xml:space="preserve"><value>TLS-Port</value></data>
+  <data name="DeploymentPortHelper" xml:space="preserve"><value>Port, an dem das Gerät das Zertifikat ausliefert, z. B. 443 für HTTPS oder 3389 für RDP. Nicht der SSH-Port.</value></data>
   <data name="DeploymentWebhook" xml:space="preserve"><value>Webhook nach Erneuerung (optional)</value></data>
   <data name="DeploymentWebhookHelper" xml:space="preserve"><value>HomeCA sendet nach einer Erneuerung einen JSON-POST ohne Geheimnisse.</value></data>
   <data name="DeploymentTargets" xml:space="preserve"><value>Ziele</value></data>

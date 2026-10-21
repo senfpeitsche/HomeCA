@@ -10,7 +10,10 @@
 
 @if (_sshSetupOpen)
 {
-    <SshSetupWizard @key="_sshTarget?.Id" Target="_sshTarget" Token="@Token" Certificates="@Certificates" OnClosed="CloseSshSetup" OnChanged="SshSetupChangedAsync" />
+    @* Focusable anchor: the row buttons sit far below, so opening the wizard scrolls up to it. *@
+    <div @ref="_sshSetupAnchor" tabindex="-1" style="outline:none">
+        <SshSetupWizard @key="_sshTarget?.Id" Target="_sshTarget" Token="@Token" Certificates="@Certificates" OnClosed="CloseSshSetup" OnChanged="SshSetupChangedAsync" />
+    </div>
 }
 else
 {
@@ -58,7 +61,7 @@ else
                     }
                 </MudSelect>
                 <MudTextField @bind-Value="_host" Label="@Text["DeploymentHost"]" HelperText="@Text["DeploymentHostHelper"]" />
-                <MudNumericField T="int" @bind-Value="_port" Label="@Text["DeploymentPort"]" Min="1" Max="65535" />
+                <MudNumericField T="int" @bind-Value="_port" Label="@Text["DeploymentPort"]" HelperText="@Text["DeploymentPortHelper"]" Min="1" Max="65535" />
                 <MudTextField @bind-Value="_webhookUrl" Label="@Text["DeploymentWebhook"]" HelperText="@Text["DeploymentWebhookHelper"]" />
                 <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAsync">@(_editingId is null ? Text["DeploymentCreate"] : Text["SaveChanges"])</MudButton>
                 @if (_editingId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelEdit">@Text["CancelEdit"]</MudButton> }
@@ -125,9 +128,10 @@ else
     private string? _editingId, _deleteId, _rotateId, _agentScript, _windowsAgentScript, _agentTargetName;
     private string _name = "", _certificateId = "", _host = "", _webhookUrl = "";
     private int _port = 443;
-    private bool _busy, _sshSetupOpen;
+    private bool _busy, _sshSetupOpen, _scrollToSshSetup;
     private string? _disablePushId;
     private DeploymentTarget? _sshTarget;
+    private ElementReference _sshSetupAnchor;
 
     private string BaseUrl => Navigation.BaseUri.TrimEnd('/');
 
@@ -251,6 +255,8 @@ else
         try
         {
             using var client = Client();
+            // A push waits for the agent run; the default 100 seconds would cancel it before the server gives up.
+            client.Timeout = DeploymentPushService.PushTimeout + TimeSpan.FromMinutes(1);
             var response = await client.PostAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/push", null);
             if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
             var result = await response.Content.ReadFromJsonAsync<DeploymentPushResult>(_json);
@@ -296,6 +302,15 @@ else
     {
         _sshTarget = target;
         _sshSetupOpen = true;
+        _scrollToSshSetup = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_scrollToSshSetup || !_sshSetupOpen) return;
+        _scrollToSshSetup = false;
+        // Focusing scrolls the element into view without a JavaScript helper.
+        await _sshSetupAnchor.FocusAsync();
     }
 
     private void CloseSshSetup()

@@ -25,7 +25,7 @@ public sealed class SshSetupService(
     ILogger<SshSetupService> logger)
 {
     private static readonly TimeSpan DetectionTimeout = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(10);
     private const int MaximumOutputLength = 64 * 1024;
 
     public async Task<SshDetectResponse> DetectAsync(SshDetectRequest request, CancellationToken ct)
