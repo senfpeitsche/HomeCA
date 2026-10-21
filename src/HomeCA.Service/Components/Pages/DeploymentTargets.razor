@@ -1,0 +1,234 @@
+@using HomeCA.Service.Deployments
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject HomeCaInternalHttpClient InternalHttpClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+<MudText Typo="Typo.overline" Class="section-kicker">@Text["DeploymentsKicker"]</MudText>
+<MudText Typo="Typo.h3" Class="page-title">@Text["DeploymentsTitle"]</MudText>
+<MudText Class="mud-text-secondary mb-4">@Text["DeploymentsDescription"]</MudText>
+
+@if (_createdToken is { } created)
+{
+    <MudPaper Class="panel" Elevation="0">
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@Text["DeploymentTokenOnce", created.Target.Name]</MudAlert>
+        <MudText Typo="Typo.subtitle2" Class="mb-1">@Text["DeploymentInstallCommands"]</MudText>
+        <CodePreview Text="@DeploymentAgentScript.RenderInstallCommands(BaseUrl, created.Target, created.Token)" Lines="7" />
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Text["DeploymentInstallHint"]</MudText>
+        <div class="mt-3"><MudButton Variant="Variant.Text" OnClick="@(() => _createdToken = null)">@Text["DeploymentTokenStored"]</MudButton></div>
+    </MudPaper>
+}
+
+<MudGrid>
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="panel" Elevation="0">
+            <div class="form-stack">
+                <MudText Typo="Typo.h6">@(_editingId is null ? Text["DeploymentCreate"] : Text["DeploymentEdit"])</MudText>
+                <MudTextField @bind-Value="_name" Label="@Text["Name"]" Required="true" HelperText="@Text["DeploymentNameHelper"]" />
+                <MudSelect T="string" Label="@Text["Certificate"]" @bind-Value="_certificateId" Required="true">
+                    @foreach (var certificate in Certificates)
+                    {
+                        <MudSelectItem Value="@certificate.Key">@certificate.Value</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_host" Label="@Text["DeploymentHost"]" HelperText="@Text["DeploymentHostHelper"]" />
+                <MudNumericField T="int" @bind-Value="_port" Label="@Text["DeploymentPort"]" Min="1" Max="65535" />
+                <MudTextField @bind-Value="_webhookUrl" Label="@Text["DeploymentWebhook"]" HelperText="@Text["DeploymentWebhookHelper"]" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAsync">@(_editingId is null ? Text["DeploymentCreate"] : Text["SaveChanges"])</MudButton>
+                @if (_editingId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelEdit">@Text["CancelEdit"]</MudButton> }
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="panel" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-2">@Text["DeploymentTargets"]</MudText>
+            <MudTable Items="_targets" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>@Text["Name"]</MudTh><MudTh>@Text["Certificate"]</MudTh><MudTh>@Text["DeploymentAgent"]</MudTh><MudTh>@Text["DeploymentServed"]</MudTh><MudTh></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="@Text["Name"]">@context.Name@if (!string.IsNullOrWhiteSpace(context.Host)) { <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@context.Host:@context.Port</MudText> }</MudTd>
+                    <MudTd DataLabel="@Text["Certificate"]">@CertificateName(context.CertificateId)</MudTd>
+                    <MudTd DataLabel="@Text["DeploymentAgent"]">@AgentStatus(context)</MudTd>
+                    <MudTd DataLabel="@Text["DeploymentServed"]">
+                        @if (context.LastProbe is { } probe)
+                        {
+                            <MudTooltip Text="@(probe.Error ?? probe.ServedFingerprint ?? string.Empty)"><MudChip T="string" Size="Size.Small" Color="@ProbeColor(probe.Status)">@ProbeLabel(probe.Status)</MudChip></MudTooltip>
+                            <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@Date(probe.CheckedAt)</MudText>
+                        }
+                        else { <MudText Typo="Typo.caption" Class="mud-text-secondary">@(string.IsNullOrWhiteSpace(context.Host) ? Text["DeploymentNoHost"] : Text["DeploymentNotChecked"])</MudText> }
+                    </MudTd>
+                    <MudTd>
+                        @if (!string.IsNullOrWhiteSpace(context.Host)) { <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_busy" OnClick="@(() => ProbeAsync(context.Id))">@Text["DeploymentCheck"]</MudButton> }
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => ShowAgentAsync(context))">@Text["DeploymentShowAgent"]</MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginEdit(context))">@Text["Edit"]</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" Disabled="_busy" OnClick="@(() => RotateTokenAsync(context))">@(_rotateId == context.Id ? Text["DeploymentConfirmRotate"] : Text["DeploymentRotateToken"])</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" Disabled="_busy" OnClick="@(() => DeleteAsync(context.Id))">@(_deleteId == context.Id ? Text["ConfirmDelete"] : Text["Delete"])</MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Class="pa-4">@Text["DeploymentNone"]</MudText></NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+        @if (_agentScript is not null)
+        {
+            <MudPaper Class="panel" Elevation="0">
+                <MudStack Row="true" AlignItems="AlignItems.Center"><MudText Typo="Typo.h6">@Text["DeploymentAgentScript", _agentTargetName ?? string.Empty]</MudText><MudSpacer /><MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="@Text["Close"]" OnClick="@(() => _agentScript = null)" /></MudStack>
+                <MudText Class="mud-text-secondary mb-2">@Text["DeploymentAgentDescription"]</MudText>
+                <CodePreview Text="@_agentScript" Lines="12" />
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter, EditorRequired] public string Token { get; set; } = string.Empty;
+    /// <summary>Active certificates as ID → display name.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<KeyValuePair<string, string>> Certificates { get; set; } = [];
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
+    private List<DeploymentTarget> _targets = [];
+    private CreatedDeploymentTarget? _createdToken;
+    private string? _editingId, _deleteId, _rotateId, _agentScript, _agentTargetName;
+    private string _name = "", _certificateId = "", _host = "", _webhookUrl = "";
+    private int _port = 443;
+    private bool _busy;
+
+    private string BaseUrl => Navigation.BaseUri.TrimEnd('/');
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private HttpClient Client()
+    {
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        return client;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            using var client = Client();
+            _targets = await client.GetFromJsonAsync<List<DeploymentTarget>>("api/v1/deployment-targets", _json) ?? [];
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_certificateId)) { Snackbar.Add(Text["DeploymentRequiredFields"], Severity.Warning); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var payload = new SaveDeploymentTargetRequest(_name, _certificateId, string.IsNullOrWhiteSpace(_host) ? null : _host, _port, string.IsNullOrWhiteSpace(_webhookUrl) ? null : _webhookUrl);
+            var response = _editingId is null
+                ? await client.PostAsJsonAsync("api/v1/deployment-targets", payload)
+                : await client.PutAsJsonAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(_editingId)}", payload);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            if (_editingId is null) _createdToken = await response.Content.ReadFromJsonAsync<CreatedDeploymentTarget>(_json);
+            Snackbar.Add(Text["ChangesSaved"], Severity.Success);
+            CancelEdit();
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private void BeginEdit(DeploymentTarget target)
+    {
+        _editingId = target.Id; _name = target.Name; _certificateId = target.CertificateId;
+        _host = target.Host ?? ""; _port = target.Port; _webhookUrl = target.WebhookUrl ?? "";
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null; _name = ""; _certificateId = ""; _host = ""; _port = 443; _webhookUrl = "";
+    }
+
+    private async Task ProbeAsync(string id)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(id)}/probe", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            var result = await response.Content.ReadFromJsonAsync<DeploymentProbeResult>(_json);
+            Snackbar.Add(ProbeLabel(result?.Status ?? DeploymentProbeResult.Unreachable), result?.Status == DeploymentProbeResult.Current ? Severity.Success : Severity.Warning);
+            await LoadAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task ShowAgentAsync(DeploymentTarget target)
+    {
+        try
+        {
+            using var client = Client();
+            _agentScript = await client.GetStringAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/agent");
+            _agentTargetName = target.Name;
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+    }
+
+    private async Task RotateTokenAsync(DeploymentTarget target)
+    {
+        if (_rotateId != target.Id) { _rotateId = target.Id; Snackbar.Add(Text["DeploymentRotateWarning"], Severity.Warning); return; }
+        _rotateId = null;
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/token", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            var token = await response.Content.ReadFromJsonAsync<TokenResponse>(_json);
+            if (token is not null) _createdToken = new CreatedDeploymentTarget(target, token.Token);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        if (_deleteId != id) { _deleteId = id; Snackbar.Add(Text["DeploymentConfirmDeleteHint"], Severity.Warning); return; }
+        _deleteId = null;
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.DeleteAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(id)}");
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private string CertificateName(string id) => Certificates.FirstOrDefault(entry => entry.Key == id).Value ?? id;
+
+    private string AgentStatus(DeploymentTarget target) =>
+        target.LastCheckInAt is null ? Text["DeploymentNeverCheckedIn"]
+        : Text["DeploymentLastCheckIn", Date(target.LastCheckInAt.Value)];
+
+    private string ProbeLabel(string status) => status switch
+    {
+        DeploymentProbeResult.Current => Text["ProbeCurrent"],
+        DeploymentProbeResult.Outdated => Text["ProbeOutdated"],
+        DeploymentProbeResult.Foreign => Text["ProbeForeign"],
+        _ => Text["ProbeUnreachable"]
+    };
+
+    private static Color ProbeColor(string status) => status switch
+    {
+        DeploymentProbeResult.Current => Color.Success,
+        DeploymentProbeResult.Outdated => Color.Warning,
+        _ => Color.Error
+    };
+
+    private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+
+    private sealed record TokenResponse(string Token);
+}

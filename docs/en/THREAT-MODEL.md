@@ -22,6 +22,13 @@ In the simple mode, the root and issuing CA remain online in the protected HomeC
 - CRLs help only clients and services that support fetching and evaluating them.
 - HomeCA cannot protect private keys after a deployment package has been copied to a target system.
 
+## Deployment tokens, trust page and outbound connections
+
+- A deployment-target token can fetch that target's private key. It is stored only as a SHA-256 hash, valid for one target and rotatable; treat the token file on the device like the key.
+- `/trust` and the trust-anchor endpoints stay on plain HTTP by design. Anyone in the path can swap the downloaded root, which is why every page and guide asks to compare the fingerprint through a second channel.
+- HomeCA opens outbound connections to configured webhook and notification URLs and to deployment-target hosts for the TLS check. Only administrators configure these addresses; payloads contain no secrets.
+- Name constraints on the issuing CA limit the damage of a stolen issuing key to the permitted domains and networks.
+
 ## Mandatory operating rules
 
 1. Never publish HomeCA directly on the Internet. Permit access only from administration or server networks; use a VPN for remote administration.

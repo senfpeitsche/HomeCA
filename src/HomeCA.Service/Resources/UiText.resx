@@ -889,4 +889,162 @@
   <data name="ScriptTypePowerShell" xml:space="preserve"><value>PowerShell (install.ps1)</value></data>
   <data name="ScriptTypeDeviceCli" xml:space="preserve"><value>Device CLI commands (device-commands.txt)</value></data>
   <data name="ProfileBaseTextHint" xml:space="preserve"><value>These fields hold the English base text. Translations of a field you change are removed.</value></data>
+  <data name="NavDeployments" xml:space="preserve"><value>Deployment</value></data>
+  <data name="ApiErrorConflict" xml:space="preserve"><value>The action could not be completed because of a conflict.</value></data>
+  <data name="DeploymentsKicker" xml:space="preserve"><value>Automatic deployment</value></data>
+  <data name="DeploymentsTitle" xml:space="preserve"><value>Deployment targets</value></data>
+  <data name="DeploymentsDescription" xml:space="preserve"><value>A deployment target follows a certificate through every renewal. A small agent on the device fetches the current files with its own token and runs the profile script. HomeCA checks over TLS whether the device actually serves the current certificate.</value></data>
+  <data name="DeploymentTokenOnce" xml:space="preserve"><value>Token for "{0}": it is shown only now. Run these commands on the device.</value></data>
+  <data name="DeploymentInstallCommands" xml:space="preserve"><value>Set up the agent (Linux, as root)</value></data>
+  <data name="DeploymentInstallHint" xml:space="preserve"><value>Requires curl. The agent runs hourly via cron and only acts when the certificate changed. Set CA_FILE in the agent if the HomeCA root CA is not in the system trust store.</value></data>
+  <data name="DeploymentTokenStored" xml:space="preserve"><value>Done, hide token</value></data>
+  <data name="DeploymentCreate" xml:space="preserve"><value>Add deployment target</value></data>
+  <data name="DeploymentEdit" xml:space="preserve"><value>Edit deployment target</value></data>
+  <data name="DeploymentNameHelper" xml:space="preserve"><value>For example the device name, such as pve01.</value></data>
+  <data name="DeploymentHost" xml:space="preserve"><value>Host to check (optional)</value></data>
+  <data name="DeploymentHostHelper" xml:space="preserve"><value>HomeCA connects here to check which certificate the device serves.</value></data>
+  <data name="DeploymentPort" xml:space="preserve"><value>TLS port</value></data>
+  <data name="DeploymentWebhook" xml:space="preserve"><value>Webhook after renewal (optional)</value></data>
+  <data name="DeploymentWebhookHelper" xml:space="preserve"><value>HomeCA sends a JSON POST without secrets when the certificate was renewed.</value></data>
+  <data name="DeploymentTargets" xml:space="preserve"><value>Targets</value></data>
+  <data name="DeploymentAgent" xml:space="preserve"><value>Agent</value></data>
+  <data name="DeploymentServed" xml:space="preserve"><value>Served certificate</value></data>
+  <data name="DeploymentNoHost" xml:space="preserve"><value>No host configured</value></data>
+  <data name="DeploymentNotChecked" xml:space="preserve"><value>Not checked yet</value></data>
+  <data name="DeploymentCheck" xml:space="preserve"><value>Check</value></data>
+  <data name="DeploymentShowAgent" xml:space="preserve"><value>Agent script</value></data>
+  <data name="DeploymentRotateToken" xml:space="preserve"><value>New token</value></data>
+  <data name="DeploymentConfirmRotate" xml:space="preserve"><value>Confirm new token</value></data>
+  <data name="DeploymentRotateWarning" xml:space="preserve"><value>The old token stops working immediately. Click again to confirm.</value></data>
+  <data name="DeploymentConfirmDeleteHint" xml:space="preserve"><value>The agent on the device can no longer fetch certificates. Click again to delete.</value></data>
+  <data name="DeploymentNone" xml:space="preserve"><value>No deployment targets yet.</value></data>
+  <data name="DeploymentAgentScript" xml:space="preserve"><value>Agent script for {0}</value></data>
+  <data name="DeploymentAgentDescription" xml:space="preserve"><value>This is the script the setup commands install. It contains no token; the token stays in the token file on the device.</value></data>
+  <data name="DeploymentRequiredFields" xml:space="preserve"><value>Name and certificate are required.</value></data>
+  <data name="DeploymentNeverCheckedIn" xml:space="preserve"><value>Never checked in</value></data>
+  <data name="DeploymentLastCheckIn" xml:space="preserve"><value>Last check-in {0}</value></data>
+  <data name="ProbeCurrent" xml:space="preserve"><value>Current</value></data>
+  <data name="ProbeOutdated" xml:space="preserve"><value>Outdated certificate</value></data>
+  <data name="ProbeForeign" xml:space="preserve"><value>Different certificate</value></data>
+  <data name="ProbeUnreachable" xml:space="preserve"><value>Unreachable</value></data>
+  <data name="NotificationCertificateRenewedTitle" xml:space="preserve"><value>HomeCA: certificate renewed</value></data>
+  <data name="NotificationCertificateRenewedMessage" xml:space="preserve"><value>The certificate '{0}' was renewed automatically and is valid until {1}. Agents pick it up on their next run.</value></data>
+  <data name="NotificationRenewalFailedTitle" xml:space="preserve"><value>HomeCA: automatic renewal failed</value></data>
+  <data name="NotificationRenewalFailedMessage" xml:space="preserve"><value>Automatic renewal of '{0}' failed. Check the HomeCA logs. Error: {1}</value></data>
+  <data name="NotificationDeploymentOutdatedTitle" xml:space="preserve"><value>HomeCA: device does not serve the current certificate</value></data>
+  <data name="NotificationDeploymentOutdatedMessage" xml:space="preserve"><value>Deployment target '{0}': {1}</value></data>
+  <data name="NotificationBackupFailedTitle" xml:space="preserve"><value>HomeCA: scheduled backup failed</value></data>
+  <data name="NotificationBackupFailedMessage" xml:space="preserve"><value>The scheduled backup failed. {0} {1}</value></data>
+  <data name="NotificationTestTitle" xml:space="preserve"><value>HomeCA: test notification</value></data>
+  <data name="NotificationTestMessage" xml:space="preserve"><value>Notifications from HomeCA arrive here.{0}{1}</value></data>
+  <data name="PushNotifications" xml:space="preserve"><value>Push and webhook notifications</value></data>
+  <data name="PushNotificationsDescription" xml:space="preserve"><value>Send renewals, failures, outdated devices and backup problems to ntfy, Gotify or a webhook (Slack, Discord, Mattermost and others). The language also applies to e-mails.</value></data>
+  <data name="NotificationLanguage" xml:space="preserve"><value>Notification language</value></data>
+  <data name="NotificationEvents" xml:space="preserve"><value>Events</value></data>
+  <data name="NotificationAllEvents" xml:space="preserve"><value>All events</value></data>
+  <data name="NotificationEventsHelper" xml:space="preserve"><value>Leave all unchecked to receive every event.</value></data>
+  <data name="NotificationTest" xml:space="preserve"><value>Test</value></data>
+  <data name="NotificationTestSent" xml:space="preserve"><value>Test message delivered.</value></data>
+  <data name="NotificationNoChannels" xml:space="preserve"><value>No channels yet.</value></data>
+  <data name="NotificationAddChannel" xml:space="preserve"><value>Add channel</value></data>
+  <data name="NotificationEditChannel" xml:space="preserve"><value>Edit channel</value></data>
+  <data name="NotificationWebhookType" xml:space="preserve"><value>Webhook (JSON)</value></data>
+  <data name="NotificationWebhookUrl" xml:space="preserve"><value>Webhook URL</value></data>
+  <data name="NotificationServerUrl" xml:space="preserve"><value>Server URL</value></data>
+  <data name="NotificationTopic" xml:space="preserve"><value>Topic</value></data>
+  <data name="NotificationGotifyToken" xml:space="preserve"><value>Application token</value></data>
+  <data name="NotificationNtfyToken" xml:space="preserve"><value>Access token (optional)</value></data>
+  <data name="NotificationWebhookToken" xml:space="preserve"><value>Bearer token (optional)</value></data>
+  <data name="NotificationEventLabelCertificateRenewed" xml:space="preserve"><value>Renewed</value></data>
+  <data name="NotificationEventLabelRenewalFailed" xml:space="preserve"><value>Renewal failed</value></data>
+  <data name="NotificationEventLabelDeploymentOutdated" xml:space="preserve"><value>Device outdated</value></data>
+  <data name="NotificationEventLabelBackupFailed" xml:space="preserve"><value>Backup failed</value></data>
+  <data name="TrustPageTitle" xml:space="preserve"><value>Trust HomeCA</value></data>
+  <data name="TrustPageHeading" xml:space="preserve"><value>Trust certificates from this network</value></data>
+  <data name="TrustPageIntro" xml:space="preserve"><value>Install the HomeCA root certificate once per device. Afterwards browsers and apps accept the certificates of your services without warnings.</value></data>
+  <data name="TrustPageNotInitialized" xml:space="preserve"><value>This HomeCA instance has no root CA yet. Ask the administrator to finish the setup.</value></data>
+  <data name="TrustPageVerifyTitle" xml:space="preserve"><value>Check the fingerprint</value></data>
+  <data name="TrustPageVerifyText" xml:space="preserve"><value>This page may be served over plain HTTP. Before you trust the certificate, compare the fingerprint your device shows with the value below.</value></data>
+  <data name="TrustPageCertificate" xml:space="preserve"><value>Certificate</value></data>
+  <data name="TrustPageQr" xml:space="preserve"><value>Scan to open this page on a phone</value></data>
+  <data name="TrustPageDetected" xml:space="preserve"><value>Detected device: {0}. The matching instructions are opened below.</value></data>
+  <data name="TrustPagePlatform_ios" xml:space="preserve"><value>iPhone and iPad</value></data>
+  <data name="TrustPagePlatform_android" xml:space="preserve"><value>Android</value></data>
+  <data name="TrustPagePlatform_windows" xml:space="preserve"><value>Windows</value></data>
+  <data name="TrustPagePlatform_macos" xml:space="preserve"><value>macOS</value></data>
+  <data name="TrustPagePlatform_linux" xml:space="preserve"><value>Linux</value></data>
+  <data name="TrustPagePlatform_other" xml:space="preserve"><value>unknown</value></data>
+  <data name="TrustPageIosStep1" xml:space="preserve"><value>Download the profile with Safari and allow the download.</value></data>
+  <data name="TrustPageIosStep2" xml:space="preserve"><value>Open Settings, tap "Profile Downloaded" and install it.</value></data>
+  <data name="TrustPageIosStep3" xml:space="preserve"><value>Go to General › About › Certificate Trust Settings and turn on full trust for the HomeCA root.</value></data>
+  <data name="TrustPageDownloadProfile" xml:space="preserve"><value>Download profile</value></data>
+  <data name="TrustPageDownloadCertificate" xml:space="preserve"><value>Download certificate</value></data>
+  <data name="TrustPageAndroidStep1" xml:space="preserve"><value>Download the certificate.</value></data>
+  <data name="TrustPageAndroidStep2" xml:space="preserve"><value>Open Settings › Security › More security settings › Encryption &amp; credentials › Install a certificate › CA certificate.</value></data>
+  <data name="TrustPageAndroidStep3" xml:space="preserve"><value>Select the downloaded file and confirm. The menu names differ slightly between manufacturers.</value></data>
+  <data name="TrustPageAndroidNote" xml:space="preserve"><value>Browsers accept the certificate afterwards; many other apps only trust system certificates and ignore user-installed CAs.</value></data>
+  <data name="TrustPageWindowsText" xml:space="preserve"><value>Run in PowerShell as administrator. Edge, Chrome and most applications use the Windows certificate store.</value></data>
+  <data name="TrustPageMacText" xml:space="preserve"><value>Install the profile under System Settings › Privacy &amp; Security › Profiles, or add the certificate in the terminal:</value></data>
+  <data name="TrustPageFirefoxText" xml:space="preserve"><value>Firefox keeps its own store. On Windows and macOS, set security.enterprise_roots.enabled to true in about:config so Firefox uses the system store. Otherwise import the certificate under Settings › Privacy &amp; Security › Certificates › View Certificates › Authorities.</value></data>
+  <data name="TrustPageOpen" xml:space="preserve"><value>Open trust page for devices</value></data>
+  <data name="NameConstraintsTitle" xml:space="preserve"><value>Limit to own names (recommended)</value></data>
+  <data name="NameConstraintsDescription" xml:space="preserve"><value>Clients reject certificates from this CA for any other name. Then even a stolen CA key cannot impersonate banks or other public sites, which makes installing the root on everyday devices much safer.</value></data>
+  <data name="NameConstraintsDns" xml:space="preserve"><value>Permitted DNS domains</value></data>
+  <data name="NameConstraintsDnsHelper" xml:space="preserve"><value>Comma-separated, e.g. lab.example.com, home.arpa. Subdomains are included.</value></data>
+  <data name="NameConstraintsIp" xml:space="preserve"><value>Permitted IP networks</value></data>
+  <data name="NameConstraintsIpHelper" xml:space="preserve"><value>CIDR, comma-separated. Leave empty to not limit IP addresses.</value></data>
+  <data name="NameConstraintsSuggest" xml:space="preserve"><value>Use internal domains and private networks</value></data>
+  <data name="NameConstraintsShort" xml:space="preserve"><value>Limited to: {0}</value></data>
+  <data name="DeviceHostName" xml:space="preserve"><value>Device name</value></data>
+  <data name="DeviceHostNameHelper" xml:space="preserve"><value>Host name or full DNS name</value></data>
+  <data name="DeviceApply" xml:space="preserve"><value>Fill in</value></data>
+  <data name="TabCsr" xml:space="preserve"><value>Sign CSR</value></data>
+  <data name="CsrDescription" xml:space="preserve"><value>For devices that create their own key, such as iDRAC, iLO, switches or appliances: paste the certificate signing request. HomeCA only takes the public key; names and extensions are set here. These certificates cannot be renewed automatically — renew them with a new CSR from the device.</value></data>
+  <data name="CsrPem" xml:space="preserve"><value>Certificate signing request (PEM)</value></data>
+  <data name="CsrDnsOverride" xml:space="preserve"><value>DNS names (optional)</value></data>
+  <data name="CsrIpOverride" xml:space="preserve"><value>IP addresses (optional)</value></data>
+  <data name="CsrOverrideHelper" xml:space="preserve"><value>Leave empty to use the names requested in the CSR.</value></data>
+  <data name="SignCsr" xml:space="preserve"><value>Sign CSR</value></data>
+  <data name="CsrRequired" xml:space="preserve"><value>Paste a CSR first.</value></data>
+  <data name="CsrSigned" xml:space="preserve"><value>CSR signed. Download the certificate and chain from the inventory.</value></data>
+  <data name="RenewNow" xml:space="preserve"><value>Renew now</value></data>
+  <data name="ConfirmRenewNow" xml:space="preserve"><value>Confirm renewal</value></data>
+  <data name="RenewNowHint" xml:space="preserve"><value>HomeCA issues a successor with the same names; plans and deployment targets move to it. Click again to confirm.</value></data>
+  <data name="CertificateRenewedNow" xml:space="preserve"><value>Certificate renewed. Agents pick up the new certificate on their next run.</value></data>
+  <data name="AcmeGuidesTitle" xml:space="preserve"><value>Set up ACME clients</value></data>
+  <data name="AcmeGuidesDescription" xml:space="preserve"><value>Many services renew certificates themselves via ACME. Enter the service name; the snippets below adjust and can be copied as they are.</value></data>
+  <data name="AcmeGuidesDomain" xml:space="preserve"><value>DNS name of the service</value></data>
+  <data name="AcmeGuidesEmail" xml:space="preserve"><value>Contact e-mail</value></data>
+  <data name="AcmeGuidesDirectory" xml:space="preserve"><value>Directory URL:</value></data>
+  <data name="AcmeGuidesTrustFirst" xml:space="preserve"><value>First: trust the HomeCA root on the client</value></data>
+  <data name="AcmeGuidesTrustFirstText" xml:space="preserve"><value>The ACME client talks to HomeCA over HTTPS and must trust its root CA (Debian/Ubuntu shown; see the trust page for other systems).</value></data>
+  <data name="AcmeGuidesCaddy" xml:space="preserve"><value>Global options of the Caddyfile. Copy the root CA to /etc/caddy/homeca-root-ca.pem first.</value></data>
+  <data name="AcmeGuidesTraefik" xml:space="preserve"><value>Static configuration plus the environment variable so Traefik trusts HomeCA.</value></data>
+  <data name="AcmeGuidesOpnSense" xml:space="preserve"><value>Install the os-acme-client plugin. Under Services › ACME Client › Accounts, add an account with the CA "Custom" and the directory URL {0}. Import the HomeCA root under System › Trust › Authorities first.</value></data>
+  <data name="AcmeGuidesHttp01" xml:space="preserve"><value>HomeCA validates with http-01: the name must resolve to the client and port 80 must be reachable from HomeCA. Clients outside the allowlist below need EAB credentials (certbot: --eab-kid and --eab-hmac-key).</value></data>
+  <data name="AttentionTitle" xml:space="preserve"><value>Needs attention</value></data>
+  <data name="AttentionNone" xml:space="preserve"><value>Everything is in order: no expiring certificates without renewal, no failed renewals, devices up to date, backups current.</value></data>
+  <data name="AttentionOpen" xml:space="preserve"><value>Open</value></data>
+  <data name="Attention_certificate-expired" xml:space="preserve"><value>{0} expired on {1}.</value></data>
+  <data name="Attention_certificate-expiring" xml:space="preserve"><value>{0} expires in {1} days and has no renewal plan.</value></data>
+  <data name="Attention_renewal-failed" xml:space="preserve"><value>Renewal of {0} failed: {1}</value></data>
+  <data name="Attention_deployment-outdated" xml:space="preserve"><value>{0} still serves an older certificate.</value></data>
+  <data name="Attention_deployment-foreign" xml:space="preserve"><value>{0} serves a certificate that is not from HomeCA.</value></data>
+  <data name="Attention_deployment-unreachable" xml:space="preserve"><value>{0} could not be checked: {1}</value></data>
+  <data name="Attention_agent-silent" xml:space="preserve"><value>The agent on {0} has not checked in since {1}.</value></data>
+  <data name="Attention_agent-missing" xml:space="preserve"><value>The agent on {0} has never checked in. Set it up with the commands shown when the target was created.</value></data>
+  <data name="Attention_backup-failed" xml:space="preserve"><value>The scheduled backup failed: {1}</value></data>
+  <data name="Attention_backup-missing" xml:space="preserve"><value>No backup in the last 7 days. Turn on scheduled backups under Operations.</value></data>
+  <data name="Attention_authority-expiring" xml:space="preserve"><value>CA {0} expires on {1}. Rotate it in time.</value></data>
+  <data name="BackupScheduleTitle" xml:space="preserve"><value>Scheduled backups</value></data>
+  <data name="BackupScheduleDescription" xml:space="preserve"><value>HomeCA creates an encrypted backup at the chosen interval and keeps the newest ones. A second directory, for example a mounted NAS share, protects against losing the host.</value></data>
+  <data name="BackupScheduleEnabled" xml:space="preserve"><value>Create backups automatically</value></data>
+  <data name="BackupScheduleInterval" xml:space="preserve"><value>Every … hours</value></data>
+  <data name="BackupScheduleRetention" xml:space="preserve"><value>Backups to keep</value></data>
+  <data name="BackupScheduleRetentionHelper" xml:space="preserve"><value>Older homeca-*.hcab files are deleted, including manual ones.</value></data>
+  <data name="BackupScheduleOffsite" xml:space="preserve"><value>Second directory (optional)</value></data>
+  <data name="BackupScheduleOffsiteHelper" xml:space="preserve"><value>Absolute path that must already exist, so an unmounted share is reported. Keep the backup key elsewhere.</value></data>
+  <data name="BackupScheduleLastError" xml:space="preserve"><value>Last scheduled backup failed: {0}</value></data>
+  <data name="BackupScheduleLastSuccess" xml:space="preserve"><value>Last scheduled backup {0}: {1}</value></data>
+  <data name="BackupScheduleRunNow" xml:space="preserve"><value>Run now</value></data>
 </root>

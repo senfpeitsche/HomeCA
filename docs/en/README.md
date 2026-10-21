@@ -13,6 +13,8 @@ German file and its file with the same name here in sync whenever a technical pr
 | `THREAT-MODEL.md` | [Threat model](THREAT-MODEL.md) |
 | `ACME-SETUP.md` | [ACME setup](ACME-SETUP.md) |
 | `CONNECTORS.md` | [DNS connectors](CONNECTORS.md) |
+| `DEPLOYMENT.md` | [Automatic deployment](DEPLOYMENT.md) |
+| `DOCKER.md` | [Running in a container](DOCKER.md) |
 | `LXC-SETUP.md` | [Proxmox Debian LXC setup](LXC-SETUP.md) |
 | `localization-inventory.md` | [UI localization inventory](localization-inventory.md) |
 | `localization.md` | [Adding a HomeCA locale](localization.md) |

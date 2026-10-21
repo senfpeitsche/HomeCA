@@ -32,8 +32,17 @@ namespace HomeCA.Service.Endpoints;
             }
         });
         
+        api.MapGet("/attention", async (AttentionService attention, CancellationToken ct) => Results.Ok(await attention.GetAsync(ct)));
+
         // Backups
-        api.MapPost("/backups", async (HomeCaStorage storage, ILogger<global::Program> logger, CancellationToken ct) =>
+        api.MapGet("/backup-schedule", async (BackupScheduleService schedule, CancellationToken ct) => Results.Ok(await schedule.GetAsync(ct)));
+        api.MapPut("/backup-schedule", async (SaveBackupScheduleRequest request, BackupScheduleService schedule, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await schedule.SaveAsync(request, ct)); }
+            catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["schedule"] = [ex.Message] }); }
+        });
+        api.MapPost("/backup-schedule/run", async (BackupScheduleService schedule, CancellationToken ct) => Results.Ok(await schedule.RunAsync(ct)));
+        api.MapPost("/backups",async (HomeCaStorage storage, ILogger<global::Program> logger, CancellationToken ct) =>
         {
             try
             {

@@ -1,0 +1,164 @@
+@using HomeCA.Service.Notifications
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject HomeCaInternalHttpClient InternalHttpClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+<div class="form-stack">
+    <MudText Typo="Typo.h6">@Text["PushNotifications"]</MudText>
+    <MudText Class="mud-text-secondary">@Text["PushNotificationsDescription"]</MudText>
+    <MudSelect T="string" Label="@Text["NotificationLanguage"]" Value="_language" ValueChanged="SetLanguageAsync">
+        <MudSelectItem Value="@("en")">English</MudSelectItem>
+        <MudSelectItem Value="@("de")">Deutsch</MudSelectItem>
+    </MudSelect>
+    <MudTable Items="_channels" Dense="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent><MudTh>@Text["Name"]</MudTh><MudTh>@Text["Type"]</MudTh><MudTh>@Text["NotificationEvents"]</MudTh><MudTh>@Text["AcmeColumnStatus"]</MudTh><MudTh></MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="@Text["Name"]">@context.Name<MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@context.Url@(context.Topic is null ? "" : "/" + context.Topic)</MudText></MudTd>
+            <MudTd DataLabel="@Text["Type"]">@TypeLabel(context.Type)</MudTd>
+            <MudTd DataLabel="@Text["NotificationEvents"]">@(context.Events.Count == 0 ? Text["NotificationAllEvents"] : string.Join(", ", context.Events.Select(EventLabel)))</MudTd>
+            <MudTd DataLabel="@Text["AcmeColumnStatus"]"><MudChip T="string" Size="Size.Small" Color="@(context.Enabled ? Color.Success : Color.Default)">@(context.Enabled ? Text["Active"] : Text["Inactive"])</MudChip></MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_busy" OnClick="@(() => TestAsync(context.Id))">@Text["NotificationTest"]</MudButton>
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginEdit(context))">@Text["Edit"]</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" Disabled="_busy" OnClick="@(() => DeleteAsync(context.Id))">@(_deleteId == context.Id ? Text["ConfirmDelete"] : Text["Delete"])</MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText Class="pa-4">@Text["NotificationNoChannels"]</MudText></NoRecordsContent>
+    </MudTable>
+
+    <MudText Typo="Typo.subtitle1" Class="mt-2">@(_editingId is null ? Text["NotificationAddChannel"] : Text["NotificationEditChannel"])</MudText>
+    <MudGrid>
+        <MudItem xs="12" md="4"><MudSelect T="string" Label="@Text["Type"]" @bind-Value="_type"><MudSelectItem Value="@NotificationChannelRegistry.Ntfy">ntfy</MudSelectItem><MudSelectItem Value="@NotificationChannelRegistry.Gotify">Gotify</MudSelectItem><MudSelectItem Value="@NotificationChannelRegistry.Webhook">@Text["NotificationWebhookType"]</MudSelectItem></MudSelect></MudItem>
+        <MudItem xs="12" md="8"><MudTextField @bind-Value="_name" Label="@Text["Name"]" Required="true" /></MudItem>
+        <MudItem xs="12" md="@(_type == NotificationChannelRegistry.Ntfy ? 8 : 12)"><MudTextField @bind-Value="_url" Label="@UrlLabel" Placeholder="@UrlPlaceholder" Required="true" /></MudItem>
+        @if (_type == NotificationChannelRegistry.Ntfy) { <MudItem xs="12" md="4"><MudTextField @bind-Value="_topic" Label="@Text["NotificationTopic"]" Required="true" /></MudItem> }
+        <MudItem xs="12"><MudTextField @bind-Value="_token" Label="@TokenLabel" InputType="InputType.Password" Placeholder="@(_editingHasToken ? Text["KeepSavedSecret"] : string.Empty)" /></MudItem>
+        <MudItem xs="12">
+            <MudText Typo="Typo.caption">@Text["NotificationEventsHelper"]</MudText>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var item in SelectableEvents)
+                {
+                    var current = item;
+                    <MudCheckBox T="bool" Value="@_events.Contains(current)" ValueChanged="@(selected => ToggleEvent(current, selected))" Label="@EventLabel(current)" Dense="true" />
+                }
+            </div>
+        </MudItem>
+        <MudItem xs="12"><MudCheckBox @bind-Value="_enabled" Label="@Text["Active"]" /></MudItem>
+    </MudGrid>
+    <div class="d-flex gap-2 flex-wrap">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveChannelAsync">@(_editingId is null ? Text["NotificationAddChannel"] : Text["SaveChanges"])</MudButton>
+        @if (_editingId is not null) { <MudButton Variant="Variant.Text" OnClick="CancelEdit">@Text["CancelEdit"]</MudButton> }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Token { get; set; } = string.Empty;
+
+    private static readonly string[] SelectableEvents = [nameof(NotificationEvent.CertificateRenewed), nameof(NotificationEvent.RenewalFailed), nameof(NotificationEvent.DeploymentOutdated), nameof(NotificationEvent.BackupFailed)];
+    private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
+    private List<NotificationChannel> _channels = [];
+    private string _language = "en", _type = NotificationChannelRegistry.Ntfy, _name = "", _url = "", _topic = "", _token = "";
+    private HashSet<string> _events = [];
+    private bool _enabled = true, _busy, _editingHasToken;
+    private string? _editingId, _deleteId;
+
+    private string UrlLabel => _type == NotificationChannelRegistry.Webhook ? Text["NotificationWebhookUrl"] : Text["NotificationServerUrl"];
+    private string UrlPlaceholder => _type switch { NotificationChannelRegistry.Ntfy => "https://ntfy.sh", NotificationChannelRegistry.Gotify => "https://gotify.lab.example", _ => "https://hooks.slack.com/services/…" };
+    private string TokenLabel => _type switch { NotificationChannelRegistry.Gotify => Text["NotificationGotifyToken"], NotificationChannelRegistry.Ntfy => Text["NotificationNtfyToken"], _ => Text["NotificationWebhookToken"] };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private HttpClient Client()
+    {
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        return client;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            using var client = Client();
+            var settings = await client.GetFromJsonAsync<NotificationSettings>("api/v1/notification-channels", _json);
+            _channels = settings?.Channels.ToList() ?? [];
+            _language = settings?.Language ?? "en";
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+    }
+
+    private async Task SetLanguageAsync(string language)
+    {
+        _language = language;
+        await SaveAsync(_channels.Select(ToRequest).ToList());
+    }
+
+    private async Task SaveChannelAsync()
+    {
+        var edited = new SaveNotificationChannelRequest(_editingId, _type, _name, _url, _type == NotificationChannelRegistry.Ntfy ? _topic : null, string.IsNullOrWhiteSpace(_token) ? null : _token, _enabled, _events.ToList());
+        var requests = _channels.Where(channel => channel.Id != _editingId).Select(ToRequest).Append(edited).ToList();
+        if (await SaveAsync(requests)) CancelEdit();
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        if (_deleteId != id) { _deleteId = id; return; }
+        _deleteId = null;
+        await SaveAsync(_channels.Where(channel => channel.Id != id).Select(ToRequest).ToList());
+    }
+
+    private async Task<bool> SaveAsync(List<SaveNotificationChannelRequest> channels)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PutAsJsonAsync("api/v1/notification-channels", new SaveNotificationSettingsRequest(_language, channels));
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            Snackbar.Add(Text["ChangesSaved"], Severity.Success);
+            await LoadAsync();
+            return true;
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); return false; }
+        finally { _busy = false; }
+    }
+
+    private async Task TestAsync(string id)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync($"api/v1/notification-channels/{Uri.EscapeDataString(id)}/test", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            Snackbar.Add(Text["NotificationTestSent"], Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private void BeginEdit(NotificationChannel channel)
+    {
+        _editingId = channel.Id; _type = channel.Type; _name = channel.Name; _url = channel.Url; _topic = channel.Topic ?? "";
+        _token = ""; _editingHasToken = channel.HasToken; _enabled = channel.Enabled; _events = channel.Events.ToHashSet();
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null; _type = NotificationChannelRegistry.Ntfy; _name = ""; _url = ""; _topic = ""; _token = "";
+        _editingHasToken = false; _enabled = true; _events = [];
+    }
+
+    private void ToggleEvent(string item, bool selected)
+    {
+        if (selected) _events.Add(item); else _events.Remove(item);
+    }
+
+    // Saving without a token keeps the stored one, so unchanged channels are sent back without it.
+    private static SaveNotificationChannelRequest ToRequest(NotificationChannel channel) =>
+        new(channel.Id, channel.Type, channel.Name, channel.Url, channel.Topic, null, channel.Enabled, channel.Events);
+
+    private string TypeLabel(string type) => type switch { NotificationChannelRegistry.Ntfy => "ntfy", NotificationChannelRegistry.Gotify => "Gotify", _ => Text["NotificationWebhookType"] };
+    private string EventLabel(string item) => Text[$"NotificationEventLabel{item}"];
+}

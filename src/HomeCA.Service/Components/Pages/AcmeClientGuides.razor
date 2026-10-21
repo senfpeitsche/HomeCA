@@ -1,0 +1,38 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+<MudText Typo="Typo.h5">@Text["AcmeGuidesTitle"]</MudText>
+<MudText Class="mud-text-secondary mb-2">@Text["AcmeGuidesDescription"]</MudText>
+<div class="d-flex gap-2 flex-wrap align-center mb-2">
+    <MudTextField @bind-Value="_domain" Label="@Text["AcmeGuidesDomain"]" Immediate="true" Style="max-width: 320px" />
+    <MudTextField @bind-Value="_email" Label="@Text["AcmeGuidesEmail"]" Immediate="true" Style="max-width: 320px" />
+</div>
+<MudText Typo="Typo.caption" Class="d-block mb-3">@Text["AcmeGuidesDirectory"] <code>@DirectoryUrl</code></MudText>
+<MudExpansionPanels MultiExpansion="true" Elevation="0">
+    <MudExpansionPanel Text="@Text["AcmeGuidesTrustFirst"]"><MudText Class="mud-text-secondary mb-2">@Text["AcmeGuidesTrustFirstText"]</MudText><CodePreview Text="@TrustRoot" Lines="2" /></MudExpansionPanel>
+    <MudExpansionPanel Text="certbot"><CodePreview Text="@Certbot" Lines="4" /></MudExpansionPanel>
+    <MudExpansionPanel Text="acme.sh"><CodePreview Text="@AcmeSh" Lines="6" /></MudExpansionPanel>
+    <MudExpansionPanel Text="Caddy"><MudText Class="mud-text-secondary mb-2">@Text["AcmeGuidesCaddy"]</MudText><CodePreview Text="@Caddy" Lines="8" /></MudExpansionPanel>
+    <MudExpansionPanel Text="Traefik"><MudText Class="mud-text-secondary mb-2">@Text["AcmeGuidesTraefik"]</MudText><CodePreview Text="@Traefik" Lines="10" /></MudExpansionPanel>
+    <MudExpansionPanel Text="Proxmox VE"><CodePreview Text="@Proxmox" Lines="3" /></MudExpansionPanel>
+    <MudExpansionPanel Text="OPNsense"><MudText Class="mud-text-secondary">@Text["AcmeGuidesOpnSense", DirectoryUrl]</MudText></MudExpansionPanel>
+</MudExpansionPanels>
+<MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">@Text["AcmeGuidesHttp01"]</MudAlert>
+
+@code {
+    /// <summary>Base URL of this HomeCA instance without trailing slash.</summary>
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = string.Empty;
+
+    private string _domain = "service.lab.example", _email = "admin@lab.example";
+
+    private string DirectoryUrl => $"{BaseUrl}/acme/directory";
+    private string RootPem => $"{BaseUrl}/api/v1/trust-anchor/pem";
+    private string Domain => string.IsNullOrWhiteSpace(_domain) ? "service.lab.example" : _domain.Trim();
+    private string Email => string.IsNullOrWhiteSpace(_email) ? "admin@lab.example" : _email.Trim();
+
+    private string TrustRoot => $"sudo curl -fsSo /usr/local/share/ca-certificates/homeca-root-ca.crt {RootPem}\nsudo update-ca-certificates";
+    private string Certbot => $"sudo REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt certbot certonly --standalone \\\n  --server {DirectoryUrl} \\\n  -d {Domain} --agree-tos -m {Email}\n# Renewal: certbot renew (uses the same server automatically)";
+    private string AcmeSh => $"acme.sh --issue --standalone --server {DirectoryUrl} \\\n  --ca-bundle /usr/local/share/ca-certificates/homeca-root-ca.crt -d {Domain}\nacme.sh --install-cert -d {Domain} \\\n  --key-file /etc/ssl/private/{Domain}.key \\\n  --fullchain-file /etc/ssl/certs/{Domain}.pem \\\n  --reloadcmd \"systemctl reload nginx\"";
+    private string Caddy => $"{{\n    email {Email}\n    acme_ca {DirectoryUrl}\n    acme_ca_root /etc/caddy/homeca-root-ca.pem\n}}\n\n{Domain} {{\n    reverse_proxy localhost:8080\n}}";
+    private string Traefik => $"# traefik.yml (static configuration)\ncertificatesResolvers:\n  homeca:\n    acme:\n      caServer: {DirectoryUrl}\n      email: {Email}\n      storage: /letsencrypt/acme.json\n      httpChallenge:\n        entryPoint: web\n# Environment: LEGO_CA_CERTIFICATES=/etc/traefik/homeca-root-ca.pem\n# Router label: traefik.http.routers.app.tls.certresolver=homeca";
+    private string Proxmox => $"pvenode acme account register homeca {Email} --directory {DirectoryUrl}\npvenode config set --acme account=homeca,domains={Domain}\npvenode acme cert order";
+}

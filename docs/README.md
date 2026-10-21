@@ -14,6 +14,8 @@ unter `docs/en/` auf demselben Stand.
 | `THREAT-MODEL.md` | [Threat model](en/THREAT-MODEL.md) |
 | `ACME-SETUP.md` | [ACME setup](en/ACME-SETUP.md) |
 | `CONNECTORS.md` | [DNS connectors](en/CONNECTORS.md) |
+| `DEPLOYMENT.md` | [Automatic deployment](en/DEPLOYMENT.md) |
+| `DOCKER.md` | [Running in a container](en/DOCKER.md) |
 | `LXC-SETUP.md` | [Proxmox Debian LXC setup](en/LXC-SETUP.md) |
 | `localization-inventory.md` | [UI localization inventory](en/localization-inventory.md) |
 | `localization.md` | [Adding a HomeCA locale](en/localization.md) |

@@ -29,6 +29,18 @@ Enable email notifications under **Renewal automation** to receive a message aft
 
 Passwords and client secrets are processed only when entered and are not returned by the management API. Stored configuration resides in the protected HomeCA data directory; restrict it to the service account.
 
+## Push and webhook notifications
+
+Below the e-mail settings, **Push and webhook notifications** adds ntfy, Gotify or a generic JSON webhook. The webhook payload contains `event`, `title` and `message`, plus `text` (Slack, Mattermost) and `content` (Discord), so these services accept it directly. Each channel can subscribe to selected events: renewed, renewal failed, device outdated and backup failed. The notification language applies to e-mails too. Tokens are write-only, like mail passwords.
+
+## Needs attention
+
+The overview lists everything that needs action: certificates expiring within 30 days without a renewal plan, expired certificates, failed renewals, devices serving an outdated or foreign certificate, silent agents, missing backups and CAs expiring within 90 days. `GET /api/v1/attention` returns the same list for monitoring; each item has a severity, a kind and the UI section that resolves it.
+
+## Scheduled backups
+
+Under **Operations › Scheduled backups**, HomeCA creates an encrypted backup at a fixed interval (default every 24 hours) and keeps the newest ones (default 14, counting all `homeca-*.hcab` files). An optional second directory, such as a mounted NAS share, receives a copy of every backup; it must already exist, so an unmounted share is reported instead of filling the local mount point. A failed run is shown in the overview and sent as a notification. Keep the backup key outside both directories.
+
 ## Backup and restore
 
 Create an encrypted backup through `POST /api/v1/backups`, then verify it with `POST /api/v1/backups/{fileName}/verify`. Verification decrypts the archive and reads its ZIP contents without changing running state.

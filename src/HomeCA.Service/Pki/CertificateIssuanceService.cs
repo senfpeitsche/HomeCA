@@ -133,31 +133,117 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
 
     public async Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken)
     {
-        if (request.DnsNames.Count == 0 && request.IpAddresses.Count == 0) throw new ArgumentException("At least one DNS or IP SAN is required.");
-        if (request.ValidityDays is < 1 or > 730) throw new ArgumentOutOfRangeException(nameof(request.ValidityDays), "Validity must be between 1 and 730 days.");
-
+        ValidateNames(request.DnsNames, request.IpAddresses, request.ValidityDays);
         var subject = request.DnsNames.FirstOrDefault() ?? request.IpAddresses.First();
         logger.LogInformation("Issuing {Usage} certificate for {Subject} ({KeyAlgorithm}, {ValidityDays} days)",
             request.Usage, subject, request.KeyAlgorithm, request.ValidityDays);
 
-        var authorityPaths = await authorities.GetDefaultIssuingAsync(cancellationToken);
-
-        using var issuer = authorities.LoadAuthorityCertificate(authorityPaths.IssuingPath);
-        var requestedNotAfter = DateTimeOffset.UtcNow.AddDays(request.ValidityDays);
-        if (issuer.NotAfter <= requestedNotAfter)
-            throw new InvalidOperationException($"The issuing CA expires on {issuer.NotAfter:yyyy-MM-dd}; rotate it or choose a shorter certificate validity.");
         using var ecc = request.KeyAlgorithm == "RSA" ? null : ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var rsa = request.KeyAlgorithm == "RSA" ? RSA.Create(request.RsaKeySize is 2048 or 3072 ? request.RsaKeySize : 2048) : null;
-        CertificateRequest certificateRequest = ecc is not null
-            ? new CertificateRequest($"CN={subject}", ecc, HashAlgorithmName.SHA256)
-            : new CertificateRequest(new X500DistinguishedName($"CN={subject}"), rsa!, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var publicKey = ecc is not null ? new PublicKey(ecc) : new PublicKey(rsa!);
+        var signed = await SignAsync(publicKey, request.Usage, request.DnsNames, request.IpAddresses, request.ValidityDays, cancellationToken);
+        using var unsigned = signed.Certificate;
+        using var certificate = ecc is not null ? unsigned.CopyWithPrivateKey(ecc) : unsigned.CopyWithPrivateKey(rsa!);
+        var keyPem = ecc is not null ? ecc.ExportPkcs8PrivateKeyPem() : rsa!.ExportPkcs8PrivateKeyPem();
+
+        var exportPath = WriteFiles(certificate, signed.Id, keyPem, signed.ChainPem, csrPem: null);
+        await FinishAsync(certificate, signed.Id, exportPath, request.TargetProfileId, cancellationToken);
+        return new IssueResult(signed.Id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath);
+    }
+
+    /// <summary>
+    /// Signs a certificate signing request from a device that keeps its own private key. Only the public key is
+    /// taken from the CSR; subject, SANs and extensions are set by HomeCA, so a CSR cannot request CA rights.
+    /// </summary>
+    public async Task<IssueResult> SignCsrAsync(SignCsrRequest request, CancellationToken cancellationToken)
+    {
+        CertificateRequest csr;
+        try
+        {
+            // The extensions are only read to take over requested SANs; the signature is always verified.
+            csr = CertificateRequest.LoadSigningRequestPem(request.CsrPem, HashAlgorithmName.SHA256,
+                CertificateRequestLoadOptions.UnsafeLoadCertificateExtensions, RSASignaturePadding.Pkcs1);
+        }
+        catch (CryptographicException exception)
+        {
+            throw new ArgumentException($"The CSR is invalid or its signature does not verify: {exception.Message}");
+        }
+
+        var (dnsNames, ipAddresses) = request.DnsNames is { Count: > 0 } || request.IpAddresses is { Count: > 0 }
+            ? (request.DnsNames ?? [], request.IpAddresses ?? [])
+            : RequestedNames(csr);
+        ValidateNames(dnsNames, ipAddresses, request.ValidityDays);
+        var keyAlgorithm = ValidateCsrKey(csr.PublicKey);
+        logger.LogInformation("Signing CSR for {Subject} ({KeyAlgorithm}, {ValidityDays} days)", dnsNames.FirstOrDefault() ?? ipAddresses.First(), keyAlgorithm, request.ValidityDays);
+
+        var signed = await SignAsync(csr.PublicKey, request.Usage, dnsNames, ipAddresses, request.ValidityDays, cancellationToken);
+        using var certificate = signed.Certificate;
+        var exportPath = WriteFiles(certificate, signed.Id, keyPem: null, signed.ChainPem, request.CsrPem.Trim() + "\n");
+        await FinishAsync(certificate, signed.Id, exportPath, request.TargetProfileId, cancellationToken);
+        return new IssueResult(signed.Id, certificate.Subject, certificate.NotAfter, request.Usage, keyAlgorithm, exportPath);
+    }
+
+    private static void ValidateNames(IReadOnlyList<string> dnsNames, IReadOnlyList<string> ipAddresses, int validityDays)
+    {
+        if (dnsNames.Count == 0 && ipAddresses.Count == 0) throw new ArgumentException("At least one DNS or IP SAN is required.");
+        if (validityDays is < 1 or > 730) throw new ArgumentOutOfRangeException(nameof(validityDays), "Validity must be between 1 and 730 days.");
+    }
+
+    private static (IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses) RequestedNames(CertificateRequest csr)
+    {
+        var dnsNames = new List<string>();
+        var ipAddresses = new List<string>();
+        foreach (var extension in csr.CertificateExtensions.Where(extension => extension.Oid?.Value == "2.5.29.17"))
+        {
+            var san = new X509SubjectAlternativeNameExtension(extension.RawData, extension.Critical);
+            dnsNames.AddRange(san.EnumerateDnsNames());
+            ipAddresses.AddRange(san.EnumerateIPAddresses().Select(address => address.ToString()));
+        }
+        if (dnsNames.Count == 0 && ipAddresses.Count == 0)
+        {
+            // Older devices only put the host name into the CN.
+            var commonName = csr.SubjectName.EnumerateRelativeDistinguishedNames()
+                .FirstOrDefault(name => name.GetSingleElementType().Value == "2.5.4.3")?.GetSingleElementValue();
+            if (System.Net.IPAddress.TryParse(commonName, out var address)) ipAddresses.Add(address.ToString());
+            else if (!string.IsNullOrWhiteSpace(commonName) && Uri.CheckHostName(commonName) == UriHostNameType.Dns) dnsNames.Add(commonName);
+        }
+        return (dnsNames, ipAddresses);
+    }
+
+    private static string ValidateCsrKey(PublicKey publicKey)
+    {
+        if (publicKey.GetRSAPublicKey() is { } rsa)
+        {
+            using (rsa) if (rsa.KeySize < 2048) throw new ArgumentException("RSA keys in a CSR must have at least 2048 bits.");
+            return "RSA";
+        }
+        if (publicKey.GetECDsaPublicKey() is { } ecdsa)
+        {
+            using (ecdsa) if (ecdsa.KeySize < 256) throw new ArgumentException("EC keys in a CSR must use at least P-256.");
+            return "ECC";
+        }
+        throw new ArgumentException("Only RSA and EC keys are supported in a CSR.");
+    }
+
+    private async Task<SignedCertificate> SignAsync(PublicKey publicKey, string usage, IReadOnlyList<string> dnsNames, IReadOnlyList<string> ipAddresses, int validityDays, CancellationToken cancellationToken)
+    {
+        var authorityPaths = await authorities.GetDefaultIssuingAsync(cancellationToken);
+        using var issuer = authorities.LoadAuthorityCertificate(authorityPaths.IssuingPath);
+        var notAfter = DateTimeOffset.UtcNow.AddDays(validityDays);
+        if (issuer.NotAfter <= notAfter)
+            throw new InvalidOperationException($"The issuing CA expires on {issuer.NotAfter:yyyy-MM-dd}; rotate it or choose a shorter certificate validity.");
+        NameConstraints.EnsurePermitted(issuer, dnsNames, ipAddresses);
+
+        var subject = dnsNames.FirstOrDefault() ?? ipAddresses.First();
+        var certificateRequest = new CertificateRequest(new X500DistinguishedName($"CN={subject}"), publicKey, HashAlgorithmName.SHA256);
+        var isRsa = publicKey.Oid.Value == "1.2.840.113549.1.1.1";
         certificateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
-        certificateRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | (rsa is not null ? X509KeyUsageFlags.KeyEncipherment : X509KeyUsageFlags.None), true));
-        var eku = request.Usage == "mTLS" ? new OidCollection { new("1.3.6.1.5.5.7.3.1"), new("1.3.6.1.5.5.7.3.2") } : new OidCollection { new("1.3.6.1.5.5.7.3.1") };
+        certificateRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | (isRsa ? X509KeyUsageFlags.KeyEncipherment : X509KeyUsageFlags.None), true));
+        var eku = usage == "mTLS" ? new OidCollection { new("1.3.6.1.5.5.7.3.1"), new("1.3.6.1.5.5.7.3.2") } : new OidCollection { new("1.3.6.1.5.5.7.3.1") };
         certificateRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(eku, true));
         var san = new SubjectAlternativeNameBuilder();
-        foreach (var name in request.DnsNames.Distinct(StringComparer.OrdinalIgnoreCase)) san.AddDnsName(name);
-        foreach (var ip in request.IpAddresses.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var name in dnsNames.Distinct(StringComparer.OrdinalIgnoreCase)) san.AddDnsName(name);
+        foreach (var ip in ipAddresses.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!System.Net.IPAddress.TryParse(ip, out var parsed)) throw new ArgumentException($"Invalid IP SAN: {ip}");
             san.AddIpAddress(parsed);
@@ -172,45 +258,55 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         }
         var serial = RandomNumberGenerator.GetBytes(16);
         var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var notAfter = requestedNotAfter;
         // Use X509SignatureGenerator to handle cross-algorithm signing (e.g. RSA cert signed by ECC CA)
         using var issuerEcc = issuer.GetECDsaPrivateKey();
         using var issuerRsa = issuerEcc is null ? issuer.GetRSAPrivateKey() : null;
         var generator = issuerEcc is not null
             ? X509SignatureGenerator.CreateForECDsa(issuerEcc)
             : X509SignatureGenerator.CreateForRSA(issuerRsa!, RSASignaturePadding.Pkcs1);
-        using var unsigned = certificateRequest.Create(issuer.SubjectName, generator, notBefore, notAfter, serial);
-        using var certificate = ecc is not null ? unsigned.CopyWithPrivateKey(ecc) : unsigned.CopyWithPrivateKey(rsa!);
-        var id = Convert.ToHexString(serial).ToLowerInvariant();
+        var certificate = certificateRequest.Create(issuer.SubjectName, generator, notBefore, notAfter, serial);
+        using var root = authorities.LoadAuthorityCertificate(authorityPaths.RootPath);
+        return new SignedCertificate(certificate, issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n", Convert.ToHexString(serial).ToLowerInvariant());
+    }
+
+    /// <summary>Writes the stored PFX and the exports. Without a key (CSR), key.pem and bundle.pem are omitted.</summary>
+    private string WriteFiles(X509Certificate2 certificate, string id, string? keyPem, string chainPem, string? csrPem)
+    {
         var certificatePath = Path.Combine(_certificateRoot, id);
         var exportPath = Path.Combine(_exportRoot, id);
-
         try
         {
             Directory.CreateDirectory(certificatePath);
             Directory.CreateDirectory(exportPath);
             File.WriteAllBytes(Path.Combine(certificatePath, "certificate.pfx"), certificate.Export(X509ContentType.Pkcs12));
             var certPem = certificate.ExportCertificatePem();
-            var keyPem = ecc is not null ? ecc.ExportPkcs8PrivateKeyPem() : rsa!.ExportPkcs8PrivateKeyPem();
             File.WriteAllText(Path.Combine(exportPath, "certificate.pem"), certPem);
-            File.WriteAllText(Path.Combine(exportPath, "key.pem"), keyPem);
-            using var root = authorities.LoadAuthorityCertificate(authorityPaths.RootPath);
-            var chainPem = issuer.ExportCertificatePem() + "\n" + root.ExportCertificatePem() + "\n";
             File.WriteAllText(Path.Combine(exportPath, "chain.pem"), chainPem);
             File.WriteAllText(Path.Combine(exportPath, "fullchain.pem"), certPem + "\n" + chainPem);
-            File.WriteAllText(Path.Combine(exportPath, "bundle.pem"), keyPem + "\n" + certPem + "\n" + chainPem);
+            if (keyPem is not null)
+            {
+                File.WriteAllText(Path.Combine(exportPath, "key.pem"), keyPem);
+                File.WriteAllText(Path.Combine(exportPath, "bundle.pem"), keyPem + "\n" + certPem + "\n" + chainPem);
+            }
+            if (csrPem is not null) File.WriteAllText(Path.Combine(exportPath, "request.csr"), csrPem);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to write certificate files for {CertificateId}", id);
             throw;
         }
-
-        await deployments.CreateAsync(exportPath, id, request.TargetProfileId, cancellationToken);
-        await AddToInventoryAsync(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", exportPath), cancellationToken);
-        logger.LogInformation("Issued certificate {CertificateId} for {Subject}, valid until {ExpiresAt:yyyy-MM-dd}", id, subject, notAfter);
-        return new IssueResult(id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath);
+        return exportPath;
     }
+
+    private async Task FinishAsync(X509Certificate2 certificate, string id, string exportPath, string? targetProfileId, CancellationToken cancellationToken)
+    {
+        await deployments.CreateAsync(exportPath, id, targetProfileId, cancellationToken);
+        await AddToInventoryAsync(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", exportPath), cancellationToken);
+        logger.LogInformation("Issued certificate {CertificateId} for {Subject}, valid until {ExpiresAt:yyyy-MM-dd}", id, certificate.Subject, certificate.NotAfter);
+    }
+
+    /// <summary>The ID is the hex serial number as generated; it names the storage directories.</summary>
+    private sealed record SignedCertificate(X509Certificate2 Certificate, string ChainPem, string Id);
 
     private async Task<List<CertificateInventoryItem>> LoadInventoryAsync(CancellationToken ct)
     {
@@ -292,3 +388,5 @@ public sealed record IssueResult(string Id, string Subject, DateTime ExpiresAt, 
 public sealed record CertificateInventoryItem(string Id, string Subject, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, string ExportPath);
 public sealed record CertificateDetails(string Id, string Subject, string Issuer, string SerialNumber, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, int KeySize, string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, IReadOnlyList<string> EnhancedKeyUsages, string ExportPath);
 public sealed record PfxExportRequest(string Password);
+/// <summary>Signs a CSR. Without DNS names or IP addresses, the SANs requested in the CSR (or its CN) are used.</summary>
+public sealed record SignCsrRequest(string CsrPem, string Usage = "TLS", int ValidityDays = 365, IReadOnlyList<string>? DnsNames = null, IReadOnlyList<string>? IpAddresses = null, string? TargetProfileId = null);

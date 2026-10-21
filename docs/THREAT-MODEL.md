@@ -22,6 +22,13 @@ Im einfachen Modus liegen Root-CA und Issuing-CA online im geschuetzten HomeCA-D
 - CRLs helfen nur bei Clients und Diensten, die den Abruf und die Auswertung auch unterstuetzen.
 - HomeCA sichert keine privaten Schluessel, nachdem ein Deployment-Paket auf ein Zielsystem kopiert wurde.
 
+## Verteilungs-Tokens, Trust-Seite und ausgehende Verbindungen
+
+- Ein Token eines Verteilungsziels kann den privaten Schlüssel dieses Ziels abrufen. Es wird nur als SHA-256-Hash gespeichert, gilt für genau ein Ziel und lässt sich rotieren; die Token-Datei auf dem Gerät ist wie der Schlüssel zu behandeln.
+- `/trust` und die Trust-Anchor-Endpunkte bleiben bewusst auf einfachem HTTP. Wer im Netzpfad sitzt, kann die heruntergeladene Root austauschen; deshalb fordern Seite und Anleitungen den Fingerprint-Vergleich über einen zweiten Kanal.
+- HomeCA baut ausgehende Verbindungen zu konfigurierten Webhook- und Benachrichtigungs-URLs sowie für die TLS-Prüfung zu den Hosts der Verteilungsziele auf. Diese Adressen legen nur Administratoren fest; die Nutzlasten enthalten keine Geheimnisse.
+- Name Constraints auf der ausstellenden CA begrenzen den Schaden eines gestohlenen Issuing-Schlüssels auf die erlaubten Domains und Netze.
+
 ## Verbindliche Betriebsregeln
 
 1. HomeCA nicht direkt im Internet veroeffentlichen. Zugriff nur aus dem Admin- oder Servernetz; bei Fernzugriff VPN verwenden.

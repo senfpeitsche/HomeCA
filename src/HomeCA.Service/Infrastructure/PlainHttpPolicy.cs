@@ -12,6 +12,8 @@ public static class PlainHttpPolicy
         "/health",
         "/api/v1/crl",
         "/api/v1/trust-anchor",
+        "/trust",
+        "/brand",
         "/acme",
         "/.well-known"
     ];

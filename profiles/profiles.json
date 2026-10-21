@@ -94,5 +94,101 @@
     "renewalScriptTemplate": "# Export the PFX from HomeCA as certificate.pfx into this folder first.\nkeytool -importkeystore -srckeystore certificate.pfx -srcstoretype PKCS12 -destkeystore /opt/teamcity/conf/keystore.jks -deststoretype JKS -deststorepass changeit -noprompt\nsystemctl restart teamcity",
     "scriptType": "sh",
     "localizations": { "de": { "displayName": "TeamCity", "purpose": "TeamCity-CI/CD-Server", "documentation": "TeamCity nutzt einen Java-Keystore oder einen vorgeschalteten Reverse Proxy. Bei direktem HTTPS: Exportiere die PFX aus HomeCA als certificate.pfx, importiere sie in einen Java-Keystore und konfiguriere die Keystore-Parameter. Bei Reverse Proxy: Verwende das Profil des Proxys." } }
+  },
+  {
+    "id": "fritzbox", "version": "1.0", "displayName": "FRITZ!Box", "purpose": "FRITZ!Box router interface", "keyAlgorithm": "RSA", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Open Internet > Permit Access > FRITZ!Box Services > Certificate, choose Import certificate and upload bundle.pem (key, certificate and chain in one file) without a password.",
+    "renewalScriptTemplate": "# FRITZ!Box web interface:\n# Internet > Permit Access > FRITZ!Box Services > Certificate > Import certificate\n# File: bundle.pem (private key, certificate and chain), no password",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "FRITZ!Box", "purpose": "FRITZ!Box-Routeroberfläche", "documentation": "Öffne Internet > Freigaben > FRITZ!Box-Dienste > Zertifikat, wähle Zertifikat importieren und lade bundle.pem (Schlüssel, Zertifikat und Kette in einer Datei) ohne Kennwort hoch." } }
+  },
+  {
+    "id": "truenas", "version": "1.0", "displayName": "TrueNAS", "purpose": "TrueNAS SCALE and CORE web interface", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Open Credentials > Certificates > Certificates > Add, select Import Certificate, paste fullchain.pem as certificate and key.pem as private key. Then select it under System > General Settings > GUI > GUI SSL Certificate.",
+    "renewalScriptTemplate": "# TrueNAS web interface:\n# Credentials > Certificates > Certificates > Add > Type: Import Certificate\n#   Certificate: contents of fullchain.pem\n#   Private Key: contents of key.pem\n# System > General Settings > GUI > GUI SSL Certificate: select the imported certificate",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "TrueNAS", "purpose": "Weboberfläche von TrueNAS SCALE und CORE", "documentation": "Öffne Credentials > Certificates > Certificates > Add, wähle Import Certificate und füge fullchain.pem als Zertifikat und key.pem als privaten Schlüssel ein. Wähle es danach unter System > General Settings > GUI > GUI SSL Certificate aus." } }
+  },
+  {
+    "id": "pfsense", "version": "1.0", "displayName": "pfSense", "purpose": "pfSense firewall web interface", "keyAlgorithm": "RSA", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Import the HomeCA chain under System > Cert. Manager > CAs first. Then add the certificate under System > Cert. Manager > Certificates > Add > Import an existing certificate with certificate.pem and key.pem, and select it under System > Advanced > Admin Access > SSL/TLS Certificate.",
+    "renewalScriptTemplate": "# pfSense web interface:\n# System > Cert. Manager > Certificates > Add/Sign > Method: Import an existing Certificate\n#   Certificate data: contents of certificate.pem\n#   Private key data: contents of key.pem\n# System > Advanced > Admin Access > SSL/TLS Certificate: select it and save",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "pfSense", "purpose": "Weboberfläche der pfSense-Firewall", "documentation": "Importiere zuerst die HomeCA-Kette unter System > Cert. Manager > CAs. Füge danach unter System > Cert. Manager > Certificates > Add > Import an existing certificate das Zertifikat mit certificate.pem und key.pem hinzu und wähle es unter System > Advanced > Admin Access > SSL/TLS Certificate aus." } }
+  },
+  {
+    "id": "unraid", "version": "1.0", "displayName": "Unraid", "purpose": "Unraid web interface", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Unraid reads a combined PEM from /boot/config/ssl/certs/<server name>_unraid_bundle.pem. Combine certificate, chain and key into that file and reload nginx; set Use SSL/TLS to Yes under Settings > Management Access.",
+    "renewalScriptTemplate": "cat certificate.pem chain.pem key.pem > \"/boot/config/ssl/certs/$(hostname)_unraid_bundle.pem\"\n/etc/rc.d/rc.nginx reload",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Unraid", "purpose": "Unraid-Weboberfläche", "documentation": "Unraid liest eine kombinierte PEM-Datei aus /boot/config/ssl/certs/<Servername>_unraid_bundle.pem. Füge Zertifikat, Kette und Schlüssel darin zusammen und lade nginx neu; stelle unter Einstellungen > Verwaltungszugriff „SSL/TLS verwenden“ auf Ja." } }
+  },
+  {
+    "id": "traefik", "version": "1.0", "displayName": "Traefik", "purpose": "Traefik reverse proxy with file provider", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Copy fullchain.pem and key.pem into the certificate directory and list them in the dynamic configuration (tls.certificates with certFile and keyFile). Traefik watches the file provider and picks up replaced files without a restart. For services that support ACME, the HomeCA ACME directory is the simpler choice.",
+    "renewalScriptTemplate": "install -d /etc/traefik/certs\ncp fullchain.pem /etc/traefik/certs/homeca.crt\ncp key.pem /etc/traefik/certs/homeca.key\n# Dynamic configuration (once):\n# tls:\n#   certificates:\n#     - certFile: /etc/traefik/certs/homeca.crt\n#       keyFile: /etc/traefik/certs/homeca.key",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Traefik", "purpose": "Traefik-Reverse-Proxy mit File-Provider", "documentation": "Kopiere fullchain.pem und key.pem in das Zertifikatsverzeichnis und trage sie in der dynamischen Konfiguration ein (tls.certificates mit certFile und keyFile). Traefik überwacht den File-Provider und übernimmt ersetzte Dateien ohne Neustart. Für ACME-fähige Dienste ist das HomeCA-ACME-Verzeichnis der einfachere Weg." } }
+  },
+  {
+    "id": "caddy", "version": "1.0", "displayName": "Caddy", "purpose": "Caddy web server and reverse proxy", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Copy fullchain.pem and key.pem to /etc/caddy/certs and reference them in the site block with 'tls /etc/caddy/certs/fullchain.pem /etc/caddy/certs/key.pem', then reload Caddy. Caddy can also obtain certificates itself from the HomeCA ACME directory.",
+    "renewalScriptTemplate": "install -d -o caddy -g caddy /etc/caddy/certs\ninstall -o caddy -g caddy -m 600 fullchain.pem key.pem /etc/caddy/certs/\nsystemctl reload caddy",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Caddy", "purpose": "Caddy-Webserver und Reverse Proxy", "documentation": "Kopiere fullchain.pem und key.pem nach /etc/caddy/certs, trage sie im Site-Block mit 'tls /etc/caddy/certs/fullchain.pem /etc/caddy/certs/key.pem' ein und lade Caddy neu. Caddy kann Zertifikate auch selbst über das HomeCA-ACME-Verzeichnis beziehen." } }
+  },
+  {
+    "id": "nginx-proxy-manager", "version": "1.0", "displayName": "Nginx Proxy Manager", "purpose": "Nginx Proxy Manager custom certificate", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "Open SSL Certificates > Add SSL Certificate > Custom. Upload key.pem as Certificate Key, certificate.pem as Certificate and chain.pem as Intermediate Certificate, then select the certificate in the proxy host's SSL tab.",
+    "renewalScriptTemplate": "# Nginx Proxy Manager web interface:\n# SSL Certificates > Add SSL Certificate > Custom\n#   Certificate Key: key.pem\n#   Certificate: certificate.pem\n#   Intermediate Certificate: chain.pem\n# Proxy Hosts > Edit > SSL: select the certificate",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "Nginx Proxy Manager", "purpose": "Eigenes Zertifikat im Nginx Proxy Manager", "documentation": "Öffne SSL Certificates > Add SSL Certificate > Custom. Lade key.pem als Certificate Key, certificate.pem als Certificate und chain.pem als Intermediate Certificate hoch und wähle das Zertifikat im SSL-Reiter des Proxy-Hosts aus." } }
+  },
+  {
+    "id": "portainer", "version": "1.0", "displayName": "Portainer", "purpose": "Portainer container management", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Either upload fullchain.pem and key.pem under Settings > SSL certificate, or mount them into the container and start Portainer with --sslcert /certs/fullchain.pem --sslkey /certs/key.pem. The script assumes the mounted directory /opt/portainer/certs and a container named portainer.",
+    "renewalScriptTemplate": "install -d /opt/portainer/certs\ncp fullchain.pem key.pem /opt/portainer/certs/\ndocker restart portainer",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Portainer", "purpose": "Portainer-Containerverwaltung", "documentation": "Lade fullchain.pem und key.pem unter Settings > SSL certificate hoch oder binde sie in den Container ein und starte Portainer mit --sslcert /certs/fullchain.pem --sslkey /certs/key.pem. Das Skript geht vom eingebundenen Verzeichnis /opt/portainer/certs und einem Container namens portainer aus." } }
+  },
+  {
+    "id": "vmware-esxi", "version": "1.0", "displayName": "VMware ESXi", "purpose": "ESXi host client and management", "keyAlgorithm": "RSA", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Enable SSH on the host, copy fullchain.pem and key.pem to the host and replace /etc/vmware/ssl/rui.crt and rui.key, then restart hostd and vpxa. Hosts managed by vCenter should get their certificate through vCenter instead.",
+    "renewalScriptTemplate": "cp /etc/vmware/ssl/rui.crt /etc/vmware/ssl/rui.crt.bak\ncp /etc/vmware/ssl/rui.key /etc/vmware/ssl/rui.key.bak\ncp fullchain.pem /etc/vmware/ssl/rui.crt\ncp key.pem /etc/vmware/ssl/rui.key\n/etc/init.d/hostd restart\n/etc/init.d/vpxa restart",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "VMware ESXi", "purpose": "ESXi-Host-Client und Verwaltung", "documentation": "Aktiviere SSH auf dem Host, kopiere fullchain.pem und key.pem auf den Host und ersetze /etc/vmware/ssl/rui.crt und rui.key, danach hostd und vpxa neu starten. Von vCenter verwaltete Hosts sollten ihr Zertifikat stattdessen über vCenter erhalten." } }
+  },
+  {
+    "id": "dell-idrac", "version": "1.0", "displayName": "Dell iDRAC", "purpose": "iDRAC out-of-band management", "keyAlgorithm": "RSA", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Upload key and certificate with racadm and reset the iDRAC. Alternatively, generate a CSR in the iDRAC (iDRAC Settings > Services > SSL) and sign it in HomeCA under Sign CSR; then only the certificate has to be uploaded.",
+    "renewalScriptTemplate": "racadm -r <idrac-host> -u <user> -p <password> sslkeyupload -t 1 -f key.pem\nracadm -r <idrac-host> -u <user> -p <password> sslcertupload -t 1 -f certificate.pem\nracadm -r <idrac-host> -u <user> -p <password> racreset soft",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "Dell iDRAC", "purpose": "iDRAC-Out-of-Band-Verwaltung", "documentation": "Lade Schlüssel und Zertifikat mit racadm hoch und starte den iDRAC neu. Alternativ erzeugst du im iDRAC einen CSR (iDRAC Settings > Services > SSL) und signierst ihn in HomeCA unter „CSR signieren“; dann muss nur das Zertifikat hochgeladen werden." } }
+  },
+  {
+    "id": "nextcloud-apache", "version": "1.0", "displayName": "Nextcloud (Apache)", "purpose": "Nextcloud or other sites served by Apache", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "Copy fullchain.pem and key.pem to /etc/ssl/homeca, set SSLCertificateFile to fullchain.pem and SSLCertificateKeyFile to key.pem in the virtual host and reload Apache. Add the host name to trusted_domains in Nextcloud's config.php.",
+    "renewalScriptTemplate": "install -d -m 750 /etc/ssl/homeca\ninstall -m 644 fullchain.pem /etc/ssl/homeca/fullchain.pem\ninstall -m 600 key.pem /etc/ssl/homeca/key.pem\napachectl configtest && systemctl reload apache2",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Nextcloud (Apache)", "purpose": "Nextcloud oder andere Seiten unter Apache", "documentation": "Kopiere fullchain.pem und key.pem nach /etc/ssl/homeca, setze im VirtualHost SSLCertificateFile auf fullchain.pem und SSLCertificateKeyFile auf key.pem und lade Apache neu. Trage den Hostnamen in Nextclouds config.php unter trusted_domains ein." } }
+  },
+  {
+    "id": "jellyfin", "version": "1.0", "displayName": "Jellyfin", "purpose": "Jellyfin media server", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Jellyfin expects a PKCS#12 file. The script builds /etc/jellyfin/jellyfin.pfx without a password; set it under Dashboard > Networking > Custom SSL certificate path and enable HTTPS.",
+    "renewalScriptTemplate": "openssl pkcs12 -export -in certificate.pem -inkey key.pem -certfile chain.pem -out /etc/jellyfin/jellyfin.pfx -passout pass:\nchown jellyfin:jellyfin /etc/jellyfin/jellyfin.pfx\nchmod 600 /etc/jellyfin/jellyfin.pfx\nsystemctl restart jellyfin",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Jellyfin", "purpose": "Jellyfin-Medienserver", "documentation": "Jellyfin erwartet eine PKCS#12-Datei. Das Skript erzeugt /etc/jellyfin/jellyfin.pfx ohne Kennwort; trage sie unter Dashboard > Netzwerk > Pfad zum benutzerdefinierten SSL-Zertifikat ein und aktiviere HTTPS." } }
   }
 ]

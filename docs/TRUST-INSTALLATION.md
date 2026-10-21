@@ -4,6 +4,14 @@ Damit Geräte und Browser den von HomeCA ausgestellten Zertifikaten vertrauen, m
 
 Installiere **nur die Root-CA** als Vertrauensanker. Das Intermediate-/Issuing-Zertifikat wird zusammen mit Serverzertifikaten ausgeliefert (etwa über `chain.pem`, `fullchain.pem` oder den PFX-Export) und gehört nicht in den Truststore von Clients.
 
+## Trust-Seite für Geräte
+
+`/trust` ist eine öffentliche Seite, die ohne Anmeldung und über einfaches HTTP funktioniert. So kann ein Gerät, das HomeCA noch nicht vertraut, sie ohne Warnung öffnen. Sie erkennt das Betriebssystem, öffnet die passende Anleitung, bietet ein Apple-Konfigurationsprofil (`GET /api/v1/trust-anchor/mobileconfig`) für iPhone, iPad und Mac, zeigt SHA-256- und SHA-1-Fingerprint sowie einen QR-Code für Handys. Übersicht und Anmeldeseite verlinken sie.
+
+## Begrenzen, wofür die Root bürgt
+
+Beim Anlegen oder Rotieren einer Intermediate-CA fügt **Auf eigene Namen beschränken** X.509-Name-Constraints mit deinen DNS-Domains und privaten Netzen hinzu. Clients lehnen dann Zertifikate dieser CA für alle anderen Namen ab, und HomeCA stellt solche gar nicht erst aus. Das macht die Root-Installation auf Alltagsgeräten deutlich weniger riskant. Bestehende Intermediates behalten ihre Eigenschaften; um die Beschränkung zu nutzen, auf eine beschränkte Intermediate rotieren.
+
 ## Root-CA-Zertifikat herunterladen
 
 HomeCA stellt das Root-CA-Zertifikat ohne Authentifizierung bereit. Ersetze `HOMECA_BASE_URL` durch die erreichbare Basis-URL, zum Beispiel `http://homeca:5080` oder nach TLS-Aktivierung `https://homeca.example.lan:5443`.

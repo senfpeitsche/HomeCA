@@ -64,13 +64,35 @@ public sealed class TargetProfileTests : IDisposable
     }
 
     [Fact]
+    public async Task New_seed_profiles_are_added_once_and_deleted_ones_stay_deleted()
+    {
+        var path = Path.Combine(_fixture.RootPath, "profiles", "profiles.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        // An older installation where the administrator deleted every built-in profile except Proxmox.
+        await File.WriteAllTextAsync(path, $"[{LegacyProxmoxProfile},{CustomProfile}]");
+
+        var first = await new TargetProfileRegistry(_fixture.CreateStorage()).ListAsync(CancellationToken.None);
+
+        Assert.Contains(first, profile => profile.Id == "fritzbox");
+        Assert.Contains(first, profile => profile.Id == "jellyfin");
+        Assert.DoesNotContain(first, profile => profile.Id == "nginx");
+
+        var registry = new TargetProfileRegistry(_fixture.CreateStorage());
+        Assert.True(await registry.DeleteAsync("fritzbox", CancellationToken.None));
+        var afterRestart = await new TargetProfileRegistry(_fixture.CreateStorage()).ListAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(afterRestart, profile => profile.Id == "fritzbox");
+        Assert.Contains(afterRestart, profile => profile.Id == "custom");
+    }
+
+    [Fact]
     public async Task Edited_legacy_profile_is_not_replaced()
     {
         var path = Path.Combine(_fixture.RootPath, "profiles", "profiles.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, $"[{LegacyProxmoxProfile.Replace("systemctl restart pveproxy", "systemctl reload pveproxy")}]");
 
-        var proxmox = Assert.Single(await new TargetProfileRegistry(_fixture.CreateStorage()).ListAsync(CancellationToken.None));
+        var proxmox = Assert.Single(await new TargetProfileRegistry(_fixture.CreateStorage()).ListAsync(CancellationToken.None), profile => profile.Id == "proxmox");
 
         Assert.Equal("Proxmox-Weboberfläche", proxmox.Purpose);
         Assert.Null(proxmox.Localizations);

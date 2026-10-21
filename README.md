@@ -29,7 +29,15 @@ HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Sy
 - 12 target system profiles: Proxmox, OPNsense, IIS/RDP, UniFi, HAProxy, nginx, Cisco, Huawei, Synology, TeamCity, Home Assistant, generic TLS, with localized guidance and a matching script per target (`install.sh`, `install.ps1` or device CLI commands)
 - Export formats: PEM, key, chain, fullchain, bundle (HAProxy), PFX with issuing CA, and complete deployment-package ZIP downloads
 - CRL generation and HTTP distribution with CDP extension in issued certificates
-- Automatic renewal via background service
+- Automatic renewal, on by default for new certificates, plus **Renew now**
+- Deployment targets: an agent on the device fetches renewed certificates with its own token, optional webhook, and a TLS check that shows whether the device serves the current certificate
+- Public trust page `/trust` with OS detection, Apple configuration profile and QR code
+- Name constraints for intermediate CAs, enforced at issuance
+- CSR signing for devices that create their own key
+- Copy-ready ACME client setups (certbot, acme.sh, Caddy, Traefik, Proxmox, OPNsense)
+- Notifications via e-mail, ntfy, Gotify or webhook (Slack, Discord, Mattermost)
+- Scheduled backups with retention and second directory, plus a "needs attention" overview (`GET /api/v1/attention`)
+- Container image and Compose file
 - Encrypted backups (AES-256-GCM)
 - Audit logging
 - Blazor Server UI with MudBlazor: English by default, with complete German support
@@ -131,6 +139,8 @@ HomeCA runs as a systemd service in a Debian-based LXC container. See:
 - [docs/EMERGENCY-RUNBOOK.md](docs/EMERGENCY-RUNBOOK.md) — Recovery and compromise response
 - [docs/LIFECYCLE.md](docs/LIFECYCLE.md) — Certificate lifecycle routine
 - [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md) — LAN access through Caddy or nginx
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Automatic deployment with agent, webhook and TLS check
+- [docs/DOCKER.md](docs/DOCKER.md) — Running HomeCA in a container
 
 By default the production service listens on LAN port `5080`, so that a homelab administrator can reach the PKI from the network. Do not expose that port to the Internet. Activate TLS in the web UI before normal operation, limit access with the host firewall or a reverse proxy, and use VPN for remote administration. TLS activation switches the service to the configured HTTPS listener (normally `https://<hostname>:5443`) and redirects the browser to that configured URL. A reverse proxy (HAProxy, nginx, Caddy) may instead terminate TLS on port 443; see [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md).
 
@@ -144,6 +154,9 @@ Key public (unauthenticated) endpoints:
 - `GET /api/v1/trust-anchor/pem` — Root CA certificate download (PEM)
 - `GET /api/v1/trust-anchor/der` — Root CA certificate download (DER/CER)
 - `GET /api/v1/crl/latest` — Current CRL download
+- `GET /trust` — Trust onboarding page for devices
+- `GET /api/v1/trust-anchor/mobileconfig` — Apple configuration profile with the Root CA
+- `GET /api/v1/deploy/{id}/…` — Agent endpoints, authenticated with the deployment target's own token
 
 All management endpoints require a Bearer token obtained via `POST /api/v1/login`.
 

@@ -54,7 +54,7 @@ public sealed class RenewalPlanRegistry(HomeCaStorage storage, ILogger<RenewalPl
             var index = items.FindIndex(plan => plan.Id == id);
             if (index < 0) return null;
             var existing = items[index];
-            var updated = new RenewalPlan(existing.Id, request.CertificateId ?? existing.CertificateId, request.RenewBeforeDays, request.Enabled, existing.CreatedAt);
+            var updated = existing with { CertificateId = request.CertificateId ?? existing.CertificateId, RenewBeforeDays = request.RenewBeforeDays, Enabled = request.Enabled };
             items[index] = updated;
             await WriteAtomicAsync(items, ct);
             return updated;
@@ -77,6 +77,41 @@ public sealed class RenewalPlanRegistry(HomeCaStorage storage, ILogger<RenewalPl
         finally { _gate.Release(); }
     }
 
+    /// <summary>Points every plan of a renewed certificate to its successor and clears a recorded failure.</summary>
+    public async Task<int> ReplaceCertificateAsync(string previousCertificateId, string renewedCertificateId, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var items = (await ReadUnsafeAsync(ct)).ToList();
+            var changed = 0;
+            for (var index = 0; index < items.Count; index++)
+            {
+                if (!string.Equals(items[index].CertificateId, previousCertificateId, StringComparison.OrdinalIgnoreCase)) continue;
+                items[index] = items[index] with { CertificateId = renewedCertificateId, LastRenewedAt = DateTimeOffset.UtcNow, LastError = null, LastFailedAt = null };
+                changed++;
+            }
+            if (changed > 0) await WriteAtomicAsync(items, ct);
+            return changed;
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>Keeps the last renewal failure on the plan so the overview can show it until a renewal succeeds.</summary>
+    public async Task RecordFailureAsync(string planId, string error, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var items = (await ReadUnsafeAsync(ct)).ToList();
+            var index = items.FindIndex(plan => plan.Id == planId);
+            if (index < 0) return;
+            items[index] = items[index] with { LastError = error, LastFailedAt = DateTimeOffset.UtcNow };
+            await WriteAtomicAsync(items, ct);
+        }
+        finally { _gate.Release(); }
+    }
+
     private async Task<List<RenewalPlan>> ReadUnsafeAsync(CancellationToken ct)
     {
         if (!File.Exists(_path)) return [];
@@ -95,4 +130,4 @@ public sealed class RenewalPlanRegistry(HomeCaStorage storage, ILogger<RenewalPl
 
 public sealed record CreateRenewalPlanRequest(string CertificateId, int RenewBeforeDays = 30, bool Enabled = true);
 public sealed record UpdateRenewalPlanRequest(int RenewBeforeDays = 30, bool Enabled = true, string? CertificateId = null);
-public sealed record RenewalPlan(string Id, string CertificateId, int RenewBeforeDays, bool Enabled, DateTimeOffset CreatedAt);
+public sealed record RenewalPlan(string Id, string CertificateId, int RenewBeforeDays, bool Enabled, DateTimeOffset CreatedAt, DateTimeOffset? LastRenewedAt = null, string? LastError = null, DateTimeOffset? LastFailedAt = null);

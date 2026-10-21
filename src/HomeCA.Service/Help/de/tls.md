@@ -74,3 +74,11 @@ Ablaufwarnungen regelmäßig prüfen und sie über Erneuerungspläne bearbeiten,
 Das bisherige funktionierende Deployment behalten, bis das Ersatzzertifikat unabhängig geprüft wurde.
 
 Die mit dem gewählten Zielprofil ausgelieferten Installationshinweise verwenden; sie enthalten Format- und dienstspezifische Deployment-Anforderungen.
+
+## Automatische Verteilung
+
+Unter **Verteilung** folgt ein Verteilungsziel einem Zertifikat über alle Erneuerungen. HomeCA zeigt einmalig ein Token und die Einrichtungsbefehle; danach holt der Agent auf dem Gerät erneuerte Zertifikate selbst ab und führt das Profilskript aus. Mit hinterlegtem Host prüft HomeCA per TLS, ob das Gerät das aktuelle Zertifikat ausliefert. **Jetzt erneuern** im Inventar stellt sofort einen Nachfolger aus.
+
+## Geräte mit eigenem Schlüssel
+
+Für Appliances, die ihren Schlüssel selbst erzeugen, füge deren Certificate Signing Request unter **CSR signieren** ein. HomeCA übernimmt nur den öffentlichen Schlüssel. Solche Zertifikate lassen sich nicht automatisch erneuern; erneuere sie mit einem neuen CSR vom Gerät.

@@ -39,6 +39,20 @@ namespace HomeCA.Service.Endpoints;
         });
         api.MapPost("/certificates", (IssueCertificateApiRequest request, CertificateIssuanceService certificates, RenewalPlanRegistry renewalPlans, ILogger<global::Program> logger, CancellationToken ct) =>
             IssueWithRenewalAsync(request, certificates, renewalPlans, logger, ct));
+        // The device keeps its private key, so HomeCA cannot renew these certificates on its own.
+        api.MapPost("/certificates/csr", async (SignCsrRequest request, CertificateIssuanceService certificates, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await certificates.SignCsrAsync(request, ct)); }
+            catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["csr"] = [ex.Message] }); }
+            catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+        });
+        api.MapPost("/certificates/{id}/renew", async (string id, CertificateRenewalService renewals, HomeCaStorage storage, CancellationToken ct) =>
+        {
+            if (!File.Exists(Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx"))) return Results.NotFound();
+            try { return Results.Ok(await renewals.RenewAsync(id, ct)); }
+            catch (InvalidOperationException ex) { return Results.Conflict(new { detail = ex.Message }); }
+            catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["certificate"] = [ex.Message] }); }
+        });
         api.MapPost("/certificates/{id}/revoke", async (string id, HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
         {
             var reason = httpRequest.Query["reason"].FirstOrDefault() ?? "unspecified";

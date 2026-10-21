@@ -21,7 +21,9 @@ public sealed class HomeCaStorage
         EnsureLayout();
     }
 
-    public string RootPath => _options.RootPath;
+    // Absolute, because Results.File treats a relative path as a path below wwwroot (relevant for the
+    // relative "data" directory of the development configuration).
+    public string RootPath => Path.GetFullPath(_options.RootPath);
     public string BackupKeyPath => _options.BackupKeyPath;
     public string CaKeyPath => _options.CaKeyPath;
     public string ConfigurationPath => Path.GetFullPath(_options.ConfigurationPath);
@@ -30,7 +32,7 @@ public sealed class HomeCaStorage
 
     public string GetConfigurationFilePath(string fileName) => HomeCaStorageOptions.GetConfigurationFilePath(_options.ConfigurationPath, fileName);
 
-    public string ResolveBackupPath(string fileName) => Path.Combine(_options.BackupPath, fileName);
+    public string ResolveBackupPath(string fileName) => Path.GetFullPath(Path.Combine(_options.BackupPath, fileName));
 
     /// <summary>Returns a stable PFX password derived from the separately stored CA key.</summary>
     public string GetCaPfxPassword()

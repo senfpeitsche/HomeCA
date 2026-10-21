@@ -74,3 +74,11 @@ Review expiry warnings regularly and resolve them through renewal plans before c
 Retain the previous known-good deployment until the replacement certificate has been independently verified.
 
 Use the installation guidance included with the selected target profile; it captures format and service-specific deployment requirements.
+
+## Automatic deployment
+
+Under **Deployment**, a deployment target follows a certificate through every renewal. HomeCA shows a token and setup commands once; the agent on the device then fetches renewed certificates on its own and runs the profile script. With a host configured, HomeCA checks over TLS whether the device serves the current certificate. **Renew now** in the inventory issues a successor immediately.
+
+## Devices with their own key
+
+For appliances that generate the key themselves, paste their certificate signing request under **Sign CSR**. HomeCA only takes the public key. Such certificates cannot be renewed automatically; renew them with a new CSR from the device.

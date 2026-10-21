@@ -12,6 +12,8 @@ public sealed class TargetProfileRegistry(HomeCaStorage storage)
     private static readonly Regex ProfileIdPattern = new("^[a-z0-9-]+$", RegexOptions.Compiled);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _path = Path.Combine(storage.RootPath, "profiles", "profiles.json");
+    private readonly string _seedStatePath = Path.Combine(storage.RootPath, "profiles", "seed-state.json");
+    private bool _seedReconciled;
 
     // SHA-256 over the text fields of every built-in profile shipped before profiles carried a script type and
     // localizations. A stored profile matching one of these was never edited and is replaced by the current seed.
@@ -142,20 +144,64 @@ public sealed class TargetProfileRegistry(HomeCaStorage storage)
         await using (var stream = File.OpenRead(_path))
             profiles = await JsonSerializer.DeserializeAsync<List<TargetProfile>>(stream, Json, cancellationToken) ?? [];
 
-        if (await MigrateLegacySeedProfilesAsync(profiles, cancellationToken))
-            await WriteUnsafeAsync(profiles, cancellationToken);
+        // The stored file only changes through this registry, so the seed is reconciled once per process.
+        if (_seedReconciled) return profiles;
+        var migrated = await MigrateLegacySeedProfilesAsync(profiles, cancellationToken);
+        var added = await AddNewSeedProfilesAsync(profiles, cancellationToken);
+        if (migrated || added) await WriteUnsafeAsync(profiles, cancellationToken);
+        _seedReconciled = true;
         return profiles;
     }
+
+    /// <summary>
+    /// Adds built-in profiles that a newer release ships and this installation has never seen. Profiles the
+    /// administrator deleted stay deleted, because every seed ID ever offered is remembered.
+    /// </summary>
+    private async Task<bool> AddNewSeedProfilesAsync(List<TargetProfile> profiles, CancellationToken cancellationToken)
+    {
+        var seed = await ReadSeedAsync(cancellationToken);
+        HashSet<string> offered;
+        if (File.Exists(_seedStatePath))
+        {
+            await using var stream = File.OpenRead(_seedStatePath);
+            offered = (await JsonSerializer.DeserializeAsync<SeedState>(stream, Json, cancellationToken))?.OfferedIds.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            // Before this file existed, the stored profiles and the original twelve were all that had been offered.
+            offered = profiles.Select(profile => profile.Id)
+                .Concat(LegacySeedFingerprints.Select(fingerprint => fingerprint[..fingerprint.IndexOf(':')]))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var additions = seed.Where(profile => !offered.Contains(profile.Id) && !profiles.Any(existing => existing.Id.Equals(profile.Id, StringComparison.OrdinalIgnoreCase))).ToList();
+        profiles.AddRange(additions);
+        var allOffered = offered.Concat(seed.Select(profile => profile.Id)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToList();
+        if (!File.Exists(_seedStatePath) || allOffered.Count != offered.Count)
+        {
+            var temporaryPath = _seedStatePath + ".tmp";
+            await using (var stream = File.Create(temporaryPath))
+                await JsonSerializer.SerializeAsync(stream, new SeedState(allOffered), Json, cancellationToken);
+            File.Move(temporaryPath, _seedStatePath, true);
+        }
+        return additions.Count > 0;
+    }
+
+    private static async Task<List<TargetProfile>> ReadSeedAsync(CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(SeedPath);
+        return await JsonSerializer.DeserializeAsync<List<TargetProfile>>(stream, Json, cancellationToken) ?? [];
+    }
+
+    private sealed record SeedState(IReadOnlyList<string> OfferedIds);
 
     /// <summary>Replaces unedited built-in profiles from older releases with the current, localized seed.</summary>
     private static async Task<bool> MigrateLegacySeedProfilesAsync(List<TargetProfile> profiles, CancellationToken cancellationToken)
     {
         if (!profiles.Any(IsUneditedLegacySeed)) return false;
 
-        List<TargetProfile> seed;
-        await using (var stream = File.OpenRead(SeedPath))
-            seed = await JsonSerializer.DeserializeAsync<List<TargetProfile>>(stream, Json, cancellationToken) ?? [];
-
+        var seed = await ReadSeedAsync(cancellationToken);
         var migrated = false;
         for (var index = 0; index < profiles.Count; index++)
         {

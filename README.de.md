@@ -35,7 +35,15 @@ vermeiden möchten.
 - 12 Zielsystemprofile: Proxmox, OPNsense, IIS/RDP, UniFi, HAProxy, nginx, Cisco, Huawei, Synology, TeamCity, Home Assistant und generisches TLS, mit lokalisierter Anleitung und passendem Skript je Ziel (`install.sh`, `install.ps1` oder Befehle für die Geräte-CLI)
 - Exportformate: PEM, Schlüssel, Chain, Fullchain, Bundle (HAProxy), PFX mit ausstellender CA sowie vollständige Deployment-Pakete als ZIP
 - CRL-Erzeugung und HTTP-Verteilung mit CDP-Erweiterung in ausgestellten Zertifikaten
-- Automatische Erneuerung durch einen Hintergrunddienst
+- Automatische Erneuerung, für neue Zertifikate standardmäßig aktiv, plus **Jetzt erneuern**
+- Verteilungsziele: Ein Agent auf dem Gerät holt erneuerte Zertifikate mit eigenem Token ab, optionaler Webhook und eine TLS-Prüfung, ob das Gerät das aktuelle Zertifikat ausliefert
+- Öffentliche Trust-Seite `/trust` mit Betriebssystemerkennung, Apple-Konfigurationsprofil und QR-Code
+- Name Constraints für Intermediate-CAs, bei der Ausstellung durchgesetzt
+- CSR-Signatur für Geräte, die ihren Schlüssel selbst erzeugen
+- Kopierfertige ACME-Client-Konfigurationen (certbot, acme.sh, Caddy, Traefik, Proxmox, OPNsense)
+- Benachrichtigungen per E-Mail, ntfy, Gotify oder Webhook (Slack, Discord, Mattermost)
+- Geplante Backups mit Aufbewahrung und zweitem Verzeichnis sowie eine Übersicht „Braucht Aufmerksamkeit“ (`GET /api/v1/attention`)
+- Container-Image und Compose-Datei
 - Verschlüsselte Backups (AES-256-GCM)
 - Audit-Protokollierung
 - Blazor-Server-Oberfläche mit MudBlazor: Englisch als Standard und vollständige deutsche Unterstützung
@@ -148,6 +156,8 @@ HomeCA läuft als systemd-Dienst in einem Debian-basierten LXC-Container. Siehe:
 - [docs/EMERGENCY-RUNBOOK.md](docs/EMERGENCY-RUNBOOK.md) — Wiederherstellung und Reaktion auf Kompromittierung
 - [docs/LIFECYCLE.md](docs/LIFECYCLE.md) — Routine für den Zertifikatslebenszyklus
 - [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md) — LAN-Zugriff mit Caddy oder nginx
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Automatische Verteilung mit Agent, Webhook und TLS-Prüfung
+- [docs/DOCKER.md](docs/DOCKER.md) — HomeCA im Container betreiben
 
 Standardmäßig lauscht der Produktionsdienst auf LAN-Port `5080`, damit ein
 Homelab-Administrator die PKI aus dem Netzwerk erreichen kann. Diesen Port
@@ -171,6 +181,9 @@ Wichtige öffentliche (nicht authentifizierte) Endpunkte:
 - `GET /api/v1/trust-anchor/pem` — Download des Root-CA-Zertifikats (PEM)
 - `GET /api/v1/trust-anchor/der` — Download des Root-CA-Zertifikats (DER/CER)
 - `GET /api/v1/crl/latest` — Download der aktuellen CRL
+- `GET /trust` — Trust-Seite für Geräte
+- `GET /api/v1/trust-anchor/mobileconfig` — Apple-Konfigurationsprofil mit der Root-CA
+- `GET /api/v1/deploy/{id}/…` — Agent-Endpunkte, authentifiziert mit dem eigenen Token des Verteilungsziels
 
 Alle Verwaltungsendpunkte erfordern einen Bearer-Token, der per
 `POST /api/v1/login` erlangt wird.

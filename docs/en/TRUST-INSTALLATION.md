@@ -4,6 +4,14 @@ Install only the HomeCA **root CA** in trust stores. The intermediate CA is
 normally served as part of the TLS certificate chain and does not belong in a
 root store.
 
+## Trust page for devices
+
+`/trust` is a public page that works without signing in and over plain HTTP, so a device that does not trust HomeCA yet can open it without warnings. It detects the operating system, opens the matching instructions, offers an Apple configuration profile (`GET /api/v1/trust-anchor/mobileconfig`) for iPhone, iPad and Mac, shows the SHA-256 and SHA-1 fingerprints and a QR code for phones. The overview and the sign-in page link to it.
+
+## Limit what the root can vouch for
+
+When creating or rotating an intermediate CA, **Limit to own names** adds X.509 name constraints with your DNS domains and private networks. Clients then reject certificates from this CA for any other name, and HomeCA refuses to issue them. This makes installing the root on everyday devices much less risky. Existing intermediates keep their properties; rotate to a constrained intermediate to adopt the limit.
+
 ## Download and verify
 
 Download PEM for Linux, macOS, Firefox and appliances, or DER/CER for Windows:

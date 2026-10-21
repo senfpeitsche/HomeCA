@@ -1,3 +1,7 @@
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Localization;
+using HomeCA.Service.Resources;
+using HomeCA.Service.Trust;
 using HomeCA.Service.Infrastructure;
 using HomeCA.Service.Security;
 using HomeCA.Service.Pki;
@@ -62,6 +66,21 @@ namespace HomeCA.Service.Endpoints;
             var export = await authorities.GetTrustIntermediateAsync("der", ct);
             return export is null ? Results.NotFound() : Results.File(export.Content, export.ContentType, export.FileName);
         });
+        endpoints.MapGet("/api/v1/trust-anchor/mobileconfig", async (CertificateAuthorityService authorities, CancellationToken ct) =>
+        {
+            var export = await authorities.GetTrustAnchorAsync("der", ct);
+            if (export is null) return Results.NotFound();
+            using var root = X509CertificateLoader.LoadCertificate(export.Content);
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(TrustProfile.Build(root)), TrustProfile.ContentType, "homeca-root-ca.mobileconfig");
+        });
+        endpoints.MapGet(TrustPage.Path, async (HttpRequest request, CertificateAuthorityService authorities, HomeCaStorage storage, IStringLocalizer<UiText> text, CancellationToken ct) =>
+        {
+            var export = await authorities.GetTrustAnchorAsync("der", ct);
+            using var root = export is null ? null : X509CertificateLoader.LoadCertificate(export.Content);
+            // The CRL base URL stays on plain HTTP after TLS activation, which is what a device without the root CA can open.
+            var bootstrapBaseUrl = storage.CrlDistributionBaseUrl ?? $"{request.Scheme}://{request.Host}{request.PathBase}";
+            return Results.Content(TrustPage.Render(root, bootstrapBaseUrl, request.Headers.UserAgent.ToString(), text), "text/html; charset=utf-8");
+        }).ExcludeFromDescription();
         endpoints.MapGet("/api/v1/crl/latest", async (CrlService crl, CancellationToken ct) =>
         {
             var export = await crl.GetLatestAsync(ct);

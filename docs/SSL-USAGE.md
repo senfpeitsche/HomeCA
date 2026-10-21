@@ -403,6 +403,14 @@ Die Verteilung auf die Zielsysteme liegt beim Betreiber. Das Skript enthält pro
 
 ---
 
+### 4.4 Automatisch verteilen und sofort erneuern
+
+Damit erneuerte Zertifikate von selbst auf das Gerät kommen, lege ein Verteilungsziel mit Agent an, siehe [DEPLOYMENT.md](DEPLOYMENT.md). **Jetzt erneuern** im Inventar (oder `POST /api/v1/certificates/{id}/renew`) stellt sofort einen Nachfolger aus und hängt Pläne und Verteilungsziele um.
+
+### 4.5 Geräte mit eigenem Schlüssel (CSR)
+
+Appliances wie iDRAC, iLO oder Switches erzeugen den Schlüssel oft selbst und bieten einen Certificate Signing Request an. Füge ihn unter **Zertifikate ausstellen › CSR signieren** ein oder sende ihn mit `csrPem` an `POST /api/v1/certificates/csr`. HomeCA übernimmt nur den öffentlichen Schlüssel; die Namen stammen aus den SANs des CSR (oder seinem CN), sofern nicht `dnsNames`/`ipAddresses` angegeben sind. Diese Zertifikate haben kein `key.pem` und lassen sich von HomeCA nicht erneuern; erneuere sie mit einem neuen CSR.
+
 ## 5. Zertifikat sperren
 
 ### Über die Weboberfläche

@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+**/data/
+.git/
+.github/
+.claude/
+.vs/
+.idea/
+artifacts/
+tests/
+docs/
+design/
+openspec/
+tools/
+*.user
+*.md
+!src/HomeCA.Service/Help/**/*.md

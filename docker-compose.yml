@@ -1,0 +1,24 @@
+# docker compose up -d --build
+# Then open http://<host>:5080 and sign in as admin / admin; HomeCA asks for a new password
+# right away. Put a reverse proxy with TLS in front before regular use,
+# see docs/REVERSE-PROXY.md.
+services:
+  homeca:
+    build: .
+    container_name: homeca
+    restart: unless-stopped
+    ports:
+      - "5080:5080"
+    environment:
+      # Address clients use to reach HomeCA; written into certificates as CRL location.
+      Storage__PublicUrl: "http://homeca.lab.example:5080"
+      TZ: "Europe/Berlin"
+    volumes:
+      - homeca-data:/data
+      - homeca-config:/config
+      - homeca-backups:/backups
+
+volumes:
+  homeca-data:
+  homeca-config:
+  homeca-backups:

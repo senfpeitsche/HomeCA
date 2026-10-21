@@ -1,3 +1,4 @@
+using HomeCA.Service.Notifications;
 using HomeCA.Service.Infrastructure;
 using HomeCA.Service.Security;
 using HomeCA.Service.Pki;
@@ -40,9 +41,15 @@ builder.Services.AddSingleton<SshCertificateService>();
 builder.Services.AddSingleton<DomainRegistry>();
 builder.Services.AddSingleton<TargetProfileRegistry>();
 builder.Services.AddSingleton<DeploymentPackageService>();
+builder.Services.AddSingleton<DeploymentTargetRegistry>();
+builder.Services.AddSingleton<DeploymentProbeService>();
+builder.Services.AddSingleton<DeploymentWebhookService>();
+builder.Services.AddSingleton<CertificateRenewalService>();
 builder.Services.AddSingleton<RenewalPlanRegistry>();
 builder.Services.AddSingleton<RenewalNotificationSettingsRegistry>();
 builder.Services.AddSingleton<RenewalMailNotificationService>();
+builder.Services.AddSingleton<NotificationChannelRegistry>();
+builder.Services.AddSingleton<NotificationService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IDnsConnector, TechnitiumDnsConnector>();
 builder.Services.AddSingleton<IDnsConnector, HetznerDnsConnector>();
@@ -54,6 +61,8 @@ builder.Services.AddSingleton<ExternalAcmeIssuerRegistry>();
 builder.Services.AddSingleton<ExternalAcmeService>();
 builder.Services.AddSingleton<Rfc8555AcmeService>();
 builder.Services.AddSingleton<CertificateExpiryService>();
+builder.Services.AddSingleton<BackupScheduleService>();
+builder.Services.AddSingleton<AttentionService>();
 builder.Services.AddSingleton<RevocationRegistry>();
 builder.Services.AddSingleton<CrlService>();
 builder.Services.AddSingleton<BearerTokenFilter>();
@@ -64,6 +73,8 @@ builder.Services.AddSingleton<UpdateCheckService>();
 // would make the localizer search for Resources.Resources.UiText instead.
 builder.Services.AddLocalization();
 builder.Services.AddHostedService<RenewalBackgroundService>();
+builder.Services.AddHostedService<DeploymentProbeBackgroundService>();
+builder.Services.AddHostedService<BackupScheduleBackgroundService>();
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi(options =>
 {
@@ -173,6 +184,7 @@ app.MapRfc8555AcmeEndpoints();
 app.MapSetupEndpoints();
 app.MapAuthorityEndpoints();
 app.MapCertificateEndpoints();
+app.MapDeploymentEndpoints();
 app.MapDomainEndpoints();
 app.MapConnectorEndpoints();
 app.MapAcmeManagementEndpoints();

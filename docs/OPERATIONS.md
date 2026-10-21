@@ -29,6 +29,18 @@ Unter **Erneuerungsautomatik** können E-Mail-Benachrichtigungen aktiviert werde
 
 Kennwörter und Client-Secrets werden nur bei der Eingabe verarbeitet und nicht über die Verwaltungs-API zurückgeliefert. Die gespeicherte Konfiguration liegt im geschützten HomeCA-Datenverzeichnis; dessen Berechtigungen müssen auf den Dienstbenutzer beschränkt bleiben.
 
+## Push- und Webhook-Benachrichtigungen
+
+Unter den E-Mail-Einstellungen ergänzt **Push- und Webhook-Benachrichtigungen** ntfy, Gotify oder einen allgemeinen JSON-Webhook. Die Webhook-Nutzlast enthält `event`, `title` und `message` sowie `text` (Slack, Mattermost) und `content` (Discord), sodass diese Dienste sie direkt annehmen. Jeder Kanal kann ausgewählte Ereignisse abonnieren: erneuert, Erneuerung fehlgeschlagen, Gerät veraltet und Backup fehlgeschlagen. Die Sprache der Benachrichtigungen gilt auch für E-Mails. Tokens sind wie Mail-Kennwörter nur schreibbar.
+
+## Braucht Aufmerksamkeit
+
+Die Übersicht listet alles, was eine Aktion braucht: Zertifikate, die in 30 Tagen ohne Erneuerungsplan ablaufen, abgelaufene Zertifikate, fehlgeschlagene Erneuerungen, Geräte mit veraltetem oder fremdem Zertifikat, stumme Agenten, fehlende Backups und CAs, die in 90 Tagen ablaufen. `GET /api/v1/attention` liefert dieselbe Liste für das Monitoring; jeder Eintrag hat eine Schwere, eine Art und den Bereich der Oberfläche, der ihn behebt.
+
+## Geplante Backups
+
+Unter **Betrieb › Geplante Backups** erstellt HomeCA im festen Abstand ein verschlüsseltes Backup (Standard alle 24 Stunden) und behält die neuesten (Standard 14, gezählt werden alle `homeca-*.hcab`-Dateien). Ein optionales zweites Verzeichnis, etwa eine eingebundene NAS-Freigabe, erhält eine Kopie jedes Backups; es muss bereits existieren, damit eine nicht eingebundene Freigabe auffällt, statt den lokalen Mountpunkt zu füllen. Ein fehlgeschlagener Lauf erscheint in der Übersicht und als Benachrichtigung. Den Backup-Schlüssel außerhalb beider Verzeichnisse aufbewahren.
+
 ## Backup und Restore
 
 Erzeuge ein verschlüsseltes Backup über `POST /api/v1/backups`. Prüfe es anschließend mit `POST /api/v1/backups/{fileName}/verify`; die Prüfung entschlüsselt das Archiv und liest dessen ZIP-Inhalt ohne den laufenden Zustand zu verändern.

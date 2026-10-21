@@ -32,9 +32,20 @@ created. Existing certificates get a plan in the UI or through
 
 Each deployment package contains the profile script as `install.sh`,
 `install.ps1` or `device-commands.txt` (device CLI commands to enter by hand),
-depending on the target profile's script type. After renewal, deploy the
-new export and reload the target service; HomeCA cannot reload arbitrary
-targets automatically. Monitor expiring certificates through the warnings API.
+depending on the target profile's script type. To get renewed certificates onto
+the device automatically, add a deployment target with the agent, see
+[DEPLOYMENT.md](DEPLOYMENT.md). **Renew now** in the inventory (or
+`POST /api/v1/certificates/{id}/renew`) issues a successor immediately and moves
+plans and deployment targets to it.
+
+## Devices that create their own key
+
+Appliances such as iDRAC, iLO or switches often generate the key themselves and
+offer a certificate signing request. Paste it under **Issue certificate › Sign
+CSR** or send it to `POST /api/v1/certificates/csr` with `csrPem`. HomeCA only
+takes the public key from the CSR; names come from the CSR's SANs (or its CN)
+unless `dnsNames`/`ipAddresses` are given. These certificates have no
+`key.pem` and cannot be renewed by HomeCA; renew them with a new CSR.
 
 Revoke a compromised certificate in HomeCA and publish the CRL. The retained
 certificate record remains available for audit. See [OPERATIONS.md](OPERATIONS.md)

@@ -1,3 +1,4 @@
+using HomeCA.Service.Notifications;
 using HomeCA.Service.Infrastructure;
 using HomeCA.Service.Security;
 using HomeCA.Service.Pki;
@@ -48,7 +49,21 @@ namespace HomeCA.Service.Endpoints;
             catch (InvalidOperationException exception) { return Results.Conflict(new { detail = exception.Message }); }
             catch (Exception exception) when (exception is not OperationCanceledException) { return Results.Problem("The test email could not be sent. Check the delivery settings and server logs.", statusCode: 502); }
         });
-        
+
+        // Push and webhook channels. Tokens are write-only; an empty token keeps the stored one.
+        api.MapGet("/notification-channels", async (NotificationChannelRegistry channels, CancellationToken ct) => Results.Ok(await channels.GetAsync(ct)));
+        api.MapPut("/notification-channels", async (SaveNotificationSettingsRequest body, NotificationChannelRegistry channels, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await channels.SaveAsync(body, ct)); }
+            catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["channels"] = [exception.Message] }); }
+        });
+        api.MapPost("/notification-channels/{id}/test", async (string id, NotificationService notifications, CancellationToken ct) =>
+        {
+            try { await notifications.TestChannelAsync(id, ct); return Results.NoContent(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { return Results.Problem($"The test message could not be delivered: {exception.Message}", statusCode: 502); }
+        });
+
         // Operations
     }
 

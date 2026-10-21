@@ -46,3 +46,9 @@ Wenn eine Vertrauensverteilung unerwartetes Client-Verhalten verursacht, den Rol
 Einen repräsentativen internen HTTPS-Dienst verwenden, um zu prüfen, dass die installierte Root-CA die vollständige Kette validiert.
 
 Ein Inventar der Systeme führen, die die Root-CA erhalten haben, damit ein späterer Ersatz oder eine Entfernung sicher eingegrenzt werden kann.
+
+## Trust-Seite und Name Constraints
+
+Öffne `/trust` direkt auf dem Gerät oder scanne den QR-Code mit dem Handy. Die Seite funktioniert über einfaches HTTP ohne Anmeldung, erkennt das Betriebssystem, bietet ein Apple-Konfigurationsprofil für iPhone, iPad und Mac und zeigt die Fingerprints zum Vergleich.
+
+Beim Anlegen oder Rotieren einer Intermediate-CA beschränkt **Auf eigene Namen beschränken** sie auf deine Domains und privaten Netze. Clients lehnen ihre Zertifikate dann für alle anderen Namen ab; das macht die Root-Installation auf privaten Geräten deutlich weniger riskant.

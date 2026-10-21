@@ -46,3 +46,9 @@ If a trust deployment causes unexpected client behavior, pause the rollout and r
 Use a representative internal HTTPS service to verify that the installed Root CA validates the complete chain.
 
 Keep an inventory of systems that received the Root CA so a later replacement or removal can be scoped safely.
+
+## Trust page and name constraints
+
+Open `/trust` on the device itself, or scan its QR code with a phone. The page works over plain HTTP without signing in, detects the operating system, offers an Apple configuration profile for iPhone, iPad and Mac and shows the fingerprints to compare.
+
+When creating or rotating an intermediate CA, **Limit to own names** restricts it to your domains and private networks. Clients then reject its certificates for any other name, which makes installing the root on personal devices far less risky.

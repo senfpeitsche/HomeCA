@@ -1,0 +1,99 @@
+@using HomeCA.Service.Operations
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject HomeCaInternalHttpClient InternalHttpClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+<div class="form-stack">
+    <MudText Typo="Typo.h6">@Text["BackupScheduleTitle"]</MudText>
+    <MudText Class="mud-text-secondary">@Text["BackupScheduleDescription"]</MudText>
+    <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="@Text["BackupScheduleEnabled"]" />
+    <MudGrid>
+        <MudItem xs="12" sm="6"><MudNumericField T="int" @bind-Value="_intervalHours" Label="@Text["BackupScheduleInterval"]" Min="1" Max="168" Disabled="@(!_enabled)" /></MudItem>
+        <MudItem xs="12" sm="6"><MudNumericField T="int" @bind-Value="_retentionCount" Label="@Text["BackupScheduleRetention"]" Min="1" Max="365" Disabled="@(!_enabled)" HelperText="@Text["BackupScheduleRetentionHelper"]" /></MudItem>
+        <MudItem xs="12"><MudTextField @bind-Value="_offsiteDirectory" Label="@Text["BackupScheduleOffsite"]" Placeholder="/mnt/nas/homeca-backups" HelperText="@Text["BackupScheduleOffsiteHelper"]" Disabled="@(!_enabled)" /></MudItem>
+    </MudGrid>
+    @if (_schedule is { } schedule)
+    {
+        @if (schedule.LastError is not null && (schedule.LastSuccessAt is null || schedule.LastRunAt > schedule.LastSuccessAt))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@Text["BackupScheduleLastError", schedule.LastError]</MudAlert>
+        }
+        else if (schedule.LastSuccessAt is { } success)
+        {
+            <MudAlert Severity="Severity.Success" Dense="true">@Text["BackupScheduleLastSuccess", success.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture), schedule.LastBackupFile ?? string.Empty]</MudAlert>
+        }
+    }
+    <div class="d-flex gap-2 flex-wrap">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAsync">@Text["SaveChanges"]</MudButton>
+        <MudButton Variant="Variant.Outlined" Disabled="@(_busy || _schedule?.Enabled != true)" OnClick="RunAsync">@Text["BackupScheduleRunNow"]</MudButton>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Token { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
+    private BackupSchedule? _schedule;
+    private bool _enabled, _busy;
+    private int _intervalHours = 24, _retentionCount = 14;
+    private string _offsiteDirectory = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private HttpClient Client()
+    {
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        return client;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            using var client = Client();
+            Apply(await client.GetFromJsonAsync<BackupSchedule>("api/v1/backup-schedule", _json));
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+    }
+
+    private void Apply(BackupSchedule? schedule)
+    {
+        _schedule = schedule;
+        if (schedule is null) return;
+        _enabled = schedule.Enabled; _intervalHours = schedule.IntervalHours; _retentionCount = schedule.RetentionCount; _offsiteDirectory = schedule.OffsiteDirectory ?? "";
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PutAsJsonAsync("api/v1/backup-schedule", new SaveBackupScheduleRequest(_enabled, _intervalHours, _retentionCount, string.IsNullOrWhiteSpace(_offsiteDirectory) ? null : _offsiteDirectory));
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            Apply(await response.Content.ReadFromJsonAsync<BackupSchedule>(_json));
+            Snackbar.Add(Text["ChangesSaved"], Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task RunAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync("api/v1/backup-schedule/run", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            Apply(await response.Content.ReadFromJsonAsync<BackupSchedule>(_json));
+            Snackbar.Add(_schedule?.LastError is null ? Text["BackupCreated", _schedule?.LastBackupFile ?? string.Empty] : Text["BackupScheduleLastError", _schedule.LastError], _schedule?.LastError is null ? Severity.Success : Severity.Error);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+}

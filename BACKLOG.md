@@ -2,10 +2,6 @@
 
 Folgende Punkte sind bewusst nicht Teil des einfachen ersten Betriebsmodus.
 
-## Als Nächstes umsetzen
-
-- Geplanter Backup-Job mit Zeitplan, Retention und optionalem Offsite-Ziel.
-
 ## Sicherheit und Zugriff
 
 - Optionale mTLS-Clientauthentisierung fuer den RFC-8555-Endpunkt.
@@ -20,6 +16,12 @@ Folgende Punkte sind bewusst nicht Teil des einfachen ersten Betriebsmodus.
 - Regelmaessiger, gefuehrter Wiederherstellungstest mit Ergebnisprotokoll.
 - Streamendes oder temp-verschluesseltes Backup, damit kein Klartext-Archiv im Temp-Verzeichnis liegt.
 - Backup-Schluessel-Handling mit ausdruecklichem Export-/Rotationsprozess ausserhalb der normalen Verwaltungs-API.
+
+## Verteilung
+
+- Aktives Ausrollen per SSH oder über Hersteller-APIs (Proxmox, OPNsense, Synology); dafür müsste HomeCA Zugangsdaten zu Zielsystemen speichern.
+- Agent für Windows (PowerShell) analog zum Shell-Agenten.
+- Signierte Apple-Konfigurationsprofile.
 
 ## Distribution und Dokumentation
 

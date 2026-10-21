@@ -158,9 +158,14 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             var id = Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(Path.Combine(_root, id));
             using var parentCertificate = parent is null ? null : Load(parent);
-            using var certificate = CreateCertificate(request, parentCertificate, parent?.Id);
+            var constraints = ConstraintsFor(request);
+            using var certificate = CreateCertificate(request, parentCertificate, parent?.Id, constraints);
             await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12, storage.GetCaPfxPassword()), ct);
-            var item = new AuthorityState(id, request.Name.Trim(), request.Type, request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, isDefaultIssuing);
+            var item = new AuthorityState(id, request.Name.Trim(), request.Type, request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, isDefaultIssuing)
+            {
+                PermittedDnsDomains = constraints?.DnsDomains,
+                PermittedIpNetworks = constraints?.IpNetworks
+            };
             all.Add(item); await WriteAsync(all, ct);
             logger.LogInformation("Created {Type} certificate authority {AuthorityId}", request.Type, id);
             return ToItem(item);
@@ -186,9 +191,18 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
 
             var id = Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(Path.Combine(_root, id));
-            using var certificate = CreateCertificate(new(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays), parentCertificate, request.ParentId);
+            // Without explicit constraints the replacement keeps the limits of the CA it replaces.
+            var constraints = request.PermittedDnsDomains is null && request.PermittedIpNetworks is null
+                ? NameConstraints.Normalize(current.PermittedDnsDomains, current.PermittedIpNetworks)
+                : NameConstraints.Normalize(request.PermittedDnsDomains, request.PermittedIpNetworks);
+            var permitted = constraints.IsEmpty ? null : constraints;
+            using var certificate = CreateCertificate(new(request.Name, request.Subject, "intermediate", request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays), parentCertificate, request.ParentId, permitted);
             await File.WriteAllBytesAsync(PathFor(id), certificate.Export(X509ContentType.Pkcs12, storage.GetCaPfxPassword()), ct);
-            var replacement = new AuthorityState(id, request.Name.Trim(), "intermediate", request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, true);
+            var replacement = new AuthorityState(id, request.Name.Trim(), "intermediate", request.Subject.Trim(), request.ParentId, request.ValidityDays, request.KeyAlgorithm, request.CrlValidityDays, true, false, DateTimeOffset.UtcNow, certificate.NotAfter, true)
+            {
+                PermittedDnsDomains = permitted?.DnsDomains,
+                PermittedIpNetworks = permitted?.IpNetworks
+            };
             var currentIndex = all.FindIndex(x => x.Id == current.Id);
             all[currentIndex] = current with { IsActive = false, IsDefaultIssuing = false };
             all.Add(replacement);
@@ -334,13 +348,21 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
             : certificate.Issuer.Equals(authority.Subject, StringComparison.OrdinalIgnoreCase);
     }
     private string PathFor(string id) => Path.Combine(_root, id, "authority.pfx");
-    private static CertificateAuthorityInventoryItem ToItem(AuthorityState x) => new(x.Id, x.Name, x.Type, x.Subject, x.ExpiresAt, x.ParentId, x.IsActive, x.IsRevoked, x.CrlValidityDays, x.IsDefaultIssuing);
+    private static CertificateAuthorityInventoryItem ToItem(AuthorityState x) => new(x.Id, x.Name, x.Type, x.Subject, x.ExpiresAt, x.ParentId, x.IsActive, x.IsRevoked, x.CrlValidityDays, x.IsDefaultIssuing, x.PermittedDnsDomains ?? [], x.PermittedIpNetworks ?? []);
     private static void Validate(CreateAuthorityRequest x)
     {
         if (string.IsNullOrWhiteSpace(x.Name) || string.IsNullOrWhiteSpace(x.Subject) || x.Type is not ("root" or "intermediate") || x.KeyAlgorithm is not ("ECC" or "RSA")) throw new ArgumentException("Name, subject, type and key algorithm are invalid.");
         if (x.ValidityDays is < 1 or > 7300 || x.CrlValidityDays is < 1 or > 365) throw new ArgumentOutOfRangeException(nameof(x.ValidityDays));
     }
-    private X509Certificate2 CreateCertificate(CreateAuthorityRequest x, X509Certificate2? parent, string? parentId)
+    private static NameConstraints.Permitted? ConstraintsFor(CreateAuthorityRequest request)
+    {
+        var constraints = NameConstraints.Normalize(request.PermittedDnsDomains, request.PermittedIpNetworks);
+        if (constraints.IsEmpty) return null;
+        if (request.Type != "intermediate") throw new ArgumentException("Name constraints are only supported on intermediate CAs.");
+        return constraints;
+    }
+
+    private X509Certificate2 CreateCertificate(CreateAuthorityRequest x, X509Certificate2? parent, string? parentId, NameConstraints.Permitted? constraints = null)
     {
         using var ecc = x.KeyAlgorithm == "ECC" ? ECDsa.Create(ECCurve.NamedCurves.nistP256) : null;
         using var rsa = x.KeyAlgorithm == "RSA" ? RSA.Create(3072) : null;
@@ -353,6 +375,7 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         var publicUrl = storage.CrlDistributionBaseUrl;
         if (parent is not null && parentId is not null && !string.IsNullOrWhiteSpace(publicUrl))
             request.CertificateExtensions.Add(BuildCdpExtension($"{publicUrl}/api/v1/crl/{parentId}"));
+        if (constraints is not null) request.CertificateExtensions.Add(NameConstraints.Build(constraints));
         var from = DateTimeOffset.UtcNow.AddMinutes(-5); var until = DateTimeOffset.UtcNow.AddDays(x.ValidityDays);
         if (parent is null) return request.CreateSelfSigned(from, until);
         using var issued = request.Create(parent, from, until, RandomNumberGenerator.GetBytes(16));
@@ -370,17 +393,22 @@ public sealed class CertificateAuthorityService(HomeCaStorage storage, ILogger<C
         }
         return new X509Extension("2.5.29.31", writer.Encode(), false);
     }
-    private sealed record AuthorityState(string Id, string Name, string Type, string Subject, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, bool IsActive, bool IsRevoked, DateTimeOffset CreatedAt, DateTime ExpiresAt, bool IsDefaultIssuing = false, DateTimeOffset? RevokedAt = null);
+    private sealed record AuthorityState(string Id, string Name, string Type, string Subject, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, bool IsActive, bool IsRevoked, DateTimeOffset CreatedAt, DateTime ExpiresAt, bool IsDefaultIssuing = false, DateTimeOffset? RevokedAt = null)
+    {
+        public IReadOnlyList<string>? PermittedDnsDomains { get; init; }
+        public IReadOnlyList<string>? PermittedIpNetworks { get; init; }
+    }
 }
 
-public sealed record CreateAuthorityRequest(string Name, string Subject, string Type, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays);
+public sealed record CreateAuthorityRequest(string Name, string Subject, string Type, string? ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, IReadOnlyList<string>? PermittedDnsDomains = null, IReadOnlyList<string>? PermittedIpNetworks = null);
 public sealed record UpdateAuthorityRequest(string Name, bool IsActive, int CrlValidityDays);
-public sealed record RotateIntermediateRequest(string Name, string Subject, string ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays);
+/// <summary>Null constraint lists keep the limits of the replaced CA; empty lists remove them.</summary>
+public sealed record RotateIntermediateRequest(string Name, string Subject, string ParentId, int ValidityDays, string KeyAlgorithm, int CrlValidityDays, IReadOnlyList<string>? PermittedDnsDomains = null, IReadOnlyList<string>? PermittedIpNetworks = null);
 public sealed record IntermediateRotationResult(CertificateAuthorityInventoryItem PreviousAuthority, CertificateAuthorityInventoryItem ReplacementAuthority, int DependentCertificateCount, DateTime? LatestDependentCertificateExpiry);
 public sealed record IssuingAuthorityPaths(string Id, string IssuingPath, string RootPath, int CrlValidityDays);
 public sealed record CrlAuthorityPaths(string Id, string Type, string AuthorityPath, int CrlValidityDays);
 public sealed record RevokedIntermediateCertificate(string SerialNumber, DateTimeOffset RevokedAt);
 public sealed record AuthorityCertificateExport(string FileName, string ContentType, byte[] Content);
 public sealed record AuthorityInventory(string RootSubject, DateTime RootExpiresAt, string TlsIssuingSubject, DateTime TlsIssuingExpiresAt, string SshHostAuthority, string SshUserAuthority);
-public sealed record CertificateAuthorityInventoryItem(string Id, string Name, string Type, string Subject, DateTime ExpiresAt, string? ParentId, bool IsActive, bool IsRevoked, int CrlValidityDays, bool IsDefaultIssuing = false);
+public sealed record CertificateAuthorityInventoryItem(string Id, string Name, string Type, string Subject, DateTime ExpiresAt, string? ParentId, bool IsActive, bool IsRevoked, int CrlValidityDays, bool IsDefaultIssuing = false, IReadOnlyList<string>? PermittedDnsDomains = null, IReadOnlyList<string>? PermittedIpNetworks = null);
 public sealed record TrustAnchorInfo(string Subject, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt);

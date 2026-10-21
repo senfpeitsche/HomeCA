@@ -12,16 +12,11 @@ public sealed class RenewalMailNotificationService(
     IHttpClientFactory httpClientFactory,
     ILogger<RenewalMailNotificationService> logger)
 {
-    public async Task SendRenewedAsync(string subject, DateTime expiresAt, CancellationToken ct) =>
-        await SendAsync("HomeCA: Zertifikat automatisch erneuert", $"Das Zertifikat '{subject}' wurde automatisch erneuert. Es ist nun bis {expiresAt:dd.MM.yyyy} gültig.", ct);
-
-    public async Task SendFailureAsync(string subject, Exception exception, CancellationToken ct) =>
-        await SendAsync("HomeCA: automatische Zertifikatserneuerung fehlgeschlagen", $"Die automatische Erneuerung für '{subject}' ist fehlgeschlagen. Prüfen Sie die HomeCA-Protokolle. Fehler: {exception.Message}", ct);
-
     public async Task SendTestAsync(CancellationToken ct) =>
-        await SendAsync("HomeCA: E-Mail-Versand getestet", "Der Versand von Erneuerungsbenachrichtigungen ist korrekt eingerichtet.", ct);
+        await SendMessageAsync("HomeCA: E-Mail-Versand getestet / e-mail delivery tested", "Der Versand von Benachrichtigungen ist korrekt eingerichtet.\nNotification e-mails are set up correctly.", ct);
 
-    private async Task SendAsync(string subject, string body, CancellationToken ct)
+    /// <summary>Sends a composed notification when e-mail delivery is enabled; does nothing otherwise.</summary>
+    public async Task SendMessageAsync(string subject, string body, CancellationToken ct)
     {
         var configuration = await settings.GetStoredAsync(ct);
         if (!configuration.Enabled) return;
