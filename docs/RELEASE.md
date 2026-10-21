@@ -36,15 +36,16 @@ Der GitHub Actions Workflow (`.github/workflows/release.yml`) wird durch den Tag
 3. Extrahiert die Versionsnummer aus dem Tag (`v1.0.0` → `1.0.0`)
 4. Baut `dotnet publish` mit `--runtime linux-x64` und setzt `-p:Version=1.0.0`
 5. Packt das Ergebnis als `homeca-linux-x64.tar.gz` und als vollständiges `homeca-release-bundle.tar.gz`
-6. Erzeugt `SHA256SUMS` sowie ein SPDX-SBOM (`homeca-linux-x64.spdx.json`)
-7. Erstellt ein GitHub Release mit allen Artefakten als Assets
+6. Kopiert `deploy/proxmox/ct/homeca.sh` als `homeca-lxc.sh` und trägt den Tag als Standardversion ein (`HOMECA_RELEASE`); `deploy/scripts/homeca-install.sh` wird als `homeca-install.sh` beigelegt
+7. Erzeugt `SHA256SUMS` sowie ein SPDX-SBOM (`homeca-linux-x64.spdx.json`)
+8. Erstellt ein GitHub Release mit allen Artefakten als Assets
 
 ### 4. Ergebnis prüfen
 
 Nach dem Workflow (ca. 2–3 Minuten) unter **Releases** im GitHub-Repository:
 
 - Ein Release namens `v1.0.0` mit generierten Release-Notes
-- Die Assets `homeca-linux-x64.tar.gz`, `homeca-release-bundle.tar.gz`, `SHA256SUMS` und `homeca-linux-x64.spdx.json`
+- Die Assets `homeca-linux-x64.tar.gz`, `homeca-release-bundle.tar.gz`, `homeca-lxc.sh`, `homeca-install.sh`, `SHA256SUMS` und `homeca-linux-x64.spdx.json`
 
 Die URL für das Asset ist dann:
 ```
@@ -65,6 +66,12 @@ sie Dateien entpacken oder den Dienst anhalten.
 Der aufgelöste Tag wird anschließend für alle Downloads verwendet; produktive
 Deployments beziehen keine Dateien aus dem `main`-Branch.
 
+`homeca-lxc.sh` lädt die Engine aus `community-scripts/core` am Commit `CORE_COMMIT` und lässt sie
+`install/homeca-install.sh` aus `raw.githubusercontent.com/senfpeitsche/HomeCA/<Tag>/deploy/proxmox`
+holen. Dieses Script prüft `homeca-install.sh` gegen `SHA256SUMS` desselben Tags. Ein neuer
+core-Commit wird in `deploy/proxmox/ct/homeca.sh` eingetragen und vor dem Release auf einem
+Proxmox-Host getestet.
+
 ## Build-Optionen
 
 Der Workflow baut aktuell **framework-dependent** (`--self-contained false`), d. h. .NET muss im Container installiert sein (wird vom Install-Script erledigt). Für einen self-contained Build stattdessen:
@@ -82,6 +89,7 @@ Das erzeugt ein größeres Artefakt (~80 MB statt ~15 MB), braucht aber kein vor
 - [ ] Änderungen committet und gepusht
 - [ ] Tag gesetzt und gepusht (`git tag vX.Y.Z && git push origin vX.Y.Z`)
 - [ ] GitHub Actions Workflow läuft durch (grün)
-- [ ] Release enthält Bundle, `SHA256SUMS` und SPDX-SBOM
+- [ ] Release enthält Bundle, `homeca-lxc.sh` mit eingetragenem Tag, `SHA256SUMS` und SPDX-SBOM
+- [ ] Neuinstallation auf Proxmox: `bash ./homeca-lxc.sh` aus dem neuen Release
 - [ ] Test-Update auf einem LXC: `HOMECA_VERSION=vX.Y.Z /opt/homeca/homeca-update.sh`
 - [ ] `/api/v1/version` zeigt die neue Version

@@ -36,15 +36,16 @@ The GitHub Actions workflow (`.github/workflows/release.yml`) runs when the tag 
 3. Extracts the version from the tag (`v1.0.0` → `1.0.0`).
 4. Runs `dotnet publish` with `--runtime linux-x64` and `-p:Version=1.0.0`.
 5. Packages `homeca-linux-x64.tar.gz` and the complete `homeca-release-bundle.tar.gz`.
-6. Generates `SHA256SUMS` and an SPDX SBOM (`homeca-linux-x64.spdx.json`).
-7. Creates a GitHub Release with every artifact as an asset.
+6. Copies `deploy/proxmox/ct/homeca.sh` as `homeca-lxc.sh` with the tag set as its default version (`HOMECA_RELEASE`), and adds `deploy/scripts/homeca-install.sh` as `homeca-install.sh`.
+7. Generates `SHA256SUMS` and an SPDX SBOM (`homeca-linux-x64.spdx.json`).
+8. Creates a GitHub Release with every artifact as an asset.
 
 ### 4. Verify the result
 
 After the workflow (about 2–3 minutes), look under **Releases** in the GitHub repository for:
 
 - A release named `v1.0.0` with generated release notes.
-- The assets `homeca-linux-x64.tar.gz`, `homeca-release-bundle.tar.gz`, `SHA256SUMS`, and `homeca-linux-x64.spdx.json`.
+- The assets `homeca-linux-x64.tar.gz`, `homeca-release-bundle.tar.gz`, `homeca-lxc.sh`, `homeca-install.sh`, `SHA256SUMS`, and `homeca-linux-x64.spdx.json`.
 
 The asset URL is then:
 
@@ -63,6 +64,8 @@ The installer and updater download only `homeca-release-bundle.tar.gz` for a spe
 
 The resolved tag is used for every download; production deployments never pull files from the `main` branch.
 
+`homeca-lxc.sh` loads the engine from `community-scripts/core` at commit `CORE_COMMIT` and lets it fetch `install/homeca-install.sh` from `raw.githubusercontent.com/senfpeitsche/HomeCA/<tag>/deploy/proxmox`. That script verifies `homeca-install.sh` against `SHA256SUMS` of the same tag. A new core commit is set in `deploy/proxmox/ct/homeca.sh` and tested on a Proxmox host before the release.
+
 ## Build options
 
 The workflow currently creates a **framework-dependent** build (`--self-contained false`), so .NET must be installed in the container (the installation script does this). To create a self-contained build instead:
@@ -80,6 +83,7 @@ This produces a larger artifact (about 80 MB rather than 15 MB) but does not nee
 - [ ] Changes committed and pushed
 - [ ] Tag created and pushed (`git tag vX.Y.Z && git push origin vX.Y.Z`)
 - [ ] GitHub Actions workflow succeeds
-- [ ] Release contains the bundle, `SHA256SUMS`, and SPDX SBOM
+- [ ] Release contains the bundle, `homeca-lxc.sh` with the tag set, `SHA256SUMS`, and SPDX SBOM
+- [ ] Fresh install on Proxmox: `bash ./homeca-lxc.sh` from the new release
 - [ ] Test update in an LXC: `HOMECA_VERSION=vX.Y.Z /opt/homeca/homeca-update.sh`
 - [ ] `/api/v1/version` returns the new version
