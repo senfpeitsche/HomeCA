@@ -135,6 +135,7 @@ public sealed class TargetProfileTests : IDisposable
     [Theory]
     [InlineData("proxmox", "install.sh", "#!/bin/sh")]
     [InlineData("iis", "install.ps1", "$ErrorActionPreference = 'Stop'")]
+    [InlineData("rdp", "install.ps1", "SSLCertificateSHA1Hash = $certificate.Thumbprint")]
     [InlineData("cisco-switch", "device-commands.txt", "not a shell script")]
     public async Task Deployment_package_uses_the_profile_script_type(string profileId, string scriptFile, string expectedContent)
     {

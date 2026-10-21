@@ -59,8 +59,11 @@ Windows-Rechner, die das Root-CA per `certutil` oder GPO installiert haben, akze
 # Zertifikat importieren
 $cert = Import-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\LocalMachine\My
 # RDP-Bindung setzen
-$path = (Get-WmiObject -Class Win32_TSGeneralSetting -Namespace root\cimv2\TerminalServices).SetSSLCertificateSHA1Hash($cert.Thumbprint)
+Get-CimInstance -Namespace root\cimv2\TerminalServices -ClassName Win32_TSGeneralSetting -Filter "TerminalName='RDP-Tcp'" |
+    Set-CimInstance -Property @{ SSLCertificateSHA1Hash = $cert.Thumbprint }
 ```
+
+Automatisch inklusive Umbinden bei jeder Erneuerung erledigt das ein Verteilungsziel mit dem Profil `rdp`; siehe [SSL-USAGE.md](SSL-USAGE.md#windows-rdp).
 
 ---
 

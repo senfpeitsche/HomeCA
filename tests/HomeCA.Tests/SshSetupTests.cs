@@ -448,7 +448,7 @@ public sealed class SshSetupTests : IDisposable
         var result = await service.InstallAsync(InstallRequest(certificateId) with { EnablePush = true, InstallRootCa = true }, "https://ca.lab.test", CancellationToken.None);
 
         Assert.True(detected.Facts!.IsWindows);
-        Assert.Equal(["iis", "windows-certstore"], detected.Suggestion!.ProfileIds);
+        Assert.Equal(["iis", "rdp", "windows-certstore"], detected.Suggestion!.ProfileIds);
         Assert.Equal(["win01.lab.test", "pve01.lab.test"], detected.Suggestion.DnsNames);
         Assert.Equal(SshSetupResult.Ok, result.Status);
         Assert.Null(result.Push);
@@ -666,7 +666,7 @@ public sealed class SshSetupTests : IDisposable
                         : new SshCommandResult(1, "", "'sh' is not recognized as an internal or external command"));
                     if (command != WindowsAgentScript.PowerShellCommand) return Task.FromResult(new SshCommandResult(127, "", "unexpected command"));
                     if (input == WindowsAgentScript.DetectionScript)
-                        return Task.FromResult(new SshCommandResult(0, $"platform=windows\nuser=WIN01\\admin\nuid={(owner.WindowsAdministrator ? 0 : 1000)}\nsudo={(owner.WindowsAdministrator ? "root" : "none")}\nhostname=WIN01\nfqdn=win01.lab.test\nos=Microsoft Windows Server 2022 Standard\nkernel=Windows\naddress=192.168.10.20\ntool=powershell\nscheduler=taskscheduler\ntruststore=windows\nservice=iis\n", ""));
+                        return Task.FromResult(new SshCommandResult(0, $"platform=windows\nuser=WIN01\\admin\nuid={(owner.WindowsAdministrator ? 0 : 1000)}\nsudo={(owner.WindowsAdministrator ? "root" : "none")}\nhostname=WIN01\nfqdn=win01.lab.test\nos=Microsoft Windows Server 2022 Standard\nkernel=Windows\naddress=192.168.10.20\ntool=powershell\nscheduler=taskscheduler\ntruststore=windows\nservice=iis\nservice=rdp\n", ""));
                     return Task.FromResult(new SshCommandResult(0, "homeca-setup: done " + WindowsTokenFrom(input!), ""));
                 }
                 var result = command switch

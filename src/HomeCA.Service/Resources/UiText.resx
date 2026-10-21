@@ -893,7 +893,7 @@
   <data name="ApiErrorConflict" xml:space="preserve"><value>The action could not be completed because of a conflict.</value></data>
   <data name="DeploymentsKicker" xml:space="preserve"><value>Automatic deployment</value></data>
   <data name="DeploymentsTitle" xml:space="preserve"><value>Deployment targets</value></data>
-  <data name="DeploymentsDescription" xml:space="preserve"><value>A deployment target follows a certificate through every renewal. A small agent on the device fetches the current files with its own token and runs the profile script. HomeCA checks over TLS whether the device actually serves the current certificate.</value></data>
+  <data name="DeploymentsDescription" xml:space="preserve"><value>A deployment target follows a certificate through every renewal. A small agent on the device fetches the current files with its own token and runs the profile script. HomeCA checks over TLS whether the device actually serves the current certificate. The guided SSH setup also installs the HomeCA root CA into the device trust store (Linux and Windows, can be turned off), so programs there trust HomeCA certificates.</value></data>
   <data name="DeploymentTokenOnce" xml:space="preserve"><value>Token for "{0}": it is shown only now. Run these commands on the device.</value></data>
   <data name="DeploymentInstallCommands" xml:space="preserve"><value>Set up the agent (Linux, as root)</value></data>
   <data name="DeploymentInstallHint" xml:space="preserve"><value>Requires curl. The agent runs hourly via cron and only acts when the certificate changed. Set CA_FILE in the agent if the HomeCA root CA is not in the system trust store.</value></data>

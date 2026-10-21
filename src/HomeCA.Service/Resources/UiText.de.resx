@@ -893,7 +893,7 @@
   <data name="ApiErrorConflict" xml:space="preserve"><value>Die Aktion konnte wegen eines Konflikts nicht abgeschlossen werden.</value></data>
   <data name="DeploymentsKicker" xml:space="preserve"><value>Automatische Verteilung</value></data>
   <data name="DeploymentsTitle" xml:space="preserve"><value>Verteilungsziele</value></data>
-  <data name="DeploymentsDescription" xml:space="preserve"><value>Ein Verteilungsziel folgt einem Zertifikat über alle Erneuerungen. Ein kleiner Agent auf dem Gerät holt mit eigenem Token die aktuellen Dateien und führt das Profilskript aus. HomeCA prüft per TLS, ob das Gerät wirklich das aktuelle Zertifikat ausliefert.</value></data>
+  <data name="DeploymentsDescription" xml:space="preserve"><value>Ein Verteilungsziel folgt einem Zertifikat über alle Erneuerungen. Ein kleiner Agent auf dem Gerät holt mit eigenem Token die aktuellen Dateien und führt das Profilskript aus. HomeCA prüft per TLS, ob das Gerät wirklich das aktuelle Zertifikat ausliefert. Die geführte Einrichtung über SSH installiert dabei auch die HomeCA-Root-CA in den Vertrauensspeicher des Geräts (Linux und Windows, abwählbar), damit Programme dort HomeCA-Zertifikaten vertrauen.</value></data>
   <data name="DeploymentTokenOnce" xml:space="preserve"><value>Token für „{0}“: Es wird nur jetzt angezeigt. Führe diese Befehle auf dem Gerät aus.</value></data>
   <data name="DeploymentInstallCommands" xml:space="preserve"><value>Agent einrichten (Linux, als root)</value></data>
   <data name="DeploymentInstallHint" xml:space="preserve"><value>Benötigt curl. Der Agent läuft stündlich per cron und handelt nur, wenn sich das Zertifikat geändert hat. Setze CA_FILE im Agenten, wenn die HomeCA-Root-CA nicht im Vertrauensspeicher des Systems liegt.</value></data>

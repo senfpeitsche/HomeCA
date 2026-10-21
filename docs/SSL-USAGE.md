@@ -262,11 +262,15 @@ $binding.AddSslCertificate($cert.Thumbprint, "My")
 
 ### Windows RDP
 
+Am einfachsten über ein Verteilungsziel mit dem Profil `rdp`: Der Agent importiert das Zertifikat, gibt dem Remotedesktopdienst Lesezugriff auf den Schlüssel und bindet den Listener bei jeder Erneuerung um. Von Hand, in einer PowerShell mit Administratorrechten:
+
 ```powershell
 $cert = Import-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\LocalMachine\My
-$path = (Get-WmiObject -Class Win32_TSGeneralSetting -Namespace root\cimv2\TerminalServices)
-$path.SetSSLCertificateSHA1Hash($cert.Thumbprint)
+Get-CimInstance -Namespace root\cimv2\TerminalServices -ClassName Win32_TSGeneralSetting -Filter "TerminalName='RDP-Tcp'" |
+    Set-CimInstance -Property @{ SSLCertificateSHA1Hash = $cert.Thumbprint }
 ```
+
+Der Remotedesktopdienst läuft als `NETWORK SERVICE` und muss den privaten Schlüssel lesen dürfen. Fehlt das Recht, liefert RDP weiter sein selbstsigniertes Zertifikat aus. Clients verbinden sich mit einem Namen oder einer IP-Adresse aus dem Zertifikat.
 
 ### OPNsense
 

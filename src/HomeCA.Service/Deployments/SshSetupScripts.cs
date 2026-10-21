@@ -18,7 +18,7 @@ public static class SshSetupScripts
     public static readonly IReadOnlyList<string> ServicePriority =
     [
         "proxmox", "vmware-esxi", "synology", "unraid", "truenas", "home-assistant", "unifi", "opnsense", "pfsense",
-        "jellyfin", "teamcity", "portainer", "nginx-proxy-manager", "traefik", "caddy", "haproxy", "nextcloud-apache", "nginx", "iis"
+        "jellyfin", "teamcity", "portainer", "nginx-proxy-manager", "traefik", "caddy", "haproxy", "nextcloud-apache", "nginx", "iis", "rdp"
     ];
 
     /// <summary>Read-only script that prints one <c>key=value</c> pair per line. It changes nothing on the device.</summary>

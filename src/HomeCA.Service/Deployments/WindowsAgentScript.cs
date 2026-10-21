@@ -60,6 +60,7 @@ public static class WindowsAgentScript
         kv scheduler taskscheduler
         kv truststore windows
         if (Get-Service W3SVC) { kv service iis }
+        if ((Get-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server').fDenyTSConnections -eq 0) { kv service rdp }
         exit 0
 
         """.Replace("\r\n", "\n");
