@@ -44,6 +44,10 @@ builder.Services.AddSingleton<DeploymentPackageService>();
 builder.Services.AddSingleton<DeploymentTargetRegistry>();
 builder.Services.AddSingleton<DeploymentProbeService>();
 builder.Services.AddSingleton<DeploymentWebhookService>();
+builder.Services.AddSingleton<ISshClientFactory, SshNetClientFactory>();
+builder.Services.AddSingleton<SshSetupService>();
+builder.Services.AddSingleton<SshPushKeyService>();
+builder.Services.AddSingleton<DeploymentPushService>();
 builder.Services.AddSingleton<CertificateRenewalService>();
 builder.Services.AddSingleton<RenewalPlanRegistry>();
 builder.Services.AddSingleton<RenewalNotificationSettingsRegistry>();
@@ -74,6 +78,7 @@ builder.Services.AddSingleton<UpdateCheckService>();
 builder.Services.AddLocalization();
 builder.Services.AddHostedService<RenewalBackgroundService>();
 builder.Services.AddHostedService<DeploymentProbeBackgroundService>();
+builder.Services.AddHostedService<DeploymentPushBackgroundService>();
 builder.Services.AddHostedService<BackupScheduleBackgroundService>();
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi(options =>

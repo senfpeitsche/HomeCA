@@ -55,7 +55,7 @@
 @code {
     [Parameter, EditorRequired] public string Token { get; set; } = string.Empty;
 
-    private static readonly string[] SelectableEvents = [nameof(NotificationEvent.CertificateRenewed), nameof(NotificationEvent.RenewalFailed), nameof(NotificationEvent.DeploymentOutdated), nameof(NotificationEvent.BackupFailed)];
+    private static readonly string[] SelectableEvents = [nameof(NotificationEvent.CertificateRenewed), nameof(NotificationEvent.RenewalFailed), nameof(NotificationEvent.DeploymentOutdated), nameof(NotificationEvent.DeploymentPushFailed), nameof(NotificationEvent.BackupFailed)];
     private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
     private List<NotificationChannel> _channels = [];
     private string _language = "en", _type = NotificationChannelRegistry.Ntfy, _name = "", _url = "", _topic = "", _token = "";

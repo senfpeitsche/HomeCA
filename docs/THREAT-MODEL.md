@@ -24,6 +24,11 @@ Im einfachen Modus liegen Root-CA und Issuing-CA online im geschuetzten HomeCA-D
 
 ## Verteilungs-Tokens, Trust-Seite und ausgehende Verbindungen
 
+- Die Einrichtung per SSH nutzt Passwort, Schlüssel und sudo-Passwort nur für die Dauer der Anfrage; sie werden weder gespeichert noch protokolliert, und Ausgaben werden um sie und das Ziel-Token bereinigt. Gespeichert wird nur der bestätigte Host-Key. Ohne bestätigten oder bei abweichendem Host-Key bricht HomeCA vor der Anmeldung ab, damit kein Angreifer im Netz Zugangsdaten oder den privaten Schlüssel abgreift. Den Fingerprint beim ersten Kontakt über die Gerätekonsole vergleichen.
+- Wer die Verwaltungsoberfläche bedient, kann mit gültigen SSH-Zugangsdaten Befehle als root auf dem Gerät ausführen lassen. Jede Erkennung und Einrichtung steht mit Benutzer, Host und Host-Key im Audit-Log.
+- Der Push-Schlüssel erlaubt root-Anmeldungen auf eingerichteten Geräten, aber per Forced Command nur den Start des Agenten, ohne Terminal und ohne Weiterleitung. Wer HomeCA übernimmt, kann damit Agentenläufe auslösen, aber keine Befehle ausführen. Der private Schlüssel liegt nur verschlüsselt im Datenverzeichnis und im Backup.
+- Das PFX für Windows-Agenten ist mit dem Ziel-Token geschützt; wer das Token hat, hat ohnehin Zugriff auf den Schlüssel. Token, Agent und Backups liegen unter `%ProgramData%\HomeCA` mit Rechten nur für SYSTEM, Administratoren und das einrichtende Konto.
+- Backups unter `/var/backups/homeca/` enthalten frühere Schlüssel und Token und sind nur für root lesbar (`700`).
 - Ein Token eines Verteilungsziels kann den privaten Schlüssel dieses Ziels abrufen. Es wird nur als SHA-256-Hash gespeichert, gilt für genau ein Ziel und lässt sich rotieren; die Token-Datei auf dem Gerät ist wie der Schlüssel zu behandeln.
 - `/trust` und die Trust-Anchor-Endpunkte bleiben bewusst auf einfachem HTTP. Wer im Netzpfad sitzt, kann die heruntergeladene Root austauschen; deshalb fordern Seite und Anleitungen den Fingerprint-Vergleich über einen zweiten Kanal.
 - HomeCA baut ausgehende Verbindungen zu konfigurierten Webhook- und Benachrichtigungs-URLs sowie für die TLS-Prüfung zu den Hosts der Verteilungsziele auf. Diese Adressen legen nur Administratoren fest; die Nutzlasten enthalten keine Geheimnisse.

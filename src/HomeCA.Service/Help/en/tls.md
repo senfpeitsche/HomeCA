@@ -15,6 +15,10 @@ openssl s_client -connect service.example:443 -showcerts
 | Key | ECC P-256 |
 | Renewal | Configure it before expiry |
 
+## Setup over SSH
+
+Under **Deployment > Set up over SSH**, HomeCA signs in to the Linux device once after you confirm its host key, detects the services, suggests profile and names and installs the agent. Credentials are not stored. Before every change HomeCA saves the affected files under `/var/backups/homeca/`; `restore.sh` in each backup restores the previous state. With push, HomeCA starts the agent right after every renewal using a key that may only run the agent. The wizard sets up Windows servers with OpenSSH with the PowerShell agent; without OpenSSH, HomeCA shows PowerShell commands to copy.
+
 ## Deployment package
 
 The ZIP deployment package contains the certificate, private key, chain, checksums, installation guidance, and the renewal-script snapshot. Treat it like the private key: transfer it only over a protected channel and remove it after installation.

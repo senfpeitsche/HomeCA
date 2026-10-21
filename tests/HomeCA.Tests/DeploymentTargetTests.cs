@@ -18,6 +18,7 @@ namespace HomeCA.Tests;
 public sealed class DeploymentTargetTests : IDisposable
 {
     private readonly TestFixture _fixture = new();
+    private DeploymentPushService? _pushes;
 
     [Fact]
     public async Task Token_is_stored_hashed_and_only_the_right_token_authenticates()
@@ -76,6 +77,23 @@ public sealed class DeploymentTargetTests : IDisposable
         Assert.Equal("certificate.renewed", payload.RootElement.GetProperty("event").GetString());
         Assert.Equal(renewed.Id, payload.RootElement.GetProperty("certificateId").GetString());
         Assert.True(File.Exists(Path.Combine(renewed.ExportPath, "install.sh")));
+    }
+
+    [Fact]
+    public async Task Renewal_queues_a_push_only_for_targets_with_push()
+    {
+        var (certificates, renewals, _, targets, _) = await SetupRenewalAsync();
+        var original = await certificates.IssueAsync(new IssueCertificateRequest("TLS", ["pve02.lab.test"], [], 90, TargetProfileId: "proxmox"), CancellationToken.None);
+        var pushed = (await targets.CreateAsync(new SaveDeploymentTargetRequest("pve02", original.Id), CancellationToken.None)).Target;
+        var timerOnly = (await targets.CreateAsync(new SaveDeploymentTargetRequest("pve03", original.Id), CancellationToken.None)).Target;
+        await targets.RecordSshSetupAsync(pushed.Id, new SshSetupInfo("pve02", 22, "root", "ssh-ed25519", "SHA256:x", DateTimeOffset.UtcNow, 0, PushEnabled: true), CancellationToken.None);
+        await targets.RecordSshSetupAsync(timerOnly.Id, new SshSetupInfo("pve03", 22, "root", "ssh-ed25519", "SHA256:y", DateTimeOffset.UtcNow, 0), CancellationToken.None);
+
+        await renewals.RenewAsync(original.Id, CancellationToken.None);
+
+        Assert.True(_pushes!.Queue.TryRead(out var queued));
+        Assert.Equal(pushed.Id, queued);
+        Assert.False(_pushes.Queue.TryRead(out _));
     }
 
     [Fact]
@@ -165,7 +183,7 @@ public sealed class DeploymentTargetTests : IDisposable
 
         var files = DeploymentEndpoints.AvailableFiles(issued.ExportPath).ToList();
 
-        Assert.Equal(["certificate.pem", "key.pem", "chain.pem", "fullchain.pem", "bundle.pem", "install.sh"], files);
+        Assert.Equal(["certificate.pem", "key.pem", "chain.pem", "fullchain.pem", "bundle.pem", "certificate.pfx", "install.sh"], files);
     }
 
     private DeploymentTargetRegistry CreateRegistry() => new(_fixture.CreateStorage(), NullLogger<DeploymentTargetRegistry>.Instance);
@@ -185,7 +203,9 @@ public sealed class DeploymentTargetTests : IDisposable
         var handler = new RecordingHandler();
         var webhooks = new DeploymentWebhookService(new SingleClientFactory(handler), storage, probes, NullLogger<DeploymentWebhookService>.Instance);
         var tls = new TlsActivationService(storage, new SetupStateService(storage, NullLogger<SetupStateService>.Instance), NullLogger<TlsActivationService>.Instance);
-        var renewals = new CertificateRenewalService(storage, certificates, plans, targets, webhooks, tls, NullLogger<CertificateRenewalService>.Instance);
+        _pushes = new DeploymentPushService(new SshNetClientFactory(), new SshPushKeyService(storage, NullLogger<SshPushKeyService>.Instance), targets, probes,
+            SshSetupTests.CreateNotifications(storage, handler), NullLogger<DeploymentPushService>.Instance);
+        var renewals = new CertificateRenewalService(storage, certificates, plans, targets, webhooks, _pushes, tls, NullLogger<CertificateRenewalService>.Instance);
         return (certificates, renewals, plans, targets, handler);
     }
 

@@ -106,5 +106,5 @@ public sealed class NotificationService(
     }
 
     private static bool IsProblem(NotificationEvent notificationEvent) =>
-        notificationEvent is NotificationEvent.RenewalFailed or NotificationEvent.DeploymentOutdated or NotificationEvent.BackupFailed;
+        notificationEvent is NotificationEvent.RenewalFailed or NotificationEvent.DeploymentOutdated or NotificationEvent.BackupFailed or NotificationEvent.DeploymentPushFailed;
 }

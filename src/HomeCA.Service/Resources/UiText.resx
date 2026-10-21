@@ -1047,4 +1047,101 @@
   <data name="BackupScheduleLastError" xml:space="preserve"><value>Last scheduled backup failed: {0}</value></data>
   <data name="BackupScheduleLastSuccess" xml:space="preserve"><value>Last scheduled backup {0}: {1}</value></data>
   <data name="BackupScheduleRunNow" xml:space="preserve"><value>Run now</value></data>
+  <data name="SshSetupTeaserTitle" xml:space="preserve"><value>Set up a device over SSH</value></data>
+  <data name="SshSetupTeaser" xml:space="preserve"><value>HomeCA connects once, detects the services, installs the agent and backs up every file it changes. Credentials are not stored.</value></data>
+  <data name="SshSetupStart" xml:space="preserve"><value>Set up over SSH</value></data>
+  <data name="SshSetupRun" xml:space="preserve"><value>Set up over SSH</value></data>
+  <data name="SshSetupLast" xml:space="preserve"><value>SSH setup {0} on {1}, exit code {2}</value></data>
+  <data name="SshSetupTitle" xml:space="preserve"><value>Set up a device over SSH</value></data>
+  <data name="SshSetupTitleExisting" xml:space="preserve"><value>Set up "{0}" again over SSH</value></data>
+  <data name="SshSetupDescription" xml:space="preserve"><value>HomeCA signs in once, only reads the system first and then installs the regular agent. Password, key and token are used only for this request and never stored.</value></data>
+  <data name="SshSetupConnect" xml:space="preserve"><value>Connect</value></data>
+  <data name="SshHost" xml:space="preserve"><value>Host name or IP address</value></data>
+  <data name="SshPort" xml:space="preserve"><value>SSH port</value></data>
+  <data name="SshUser" xml:space="preserve"><value>User</value></data>
+  <data name="SshUserHelper" xml:space="preserve"><value>root, or a user that may use sudo</value></data>
+  <data name="SshAuthPassword" xml:space="preserve"><value>Password</value></data>
+  <data name="SshAuthKey" xml:space="preserve"><value>Private key</value></data>
+  <data name="SshPassword" xml:space="preserve"><value>SSH password</value></data>
+  <data name="SshPrivateKey" xml:space="preserve"><value>Private key (OpenSSH or PEM)</value></data>
+  <data name="SshPrivateKeyHelper" xml:space="preserve"><value>Paste the content of the key file, for example ~/.ssh/id_ed25519.</value></data>
+  <data name="SshPassphrase" xml:space="preserve"><value>Key passphrase (optional)</value></data>
+  <data name="SshSudoPassword" xml:space="preserve"><value>sudo password (optional)</value></data>
+  <data name="SshSudoPasswordHelper" xml:space="preserve"><value>Only needed when it differs from the SSH password or you sign in with a key.</value></data>
+  <data name="SshDetect" xml:space="preserve"><value>Connect and detect</value></data>
+  <data name="SshConnecting" xml:space="preserve"><value>Connecting…</value></data>
+  <data name="SshSetupRequiredFields" xml:space="preserve"><value>Enter host and user.</value></data>
+  <data name="SshHostKeyUnknown" xml:space="preserve"><value>First connection: confirm the host key</value></data>
+  <data name="SshHostKeyChanged" xml:space="preserve"><value>Warning: the host key has changed</value></data>
+  <data name="SshHostKeyExpected" xml:space="preserve"><value>Confirmed earlier: {0}. If the device was not reinstalled, someone may be intercepting the connection.</value></data>
+  <data name="SshHostKeyCompare" xml:space="preserve"><value>Compare it with the output of this command on the device's console:</value></data>
+  <data name="SshHostKeyReplace" xml:space="preserve"><value>I reinstalled the device and accept the new host key</value></data>
+  <data name="SshHostKeyConfirm" xml:space="preserve"><value>Fingerprint matches, continue</value></data>
+  <data name="SshDetected" xml:space="preserve"><value>Detected system</value></data>
+  <data name="SshFactSystem" xml:space="preserve"><value>System</value></data>
+  <data name="SshFactNames" xml:space="preserve"><value>Names</value></data>
+  <data name="SshFactAddresses" xml:space="preserve"><value>Addresses</value></data>
+  <data name="SshFactServices" xml:space="preserve"><value>Services</value></data>
+  <data name="SshFactPrivileges" xml:space="preserve"><value>Privileges</value></data>
+  <data name="SshFactScheduler" xml:space="preserve"><value>Schedule</value></data>
+  <data name="SshNoServices" xml:space="preserve"><value>No known service found</value></data>
+  <data name="SshPrivilegeRoot" xml:space="preserve"><value>Signed in as root</value></data>
+  <data name="SshPrivilegeSudo" xml:space="preserve"><value>sudo without password</value></data>
+  <data name="SshPrivilegeSudoPassword" xml:space="preserve"><value>sudo with password</value></data>
+  <data name="SshPrivilegeNone" xml:space="preserve"><value>No root privileges</value></data>
+  <data name="SshSchedulerSystemd" xml:space="preserve"><value>systemd timer</value></data>
+  <data name="SshSchedulerCron" xml:space="preserve"><value>cron (/etc/cron.d)</value></data>
+  <data name="SshSchedulerNone" xml:space="preserve"><value>None found</value></data>
+  <data name="SshWarningCurl" xml:space="preserve"><value>curl is missing on the device. Install it before the setup.</value></data>
+  <data name="SshWarningRoot" xml:space="preserve"><value>The user is not root and sudo is not available.</value></data>
+  <data name="SshWarningScheduler" xml:space="preserve"><value>Neither systemd nor /etc/cron.d was found. The agent is installed but must be run regularly by hand.</value></data>
+  <data name="SshChooseCertificate" xml:space="preserve"><value>Choose the certificate</value></data>
+  <data name="SshNoMatchingCertificate" xml:space="preserve"><value>No existing certificate matches this device. Issue one now with the suggested profile and names.</value></data>
+  <data name="SshIssueNamesHelper" xml:space="preserve"><value>Detected from the device; separate several names with commas.</value></data>
+  <data name="SshIssueNamesRequired" xml:space="preserve"><value>Enter at least one DNS name or IP address.</value></data>
+  <data name="SshIssueCertificate" xml:space="preserve"><value>Issue certificate</value></data>
+  <data name="SshSetupCertificateIssued" xml:space="preserve"><value>Certificate issued and selected.</value></data>
+  <data name="SshProfileWithoutShellScript" xml:space="preserve"><value>The suggested profile has no shell script for this device. The agent will fetch the files, but you finish the installation by hand.</value></data>
+  <data name="SshHomeCaUrl" xml:space="preserve"><value>HomeCA URL as seen from the device</value></data>
+  <data name="SshHomeCaUrlHelper" xml:space="preserve"><value>The agent fetches renewed certificates from this address.</value></data>
+  <data name="SshHomeCaUrlLocal" xml:space="preserve"><value>localhost only works on this computer. Enter the address the device uses.</value></data>
+  <data name="SshInstallRootCa" xml:space="preserve"><value>Add the HomeCA root CA to the device's system trust store</value></data>
+  <data name="SshInstallRootCaHelper" xml:space="preserve"><value>Lets tools on the device trust HomeCA certificates. The agent works without it.</value></data>
+  <data name="SshInstallRootCaUnavailable" xml:space="preserve"><value>No supported trust store found; the agent uses its own copy of the root CA.</value></data>
+  <data name="SshBackupNotice" xml:space="preserve"><value>Before every change, HomeCA saves the affected files under /var/backups/homeca/ on the device. Each backup contains restore.sh, which restores the previous state.</value></data>
+  <data name="SshInstall" xml:space="preserve"><value>Install agent</value></data>
+  <data name="SshInstalling" xml:space="preserve"><value>Installing…</value></data>
+  <data name="SshChangeConnection" xml:space="preserve"><value>Change connection</value></data>
+  <data name="SshInstallSucceeded" xml:space="preserve"><value>The device is set up. The agent fetched the certificate and now checks for renewals every hour.</value></data>
+  <data name="SshProbeResult" xml:space="preserve"><value>TLS check: {0}</value></data>
+  <data name="SshOutput" xml:space="preserve"><value>Output</value></data>
+  <data name="SshRestoreHint" xml:space="preserve"><value>To undo a change, run restore.sh in the backup directory named in the output as root, newest backup first.</value></data>
+  <data name="SshTryAgain" xml:space="preserve"><value>Try again</value></data>
+  <data name="SshUnexpectedResponse" xml:space="preserve"><value>Unexpected response from HomeCA.</value></data>
+  <data name="SshStatusAuthentication" xml:space="preserve"><value>The device rejected the user name or the credentials.</value></data>
+  <data name="SshStatusUnreachable" xml:space="preserve"><value>No SSH connection to the device.</value></data>
+  <data name="SshStatusSudo" xml:space="preserve"><value>sudo rejected the password.</value></data>
+  <data name="SshStatusKey" xml:space="preserve"><value>The private key could not be read.</value></data>
+  <data name="SshStatusFailed" xml:space="preserve"><value>The setup failed.</value></data>
+  <data name="SshEnablePush" xml:space="preserve"><value>Push renewals immediately (recommended)</value></data>
+  <data name="SshEnablePushHelper" xml:space="preserve"><value>Adds a HomeCA key to root's authorized_keys that can only start this agent: no shell, no forwarding. Requires root logins with keys. The hourly timer stays as a fallback.</value></data>
+  <data name="SshPushTestOk" xml:space="preserve"><value>Push works: HomeCA started the agent with its restricted key.</value></data>
+  <data name="SshPushTestFailed" xml:space="preserve"><value>Push is not available, the hourly timer still applies: {0}</value></data>
+  <data name="DeploymentPushNow" xml:space="preserve"><value>Push now</value></data>
+  <data name="DeploymentPushDisable" xml:space="preserve"><value>Turn off push</value></data>
+  <data name="DeploymentPushConfirmDisable" xml:space="preserve"><value>Confirm turning off push</value></data>
+  <data name="DeploymentPushDisableHint" xml:space="preserve"><value>HomeCA stops pushing; the key stays on the device until you run restore.sh or set it up again without push. Click again to confirm.</value></data>
+  <data name="DeploymentPushActive" xml:space="preserve"><value>Push active</value></data>
+  <data name="DeploymentPushOk" xml:space="preserve"><value>Push OK {0}</value></data>
+  <data name="DeploymentPushBusy" xml:space="preserve"><value>Push {0}: agent was already running</value></data>
+  <data name="DeploymentPushFailed" xml:space="preserve"><value>Push failed {0}</value></data>
+  <data name="NotificationEventLabelDeploymentPushFailed" xml:space="preserve"><value>Push failed</value></data>
+  <data name="NotificationDeploymentPushFailedTitle" xml:space="preserve"><value>HomeCA: push to device failed</value></data>
+  <data name="NotificationDeploymentPushFailedMessage" xml:space="preserve"><value>Deployment target '{0}': {1}. The hourly timer on the device still fetches the certificate.</value></data>
+  <data name="DeploymentInstallHintWindows" xml:space="preserve"><value>Run in an elevated PowerShell on the device, locally or in your own remoting session (Enter-PSSession over WinRM). The agent runs hourly as a scheduled task under SYSTEM. If Windows does not trust HomeCA's TLS certificate yet, install the root CA from the trust page first.</value></data>
+  <data name="SshWindowsNotice" xml:space="preserve"><value>Windows: HomeCA installs the PowerShell agent as an hourly scheduled task under SYSTEM. Push is not available for Windows.</value></data>
+  <data name="SshSchedulerTaskScheduler" xml:space="preserve"><value>Windows Task Scheduler</value></data>
+  <data name="SshPrivilegeAdministrator" xml:space="preserve"><value>Administrator</value></data>
+  <data name="SshBackupNoticeWindows" xml:space="preserve"><value>Before every change, HomeCA saves the affected files, the scheduled task, certificate store entries and IIS bindings under %ProgramData%\HomeCA\Backups\ on the device. Each backup contains restore.ps1, which restores the previous state.</value></data>
+  <data name="SshRestoreHintWindows" xml:space="preserve"><value>To undo a change, run restore.ps1 in the backup directory named in the output in an elevated PowerShell, newest backup first.</value></data>
 </root>

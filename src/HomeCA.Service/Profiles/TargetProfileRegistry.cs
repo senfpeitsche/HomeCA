@@ -38,6 +38,18 @@ public sealed class TargetProfileRegistry(HomeCaStorage storage)
         "teamcity:f617bb42b9f4bb117b43c009b5c7f0a9310ad02fedc506798a586f0282c1d254"
     };
 
+    // SHA-256 over the text fields of built-in profiles whose script later gained explicit backups or ran unattended. A stored profile
+    // matching one of these was never edited and is replaced by the current seed.
+    private static readonly HashSet<string> PreviousSeedFingerprints = new(StringComparer.Ordinal)
+    {
+        "unifi:d116b25cf6a304bcdea7e4d580e003f8d7deb9d0d44c40092399056602db82d7",
+        "teamcity:94d9566413543842d61bdb40290ce6c9e5a1706cec4e72a8aa5a12192c127314",
+        "unraid:0d73d9494f42c20e377252076eb65431d5d062d4d3a3b57329e28276484df9dd",
+        "vmware-esxi:d825b2ea29044e9cebfa5608608868bb2af8806fdcef2ce56839877160b3a961",
+        "jellyfin:9663de05cce690ed192a31749e6deaf5a943abe5a6f1856471679ebc8bfb4c83",
+        "iis:3bc80a2652358fe4f56c818f1100f28f69e42915c77295fdd67f2b6f5b43e4f4"
+    };
+
     public async Task<IReadOnlyList<TargetProfile>> ListAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -216,7 +228,8 @@ public sealed class TargetProfileRegistry(HomeCaStorage storage)
     }
 
     private static bool IsUneditedLegacySeed(TargetProfile profile) =>
-        profile.ScriptType is null && profile.Localizations is null && LegacySeedFingerprints.Contains(Fingerprint(profile));
+        (profile.ScriptType is null && profile.Localizations is null && LegacySeedFingerprints.Contains(Fingerprint(profile)))
+        || PreviousSeedFingerprints.Contains(Fingerprint(profile));
 
     internal static string Fingerprint(TargetProfile profile)
     {

@@ -15,6 +15,10 @@ openssl s_client -connect service.example:443 -showcerts
 | Schlüssel | ECC P-256 |
 | Erneuerung | Vor Ablauf einrichten |
 
+## Einrichtung per SSH
+
+Unter **Verteilung > Per SSH einrichten** meldet sich HomeCA nach Bestätigung des Host-Keys einmalig am Linux-Gerät an, erkennt die Dienste, schlägt Profil und Namen vor und installiert den Agenten. Zugangsdaten werden nicht gespeichert. Vor jeder Änderung sichert HomeCA die betroffenen Dateien unter `/var/backups/homeca/`; `restore.sh` im jeweiligen Backup stellt den vorherigen Zustand wieder her. Mit Push startet HomeCA den Agenten direkt nach jeder Erneuerung über einen Schlüssel, der nur den Agenten ausführen darf. Windows-Server mit OpenSSH richtet der Assistent mit dem PowerShell-Agenten ein; ohne OpenSSH zeigt HomeCA PowerShell-Befehle zum Kopieren.
+
 ## Deployment-Paket
 
 Das ZIP-Deployment-Paket enthält Zertifikat, privaten Schlüssel, Kette, Prüfsummen, Installationshinweise und den Snapshot des Erneuerungsskripts. Behandle es wie den privaten Schlüssel: nur über einen geschützten Kanal übertragen und nach der Installation entfernen.

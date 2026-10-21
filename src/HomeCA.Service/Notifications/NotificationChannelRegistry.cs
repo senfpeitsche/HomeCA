@@ -89,7 +89,9 @@ public enum NotificationEvent
     RenewalFailed,
     DeploymentOutdated,
     BackupFailed,
-    Test
+    Test,
+    // Appended after Test: stored channels keep events as numbers.
+    DeploymentPushFailed
 }
 
 public sealed record SaveNotificationSettingsRequest(string? Language, IReadOnlyList<SaveNotificationChannelRequest> Channels);

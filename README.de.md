@@ -37,6 +37,8 @@ vermeiden möchten.
 - CRL-Erzeugung und HTTP-Verteilung mit CDP-Erweiterung in ausgestellten Zertifikaten
 - Automatische Erneuerung, für neue Zertifikate standardmäßig aktiv, plus **Jetzt erneuern**
 - Verteilungsziele: Ein Agent auf dem Gerät holt erneuerte Zertifikate mit eigenem Token ab, optionaler Webhook und eine TLS-Prüfung, ob das Gerät das aktuelle Zertifikat ausliefert
+- Einrichtung per SSH: HomeCA verbindet sich einmalig mit bestätigtem Host-Key, erkennt die Dienste, schlägt Profil und Namen vor, installiert den Agenten und sichert jede Datei, die es auf dem Gerät ändert (mit `restore.sh`); Zugangsdaten werden nie gespeichert; optionaler Push mit eingeschränktem Schlüssel startet den Agenten direkt nach jeder Erneuerung
+- Windows: PowerShell-Agent als geplante Aufgabe, Einrichtung über OpenSSH oder per kopierbaren PowerShell-Befehlen, IIS-Umbindung und Backups mit `restore.ps1`
 - Öffentliche Trust-Seite `/trust` mit Betriebssystemerkennung, Apple-Konfigurationsprofil und QR-Code
 - Name Constraints für Intermediate-CAs, bei der Ausstellung durchgesetzt
 - CSR-Signatur für Geräte, die ihren Schlüssel selbst erzeugen
@@ -184,6 +186,8 @@ Wichtige öffentliche (nicht authentifizierte) Endpunkte:
 - `GET /trust` — Trust-Seite für Geräte
 - `GET /api/v1/trust-anchor/mobileconfig` — Apple-Konfigurationsprofil mit der Root-CA
 - `GET /api/v1/deploy/{id}/…` — Agent-Endpunkte, authentifiziert mit dem eigenen Token des Verteilungsziels
+- `POST /api/v1/deployment-targets/{id}/push`, `DELETE /api/v1/deployment-targets/{id}/push` — Jetzt verteilen, Push abschalten
+- `POST /api/v1/ssh-setup/detect`, `POST /api/v1/ssh-setup/install` — Geführte Einrichtung per SSH (Administrator-Token; Zugangsdaten nur in der Anfrage)
 
 Alle Verwaltungsendpunkte erfordern einen Bearer-Token, der per
 `POST /api/v1/login` erlangt wird.

@@ -1,0 +1,408 @@
+@using HomeCA.Service.Deployments
+@using HomeCA.Service.Profiles
+@using HomeCA.Service.Pki
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject HomeCaInternalHttpClient InternalHttpClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+@* Guided setup over SSH. Credentials live only in this component and are cleared once the setup ran or the panel closes. *@
+<MudPaper Class="panel" Elevation="0">
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h6">@(Target is null ? Text["SshSetupTitle"] : Text["SshSetupTitleExisting", Target.Name])</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="@Text["Close"]" OnClick="CloseAsync" />
+    </MudStack>
+    <MudText Class="mud-text-secondary mb-3">@Text["SshSetupDescription"]</MudText>
+
+    @if (_result is null)
+    {
+        <div class="form-stack">
+            <div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">@Text["Step1"]</MudText><MudText Typo="Typo.h6">@Text["SshSetupConnect"]</MudText></div>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="8"><MudTextField @bind-Value="_host" Label="@Text["SshHost"]" Placeholder="pve01.lab.example" Required="true" Disabled="@(_facts is not null)" /></MudItem>
+                <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_port" Label="@Text["SshPort"]" Min="1" Max="65535" Disabled="@(_facts is not null)" /></MudItem>
+            </MudGrid>
+            <MudTextField @bind-Value="_userName" Label="@Text["SshUser"]" HelperText="@Text["SshUserHelper"]" Required="true" Disabled="@(_facts is not null)" />
+            <MudRadioGroup T="bool" @bind-Value="_useKey" Disabled="@(_facts is not null)">
+                <MudRadio T="bool" Value="false">@Text["SshAuthPassword"]</MudRadio>
+                <MudRadio T="bool" Value="true">@Text["SshAuthKey"]</MudRadio>
+            </MudRadioGroup>
+            @if (_useKey)
+            {
+                <MudTextField @bind-Value="_privateKey" Label="@Text["SshPrivateKey"]" Lines="4" HelperText="@Text["SshPrivateKeyHelper"]" Disabled="@(_facts is not null)" Class="code-input" />
+                <MudTextField @bind-Value="_passphrase" Label="@Text["SshPassphrase"]" InputType="InputType.Password" Disabled="@(_facts is not null)" />
+            }
+            else
+            {
+                <MudTextField @bind-Value="_password" Label="@Text["SshPassword"]" InputType="InputType.Password" Disabled="@(_facts is not null)" />
+            }
+            @if (_facts is null || _facts.Sudo == SshHostFacts.SudoWithPassword)
+            {
+                <MudTextField @bind-Value="_sudoPassword" Label="@Text["SshSudoPassword"]" InputType="InputType.Password" HelperText="@Text["SshSudoPasswordHelper"]" />
+            }
+
+            @if (_hostKey is not null && _facts is null)
+            {
+                <MudAlert Severity="@(_hostKeyChanged ? Severity.Error : Severity.Warning)" Class="mt-2">
+                    <MudText Typo="Typo.subtitle2">@(_hostKeyChanged ? Text["SshHostKeyChanged"] : Text["SshHostKeyUnknown"])</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-1">@_hostKey.Algorithm</MudText>
+                    <code class="d-block mt-1">@_hostKey.Fingerprint</code>
+                    @if (_hostKeyChanged && _expectedHostKey is not null) { <MudText Typo="Typo.caption" Class="d-block mt-1">@Text["SshHostKeyExpected", _expectedHostKey]</MudText> }
+                    <MudText Typo="Typo.caption" Class="d-block mt-2">@Text["SshHostKeyCompare"]</MudText>
+                    <code class="d-block">ssh-keygen -lf /etc/ssh/ssh_host_@(KeyFileName(_hostKey.Algorithm))_key.pub</code>
+                </MudAlert>
+                @if (_hostKeyChanged) { <MudCheckBox T="bool" @bind-Value="_replaceHostKey" Label="@Text["SshHostKeyReplace"]" Color="Color.Error" /> }
+                <MudButton Variant="Variant.Filled" Color="@(_hostKeyChanged ? Color.Error : Color.Primary)" Disabled="@(_busy || (_hostKeyChanged && !_replaceHostKey))" OnClick="ConfirmHostKeyAsync">@Text["SshHostKeyConfirm"]</MudButton>
+            }
+            else if (_facts is null)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="DetectAsync" StartIcon="@Icons.Material.Filled.Search">@(_busy ? Text["SshConnecting"] : Text["SshDetect"])</MudButton>
+            }
+
+            @if (_facts is not null && _suggestion is not null)
+            {
+                <div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">@Text["Step2"]</MudText><MudText Typo="Typo.h6">@Text["SshDetected"]</MudText></div>
+                <MudSimpleTable Dense="true" Bordered="false">
+                    <tbody>
+                        <tr><td>@Text["SshFactSystem"]</td><td>@(_facts.OperatingSystem ?? _facts.Kernel) @_facts.Architecture</td></tr>
+                        <tr><td>@Text["SshFactNames"]</td><td>@string.Join(", ", new[] { _facts.Fqdn, _facts.HostName }.Where(name => !string.IsNullOrWhiteSpace(name)).Distinct())</td></tr>
+                        <tr><td>@Text["SshFactAddresses"]</td><td>@string.Join(", ", _facts.Addresses)</td></tr>
+                        <tr><td>@Text["SshFactServices"]</td><td>@(_facts.Services.Count == 0 ? Text["SshNoServices"] : string.Join(", ", _facts.Services.Select(ProfileName)))</td></tr>
+                        <tr><td>@Text["SshFactPrivileges"]</td><td>@PrivilegeLabel(_facts.Sudo)</td></tr>
+                        <tr><td>@Text["SshFactScheduler"]</td><td>@SchedulerLabel(_facts.Scheduler)</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+                @foreach (var warning in _warnings) { <MudAlert Severity="Severity.Warning" Dense="true">@WarningLabel(warning)</MudAlert> }
+
+                <div class="assistant-stage"><MudText Typo="Typo.overline" Class="section-kicker">@Text["Step3"]</MudText><MudText Typo="Typo.h6">@Text["SshChooseCertificate"]</MudText></div>
+                @if (Target is null) { <MudTextField @bind-Value="_name" Label="@Text["Name"]" Required="true" HelperText="@Text["DeploymentNameHelper"]" /> }
+                <MudSelect T="string" Label="@Text["Certificate"]" @bind-Value="_certificateId" Required="true" Disabled="@(Target is not null)" Clearable="true">
+                    @foreach (var certificate in Certificates) { <MudSelectItem Value="@certificate.Key">@certificate.Value</MudSelectItem> }
+                </MudSelect>
+                @if (Target is null && string.IsNullOrWhiteSpace(_certificateId))
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">@Text["SshNoMatchingCertificate"]</MudAlert>
+                    <MudSelect T="string" Label="@Text["TargetProfile"]" @bind-Value="_issueProfileId">
+                        @foreach (var profile in OrderedProfiles) { <MudSelectItem Value="@profile.Id">@ProfileName(profile.Id)</MudSelectItem> }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_issueDnsNames" Label="@Text["DnsNames"]" HelperText="@Text["SshIssueNamesHelper"]" />
+                    <MudTextField @bind-Value="_issueIpAddresses" Label="@Text["IpAddresses"]" Disabled="@(!AllowsIp)" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Disabled="@(_busy || string.IsNullOrWhiteSpace(_issueProfileId))" OnClick="IssueCertificateAsync" StartIcon="@Icons.Material.Filled.NoteAdd">@Text["SshIssueCertificate"]</MudButton>
+                }
+                else if (SelectedScriptType is ProfileScripts.DeviceCli or ProfileScripts.PowerShell)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true">@Text["SshProfileWithoutShellScript"]</MudAlert>
+                }
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="8"><MudTextField @bind-Value="_probeHost" Label="@Text["DeploymentHost"]" HelperText="@Text["DeploymentHostHelper"]" Disabled="@(Target is not null)" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_probePort" Label="@Text["DeploymentPort"]" Min="1" Max="65535" Disabled="@(Target is not null)" /></MudItem>
+                </MudGrid>
+                <MudTextField @bind-Value="_homeCaUrl" Label="@Text["SshHomeCaUrl"]" HelperText="@Text["SshHomeCaUrlHelper"]" Error="@HomeCaUrlIsLocal" ErrorText="@Text["SshHomeCaUrlLocal"]" />
+                <MudCheckBox T="bool" @bind-Value="_installRootCa" Label="@Text["SshInstallRootCa"]" Disabled="@(_facts.TrustStore == "none")" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mt-n2">@(_facts.TrustStore == "none" ? Text["SshInstallRootCaUnavailable"] : Text["SshInstallRootCaHelper"])</MudText>
+                @if (_facts.IsWindows)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">@Text["SshWindowsNotice"]</MudAlert>
+                }
+                else
+                {
+                    <MudCheckBox T="bool" @bind-Value="_enablePush" Label="@Text["SshEnablePush"]" />
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary mt-n2">@Text["SshEnablePushHelper"]</MudText>
+                }
+                <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Filled.Restore">@(_facts.IsWindows ? Text["SshBackupNoticeWindows"] : Text["SshBackupNotice"])</MudAlert>
+                <MudStack Row="true">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || !CanInstall)" OnClick="InstallAsync" StartIcon="@Icons.Material.Filled.RocketLaunch">@(_busy ? Text["SshInstalling"] : Text["SshInstall"])</MudButton>
+                    <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="ResetConnection">@Text["SshChangeConnection"]</MudButton>
+                </MudStack>
+            }
+        </div>
+    }
+    else
+    {
+        <MudAlert Severity="@(_result.Status == SshSetupResult.Ok ? Severity.Success : Severity.Error)" Class="mb-3">
+            @(_result.Status == SshSetupResult.Ok ? Text["SshInstallSucceeded"] : (_result.Message ?? StatusLabel(_result.Status)))
+        </MudAlert>
+        @if (_result.Push is { } push)
+        {
+            <MudAlert Severity="@(push.Status == DeploymentPushResult.Failed ? Severity.Warning : Severity.Success)" Dense="true" Class="mb-2">
+                @(push.Status == DeploymentPushResult.Failed ? Text["SshPushTestFailed", LastLine(push.Output)] : Text["SshPushTestOk"])
+            </MudAlert>
+        }
+        @if (_result.Probe is { } probe)
+        {
+            <MudText Class="mb-2">@Text["SshProbeResult", ProbeLabel(probe.Status)]</MudText>
+        }
+        @if (!string.IsNullOrWhiteSpace(_result.Output))
+        {
+            <MudText Typo="Typo.subtitle2" Class="mb-1">@Text["SshOutput"]</MudText>
+            <CodePreview Text="@_result.Output" Lines="12" />
+        }
+        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@(_facts?.IsWindows == true ? Text["SshRestoreHintWindows"] : Text["SshRestoreHint"])</MudText>
+        <MudStack Row="true" Class="mt-3">
+            @if (_result.Status != SshSetupResult.Ok) { <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _result = null)">@Text["SshTryAgain"]</MudButton> }
+            <MudButton Variant="Variant.Text" OnClick="CloseAsync">@Text["Close"]</MudButton>
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    /// <summary>Set when an existing target is set up again; otherwise the wizard creates a new target.</summary>
+    [Parameter] public DeploymentTarget? Target { get; set; }
+    [Parameter, EditorRequired] public string Token { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<KeyValuePair<string, string>> Certificates { get; set; } = [];
+    [Parameter] public EventCallback OnClosed { get; set; }
+    /// <summary>Raised after a target or certificate changed, so the parent reloads its lists.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
+    private string _host = "", _userName = "root", _password = "", _privateKey = "", _passphrase = "", _sudoPassword = "";
+    private int _port = 22;
+    private bool _useKey, _busy, _hostKeyChanged, _replaceHostKey, _installRootCa, _enablePush = true;
+    private SshHostKey? _hostKey;
+    private string? _confirmedHostKey, _expectedHostKey;
+    private SshHostFacts? _facts;
+    private SshSetupSuggestion? _suggestion;
+    private IReadOnlyList<string> _warnings = [];
+    private List<TargetProfile> _profiles = [];
+    private string _name = "", _certificateId = "", _probeHost = "", _homeCaUrl = "", _issueProfileId = "", _issueDnsNames = "", _issueIpAddresses = "";
+    private int _probePort = 443;
+    private SshInstallResponse? _result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _homeCaUrl = Navigation.BaseUri.TrimEnd('/');
+        if (Target is { } target)
+        {
+            _enablePush = target.Ssh?.PushEnabled ?? true;
+            _certificateId = target.CertificateId;
+            _probeHost = target.Host ?? "";
+            _probePort = target.Port;
+            if (target.Ssh is { } ssh) { _host = ssh.Host; _port = ssh.Port; _userName = ssh.UserName; }
+            else if (!string.IsNullOrWhiteSpace(target.Host)) _host = target.Host;
+        }
+        try
+        {
+            using var client = Client();
+            _profiles = await client.GetFromJsonAsync<List<TargetProfile>>("api/v1/profiles", _json) ?? [];
+            if (await client.GetFromJsonAsync<InstanceDto>("api/v1/instance", _json) is { Instance.PublicUrl: { Length: > 0 } publicUrl }) _homeCaUrl = publicUrl.TrimEnd('/');
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+    }
+
+    private HttpClient Client()
+    {
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        return client;
+    }
+
+    private SshCredentials Credentials() => new(
+        _host.Trim(), _port, _userName.Trim(),
+        _useKey ? null : _password, _useKey ? _privateKey : null, _useKey && _passphrase.Length > 0 ? _passphrase : null,
+        _sudoPassword.Length > 0 ? _sudoPassword : null, _confirmedHostKey, _replaceHostKey);
+
+    private async Task DetectAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_host) || string.IsNullOrWhiteSpace(_userName)) { Snackbar.Add(Text["SshSetupRequiredFields"], Severity.Warning); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsJsonAsync("api/v1/ssh-setup/detect", new SshDetectRequest(Credentials(), Target?.Id), _json);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            var result = await response.Content.ReadFromJsonAsync<SshDetectResponse>(_json) ?? throw new InvalidOperationException(Text["SshUnexpectedResponse"]);
+            switch (result.Status)
+            {
+                case SshSetupResult.HostKeyUnknown or SshSetupResult.HostKeyChanged:
+                    _hostKey = result.HostKey;
+                    _hostKeyChanged = result.Status == SshSetupResult.HostKeyChanged;
+                    _expectedHostKey = result.ExpectedHostKey;
+                    _replaceHostKey = false;
+                    break;
+                case SshSetupResult.Ok:
+                    _confirmedHostKey = result.HostKey?.Fingerprint;
+                    _hostKey = result.HostKey;
+                    _facts = result.Facts;
+                    _suggestion = result.Suggestion;
+                    _warnings = result.Warnings ?? [];
+                    ApplySuggestion();
+                    break;
+                default:
+                    Snackbar.Add(result.Message ?? StatusLabel(result.Status), Severity.Error);
+                    break;
+            }
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task ConfirmHostKeyAsync()
+    {
+        _confirmedHostKey = _hostKey?.Fingerprint;
+        _hostKey = null;
+        await DetectAsync();
+    }
+
+    private void ApplySuggestion()
+    {
+        if (_suggestion is null || _facts is null) return;
+        _installRootCa = _facts.TrustStore != "none";
+        if (Target is not null) return;
+        _name = _suggestion.Name;
+        _probeHost = _host.Trim();
+        _issueProfileId = _suggestion.ProfileIds.FirstOrDefault() ?? "";
+        _issueDnsNames = string.Join(", ", _suggestion.DnsNames);
+        _issueIpAddresses = string.Join(", ", _suggestion.IpAddresses);
+        if (_suggestion.CertificateId is { } id && Certificates.Any(certificate => certificate.Key == id)) _certificateId = id;
+    }
+
+    private async Task IssueCertificateAsync()
+    {
+        var profile = _profiles.FirstOrDefault(item => item.Id == _issueProfileId);
+        if (profile is null) return;
+        _busy = true;
+        try
+        {
+            var dnsNames = Split(_issueDnsNames);
+            var ipAddresses = AllowsIp ? Split(_issueIpAddresses) : [];
+            if (dnsNames.Count == 0 && ipAddresses.Count == 0) { Snackbar.Add(Text["SshIssueNamesRequired"], Severity.Warning); return; }
+            using var client = Client();
+            var request = new IssueCertificateApiRequest("TLS", dnsNames, ipAddresses, Math.Min(365, profile.Validation.MaximumValidityDays), profile.KeyAlgorithm,
+                TargetProfileId: profile.Id);
+            var response = await client.PostAsJsonAsync("api/v1/certificates", request, _json);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            var issued = await response.Content.ReadFromJsonAsync<IssueResultDto>(_json);
+            await OnChanged.InvokeAsync();
+            if (issued is not null) _certificateId = issued.Id;
+            Snackbar.Add(Text["SshSetupCertificateIssued"], Severity.Success);
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task InstallAsync()
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var request = new SshInstallRequest(Credentials(), Target?.Id, Target is null ? _name.Trim() : null, Target is null ? _certificateId : null,
+                Target is null && !string.IsNullOrWhiteSpace(_probeHost) ? _probeHost.Trim() : null, Target is null ? _probePort : null, _installRootCa,
+                string.IsNullOrWhiteSpace(_homeCaUrl) ? null : _homeCaUrl.Trim(), _enablePush);
+            var response = await client.PostAsJsonAsync("api/v1/ssh-setup/install", request, _json);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            var result = await response.Content.ReadFromJsonAsync<SshInstallResponse>(_json) ?? throw new InvalidOperationException(Text["SshUnexpectedResponse"]);
+            if (result.Status is SshSetupResult.HostKeyUnknown or SshSetupResult.HostKeyChanged)
+            {
+                ResetConnection();
+                _hostKey = result.HostKey;
+                _hostKeyChanged = result.Status == SshSetupResult.HostKeyChanged;
+                _expectedHostKey = result.ExpectedHostKey;
+                return;
+            }
+            _result = result;
+            if (result.Target is not null) await OnChanged.InvokeAsync();
+            if (result.Status == SshSetupResult.Ok) ClearSecrets();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private void ResetConnection()
+    {
+        _facts = null; _suggestion = null; _hostKey = null; _confirmedHostKey = null; _warnings = []; _replaceHostKey = false;
+    }
+
+    private void ClearSecrets() { _password = ""; _privateKey = ""; _passphrase = ""; _sudoPassword = ""; }
+
+    private async Task CloseAsync()
+    {
+        ClearSecrets();
+        await OnClosed.InvokeAsync();
+    }
+
+    private bool CanInstall => _facts is not null && !string.IsNullOrWhiteSpace(_certificateId) && (Target is not null || !string.IsNullOrWhiteSpace(_name)) && !HomeCaUrlIsLocal;
+
+    private bool HomeCaUrlIsLocal => Uri.TryCreate(_homeCaUrl.Trim(), UriKind.Absolute, out var uri) && uri.IsLoopback;
+
+    private TargetProfile? IssueProfile => _profiles.FirstOrDefault(profile => profile.Id == _issueProfileId);
+
+    private bool AllowsIp => IssueProfile?.Validation.AllowsIpAddress ?? true;
+
+    // The export package of the chosen certificate determines the script; the suggested profile is the best guess for it.
+    private string? SelectedScriptType => _suggestion?.ProfileIds.FirstOrDefault() is { } id && _profiles.FirstOrDefault(profile => profile.Id == id) is { } profile
+        ? ProfileScripts.Resolve(profile) : null;
+
+    private IEnumerable<TargetProfile> OrderedProfiles =>
+        (_suggestion?.ProfileIds ?? []).Select(id => _profiles.FirstOrDefault(profile => profile.Id == id)).OfType<TargetProfile>()
+            .Concat(_profiles.Where(profile => _suggestion?.ProfileIds.Contains(profile.Id) != true).OrderBy(profile => ProfileName(profile.Id), StringComparer.CurrentCultureIgnoreCase));
+
+    private string ProfileName(string id)
+    {
+        var profile = _profiles.FirstOrDefault(item => item.Id == id);
+        if (profile is null) return id;
+        return profile.Localizations is { } localizations && localizations.TryGetValue(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, out var translation)
+            && !string.IsNullOrWhiteSpace(translation.DisplayName) ? translation.DisplayName : profile.DisplayName;
+    }
+
+    private static string LastLine(string? output) =>
+        output?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
+
+    private static List<string> Split(string value) =>
+        value.Split([',', ';', ' ', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    private static string KeyFileName(string algorithm) => algorithm switch
+    {
+        "ssh-ed25519" => "ed25519",
+        "ssh-rsa" or "rsa-sha2-256" or "rsa-sha2-512" => "rsa",
+        _ when algorithm.StartsWith("ecdsa", StringComparison.Ordinal) => "ecdsa",
+        _ => "*"
+    };
+
+    private string PrivilegeLabel(string sudo) => sudo switch
+    {
+        SshHostFacts.SudoRoot when _facts?.IsWindows == true => Text["SshPrivilegeAdministrator"],
+        SshHostFacts.SudoRoot => Text["SshPrivilegeRoot"],
+        SshHostFacts.SudoWithoutPassword => Text["SshPrivilegeSudo"],
+        SshHostFacts.SudoWithPassword => Text["SshPrivilegeSudoPassword"],
+        _ => Text["SshPrivilegeNone"]
+    };
+
+    private string SchedulerLabel(string scheduler) => scheduler switch
+    {
+        "systemd" => Text["SshSchedulerSystemd"],
+        "cron" => Text["SshSchedulerCron"],
+        "taskscheduler" => Text["SshSchedulerTaskScheduler"],
+        _ => Text["SshSchedulerNone"]
+    };
+
+    private string WarningLabel(string warning) => warning switch
+    {
+        "curl-missing" => Text["SshWarningCurl"],
+        "no-root" => Text["SshWarningRoot"],
+        _ => Text["SshWarningScheduler"]
+    };
+
+    private string StatusLabel(string status) => status switch
+    {
+        SshSetupResult.AuthenticationFailed => Text["SshStatusAuthentication"],
+        SshSetupResult.Unreachable => Text["SshStatusUnreachable"],
+        SshSetupResult.SudoFailed => Text["SshStatusSudo"],
+        SshSetupResult.InvalidKey => Text["SshStatusKey"],
+        _ => Text["SshStatusFailed"]
+    };
+
+    private string ProbeLabel(string status) => status switch
+    {
+        DeploymentProbeResult.Current => Text["ProbeCurrent"],
+        DeploymentProbeResult.Outdated => Text["ProbeOutdated"],
+        DeploymentProbeResult.Foreign => Text["ProbeForeign"],
+        _ => Text["ProbeUnreachable"]
+    };
+
+    private sealed record InstanceDto(InstanceDescription? Instance);
+    private sealed record InstanceDescription(string? PublicUrl);
+    private sealed record IssueResultDto(string Id);
+}

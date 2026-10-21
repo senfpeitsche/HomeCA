@@ -15,6 +15,7 @@ public sealed class CertificateRenewalService(
     RenewalPlanRegistry plans,
     DeploymentTargetRegistry targets,
     DeploymentWebhookService webhooks,
+    DeploymentPushService pushes,
     TlsActivationService tls,
     ILogger<CertificateRenewalService> logger)
 {
@@ -41,7 +42,10 @@ public sealed class CertificateRenewalService(
         }
 
         foreach (var target in movedTargets)
+        {
             await webhooks.NotifyRenewedAsync(target, ct);
+            pushes.Enqueue(target);
+        }
 
         return result;
     }

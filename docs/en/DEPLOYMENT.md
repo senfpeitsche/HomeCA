@@ -2,6 +2,59 @@
 
 A **deployment target** follows a certificate through all renewals. When HomeCA issues a successor – automatically through a renewal plan or via **Renew now** – the target points to the new certificate right away. A small agent on the device fetches the files and runs the profile script.
 
+## Setup over SSH
+
+Under **Deployment > Set up over SSH**, HomeCA does the setup on Linux devices itself:
+
+1. Enter host, port, user and a password or private key. A user other than root needs `sudo`; the sudo password is only needed when it differs from the SSH password.
+2. On first contact HomeCA shows the SHA-256 fingerprint of the host key and only signs in after you confirm it. Compare it on the device's console with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
+3. HomeCA only reads the system: host name, FQDN, addresses, privileges, systemd or cron, trust store and running services (for example Proxmox, nginx, Caddy, Traefik, Jellyfin). From these it suggests a profile, names and a matching existing certificate; if none exists, you can issue one right in the wizard.
+4. **Install agent** creates the target (or renews the token when setting it up again), writes the token, the agent and an hourly systemd timer or cron entry, optionally adds the root CA to the system trust store and runs the agent once. Output and exit code appear directly in the interface.
+
+Password, key, passphrase and token are never stored or logged. The target keeps only host, port, user name and the confirmed host key. If the host key differs later, HomeCA stops before signing in; after reinstalling the device you accept the new key explicitly.
+
+If the device cannot reach HomeCA at the address in your browser (for example `localhost`), enter the right address under **HomeCA URL as seen from the device**. If the system does not trust HomeCA's TLS certificate, the agent uses a copy of the root CA automatically (`CA_FILE` in `/etc/homeca-agent/<id>.env`).
+
+## Windows
+
+Windows gets a PowerShell agent (`agent.ps1`, Windows PowerShell 5.1 or PowerShell 7). It runs hourly as the scheduled task `\HomeCA\Agent <id>` under SYSTEM, fetches the files like the shell agent and runs `install.ps1`. It also gets `certificate.pfx` with certificate, key and issuing CA; the PFX is protected with the target token, and `install.ps1` receives the password in `HOMECA_PFX_PASSWORD`.
+
+- **Setup over SSH:** If OpenSSH is enabled on the server (built in since Windows 10 1809 and Server 2019), **Set up over SSH** detects Windows automatically, with cmd or PowerShell as the default shell and even with Git Bash in the PATH. The user must be an administrator. HomeCA creates `%ProgramData%\HomeCA\Agent` with access for SYSTEM and Administrators only, writes token and agent, optionally adds the root CA to `LocalMachine\Root`, registers the task and runs the agent once. Push is not available for Windows.
+- **Without OpenSSH:** After you add a target, HomeCA shows PowerShell commands with the token under **Windows**. Run them in an elevated PowerShell, locally or in your own remoting session (`Enter-PSSession`, so WinRM works too).
+- **Trust:** If Windows does not trust HomeCA's TLS certificate, the agent validates the chain against its copy of the root CA (`caFile` in `%ProgramData%\HomeCA\Agent\<id>.settings.json`).
+- **Profiles:** `iis` imports the certificate into `LocalMachine\My` and moves every HTTPS binding whose certificate has the same subject to it. Bind a new site once in IIS Manager. `windows-certstore` only imports, for example for RDP or a WinRM HTTPS listener.
+- **Backups:** Before every change HomeCA saves the affected files, the scheduled task (`task.xml`), newly imported certificates and the previous certificate of every IIS binding under `%ProgramData%\HomeCA\Backups\<target>\<timestamp>-<reason>\`. `restore.ps1` in an elevated PowerShell restores the previous state, newest backup first. Custom profiles use `Backup-HomeCAFile <path>`, `Add-HomeCARestoreStep '<command>'` and `Import-HomeCACertificate certificate.pfx`.
+
+HomeCA does not offer a direct setup over WinRM: there is no maintained client for it on Linux, and without Kerberos or an HTTPS listener there is no server authentication like the SSH host key.
+
+## Push renewals immediately
+
+With **Push renewals immediately** (the default) the setup adds HomeCA's own key (ECDSA P-256) to root's `authorized_keys`:
+
+```
+command="/usr/local/bin/homeca-agent-<id>",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ecdsa-sha2-nistp256 AAAA… homeca-push-<id>
+```
+
+The key can only start this target's agent: no shell, no terminal and no forwarding, whatever command the client sends. After every renewal HomeCA signs in as root with the stored host key and this key and starts the agent, so the device has the new certificate within seconds instead of up to an hour. **Push now** in the target list does the same by hand.
+
+- Right after the setup, a test push checks that `sshd` accepts the key. If `sshd` refuses root logins (`PermitRootLogin no`), push stays off.
+- If another agent run is in progress (for example the timer), the agent exits with code 75; HomeCA retries up to four times, 30 seconds apart.
+- A failed push sends the **Push failed** notification. The hourly timer always stays active and still fetches the certificate.
+- If the host key differs, HomeCA does not sign in and the push counts as failed.
+- **Turn off push** stops pushes in HomeCA. The line on the device is removed by the setup's `restore.sh` or by setting the device up again without push. Other entries in `authorized_keys` stay untouched.
+- The private key is stored encrypted with the CA key under `state/ssh-push-key.pem` and is part of the HomeCA backup.
+
+## Backups on the device
+
+Before every change, HomeCA saves the affected files under `/var/backups/homeca/<target>/<timestamp>-<reason>/`:
+
+- `-setup`: everything the setup writes (token, agent, timer, cron, root CA).
+- `-renewal`: everything the profile script replaces during an agent run, such as `/etc/nginx/ssl/fullchain.pem`.
+
+Each backup contains `files.txt` and `restore.sh`. `restore.sh` copies replaced files back and removes files that did not exist before. Undo several changes in reverse order, newest backup first. The agent keeps the ten newest backups per target (`KEEP_BACKUPS`).
+
+In profile scripts, `cp` and `install` save their destination automatically. If a custom profile writes in another way, for example with `>` or `openssl -out`, call `homeca_backup /path/to/file` first. Without the agent, backups go to `/var/backups/homeca/manual/`.
+
 ## Flow
 
 1. Issue a certificate (the renewal plan is on by default).

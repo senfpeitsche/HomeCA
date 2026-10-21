@@ -8,13 +8,39 @@
 <MudText Typo="Typo.h3" Class="page-title">@Text["DeploymentsTitle"]</MudText>
 <MudText Class="mud-text-secondary mb-4">@Text["DeploymentsDescription"]</MudText>
 
+@if (_sshSetupOpen)
+{
+    <SshSetupWizard @key="_sshTarget?.Id" Target="_sshTarget" Token="@Token" Certificates="@Certificates" OnClosed="CloseSshSetup" OnChanged="SshSetupChangedAsync" />
+}
+else
+{
+    <MudPaper Class="panel" Elevation="0">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <MudIcon Icon="@Icons.Material.Filled.Terminal" Color="Color.Primary" />
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.subtitle1">@Text["SshSetupTeaserTitle"]</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@Text["SshSetupTeaser"]</MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OpenSshSetup(null))">@Text["SshSetupStart"]</MudButton>
+        </MudStack>
+    </MudPaper>
+}
+
 @if (_createdToken is { } created)
 {
     <MudPaper Class="panel" Elevation="0">
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@Text["DeploymentTokenOnce", created.Target.Name]</MudAlert>
         <MudText Typo="Typo.subtitle2" Class="mb-1">@Text["DeploymentInstallCommands"]</MudText>
-        <CodePreview Text="@DeploymentAgentScript.RenderInstallCommands(BaseUrl, created.Target, created.Token)" Lines="7" />
-        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Text["DeploymentInstallHint"]</MudText>
+        <MudTabs Elevation="0" Rounded="false" PanelClass="pt-2">
+            <MudTabPanel Text="Linux">
+                <CodePreview Text="@DeploymentAgentScript.RenderInstallCommands(BaseUrl, created.Target, created.Token)" Lines="7" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@Text["DeploymentInstallHint"]</MudText>
+            </MudTabPanel>
+            <MudTabPanel Text="Windows">
+                <CodePreview Text="@WindowsAgentScript.RenderInstallCommands(BaseUrl, created.Target, created.Token)" Lines="7" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@Text["DeploymentInstallHintWindows"]</MudText>
+            </MudTabPanel>
+        </MudTabs>
         <div class="mt-3"><MudButton Variant="Variant.Text" OnClick="@(() => _createdToken = null)">@Text["DeploymentTokenStored"]</MudButton></div>
     </MudPaper>
 }
@@ -47,7 +73,7 @@
                 <RowTemplate>
                     <MudTd DataLabel="@Text["Name"]">@context.Name@if (!string.IsNullOrWhiteSpace(context.Host)) { <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@context.Host:@context.Port</MudText> }</MudTd>
                     <MudTd DataLabel="@Text["Certificate"]">@CertificateName(context.CertificateId)</MudTd>
-                    <MudTd DataLabel="@Text["DeploymentAgent"]">@AgentStatus(context)</MudTd>
+                    <MudTd DataLabel="@Text["DeploymentAgent"]">@AgentStatus(context)@if (context.Ssh is { } ssh) { <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@Text["SshSetupLast", ssh.UserName + "@" + ssh.Host, Date(ssh.LastSetupAt), ssh.LastExitCode]</MudText> @if (ssh.PushEnabled) { <MudTooltip Text="@(ssh.LastPush?.Output ?? string.Empty)"><MudChip T="string" Size="Size.Small" Color="@PushColor(ssh.LastPush)">@PushLabel(ssh.LastPush)</MudChip></MudTooltip> } }</MudTd>
                     <MudTd DataLabel="@Text["DeploymentServed"]">
                         @if (context.LastProbe is { } probe)
                         {
@@ -58,6 +84,12 @@
                     </MudTd>
                     <MudTd>
                         @if (!string.IsNullOrWhiteSpace(context.Host)) { <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_busy" OnClick="@(() => ProbeAsync(context.Id))">@Text["DeploymentCheck"]</MudButton> }
+                        @if (context.Ssh is { PushEnabled: true })
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="_busy" OnClick="@(() => PushAsync(context))">@Text["DeploymentPushNow"]</MudButton>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_busy" OnClick="@(() => DisablePushAsync(context))">@(_disablePushId == context.Id ? Text["DeploymentPushConfirmDisable"] : Text["DeploymentPushDisable"])</MudButton>
+                        }
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => OpenSshSetup(context))">@Text["SshSetupRun"]</MudButton>
                         <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => ShowAgentAsync(context))">@Text["DeploymentShowAgent"]</MudButton>
                         <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginEdit(context))">@Text["Edit"]</MudButton>
                         <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" Disabled="_busy" OnClick="@(() => RotateTokenAsync(context))">@(_rotateId == context.Id ? Text["DeploymentConfirmRotate"] : Text["DeploymentRotateToken"])</MudButton>
@@ -72,7 +104,10 @@
             <MudPaper Class="panel" Elevation="0">
                 <MudStack Row="true" AlignItems="AlignItems.Center"><MudText Typo="Typo.h6">@Text["DeploymentAgentScript", _agentTargetName ?? string.Empty]</MudText><MudSpacer /><MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="@Text["Close"]" OnClick="@(() => _agentScript = null)" /></MudStack>
                 <MudText Class="mud-text-secondary mb-2">@Text["DeploymentAgentDescription"]</MudText>
-                <CodePreview Text="@_agentScript" Lines="12" />
+                <MudTabs Elevation="0" Rounded="false" PanelClass="pt-2">
+                    <MudTabPanel Text="Linux (agent.sh)"><CodePreview Text="@_agentScript" Lines="12" /></MudTabPanel>
+                    <MudTabPanel Text="Windows (agent.ps1)"><CodePreview Text="@(_windowsAgentScript ?? string.Empty)" Lines="12" /></MudTabPanel>
+                </MudTabs>
             </MudPaper>
         }
     </MudItem>
@@ -87,10 +122,12 @@
     private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
     private List<DeploymentTarget> _targets = [];
     private CreatedDeploymentTarget? _createdToken;
-    private string? _editingId, _deleteId, _rotateId, _agentScript, _agentTargetName;
+    private string? _editingId, _deleteId, _rotateId, _agentScript, _windowsAgentScript, _agentTargetName;
     private string _name = "", _certificateId = "", _host = "", _webhookUrl = "";
     private int _port = 443;
-    private bool _busy;
+    private bool _busy, _sshSetupOpen;
+    private string? _disablePushId;
+    private DeploymentTarget? _sshTarget;
 
     private string BaseUrl => Navigation.BaseUri.TrimEnd('/');
 
@@ -168,6 +205,7 @@
         {
             using var client = Client();
             _agentScript = await client.GetStringAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/agent");
+            _windowsAgentScript = await client.GetStringAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/agent?platform=windows");
             _agentTargetName = target.Name;
         }
         catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
@@ -205,6 +243,71 @@
         }
         catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
         finally { _busy = false; }
+    }
+
+    private async Task PushAsync(DeploymentTarget target)
+    {
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/push", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            var result = await response.Content.ReadFromJsonAsync<DeploymentPushResult>(_json);
+            Snackbar.Add(PushLabel(result), result?.Status == DeploymentPushResult.Failed ? Severity.Error : Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task DisablePushAsync(DeploymentTarget target)
+    {
+        if (_disablePushId != target.Id) { _disablePushId = target.Id; Snackbar.Add(Text["DeploymentPushDisableHint"], Severity.Info); return; }
+        _disablePushId = null;
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.DeleteAsync($"api/v1/deployment-targets/{Uri.EscapeDataString(target.Id)}/push");
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            await LoadAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private string PushLabel(DeploymentPushResult? push) => push?.Status switch
+    {
+        null => Text["DeploymentPushActive"],
+        DeploymentPushResult.Ok => Text["DeploymentPushOk", Date(push.PushedAt)],
+        DeploymentPushResult.Busy => Text["DeploymentPushBusy", Date(push.PushedAt)],
+        _ => Text["DeploymentPushFailed", Date(push.PushedAt)]
+    };
+
+    private static Color PushColor(DeploymentPushResult? push) => push?.Status switch
+    {
+        DeploymentPushResult.Failed => Color.Error,
+        DeploymentPushResult.Busy => Color.Warning,
+        _ => Color.Success
+    };
+
+    private void OpenSshSetup(DeploymentTarget? target)
+    {
+        _sshTarget = target;
+        _sshSetupOpen = true;
+    }
+
+    private void CloseSshSetup()
+    {
+        _sshSetupOpen = false;
+        _sshTarget = null;
+    }
+
+    private async Task SshSetupChangedAsync()
+    {
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
     }
 
     private string CertificateName(string id) => Certificates.FirstOrDefault(entry => entry.Key == id).Value ?? id;

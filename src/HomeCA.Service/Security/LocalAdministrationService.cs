@@ -173,6 +173,9 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
         return _snapshot = new StateSnapshot(administrator, sessions);
     }
 
+    /// <summary>Appends an audit event for actions outside administrator sign-in, such as a guided SSH setup.</summary>
+    public Task RecordAuditAsync(string action, string subject, CancellationToken cancellationToken) => AuditAsync(action, subject, cancellationToken);
+
     private async Task AuditAsync(string action, string subject, CancellationToken cancellationToken)
     {
         var entry = JsonSerializer.Serialize(new { occurredAt = DateTimeOffset.UtcNow, action, subject });

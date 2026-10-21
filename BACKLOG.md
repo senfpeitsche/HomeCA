@@ -19,8 +19,9 @@ Folgende Punkte sind bewusst nicht Teil des einfachen ersten Betriebsmodus.
 
 ## Verteilung
 
-- Aktives Ausrollen per SSH oder über Hersteller-APIs (Proxmox, OPNsense, Synology); dafür müsste HomeCA Zugangsdaten zu Zielsystemen speichern.
-- Agent für Windows (PowerShell) analog zum Shell-Agenten.
+- Push für Geräte ohne root-Anmeldung über einen eingeschränkten sudo-Eintrag; Rotation des Push-Schlüssels.
+- Ausrollen über Hersteller-APIs (Proxmox, OPNsense, Synology); dafür müsste HomeCA API-Tokens zu Zielsystemen speichern.
+- Einrichtung direkt über WinRM (HTTPS-Listener oder Kerberos) und Push auf Windows-Ziele.
 - Signierte Apple-Konfigurationsprofile.
 
 ## Distribution und Dokumentation

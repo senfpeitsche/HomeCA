@@ -1047,4 +1047,101 @@
   <data name="BackupScheduleLastError" xml:space="preserve"><value>Letztes geplantes Backup fehlgeschlagen: {0}</value></data>
   <data name="BackupScheduleLastSuccess" xml:space="preserve"><value>Letztes geplantes Backup {0}: {1}</value></data>
   <data name="BackupScheduleRunNow" xml:space="preserve"><value>Jetzt ausführen</value></data>
+  <data name="SshSetupTeaserTitle" xml:space="preserve"><value>Gerät per SSH einrichten</value></data>
+  <data name="SshSetupTeaser" xml:space="preserve"><value>HomeCA verbindet sich einmalig, erkennt die Dienste, installiert den Agenten und sichert jede Datei, die es ändert. Zugangsdaten werden nicht gespeichert.</value></data>
+  <data name="SshSetupStart" xml:space="preserve"><value>Per SSH einrichten</value></data>
+  <data name="SshSetupRun" xml:space="preserve"><value>Per SSH einrichten</value></data>
+  <data name="SshSetupLast" xml:space="preserve"><value>SSH-Einrichtung {0} am {1}, Exit-Code {2}</value></data>
+  <data name="SshSetupTitle" xml:space="preserve"><value>Gerät per SSH einrichten</value></data>
+  <data name="SshSetupTitleExisting" xml:space="preserve"><value>„{0}“ erneut per SSH einrichten</value></data>
+  <data name="SshSetupDescription" xml:space="preserve"><value>HomeCA meldet sich einmalig an, liest das System zuerst nur aus und installiert dann den normalen Agenten. Passwort, Schlüssel und Token werden nur für diese Anfrage verwendet und nie gespeichert.</value></data>
+  <data name="SshSetupConnect" xml:space="preserve"><value>Verbinden</value></data>
+  <data name="SshHost" xml:space="preserve"><value>Hostname oder IP-Adresse</value></data>
+  <data name="SshPort" xml:space="preserve"><value>SSH-Port</value></data>
+  <data name="SshUser" xml:space="preserve"><value>Benutzer</value></data>
+  <data name="SshUserHelper" xml:space="preserve"><value>root oder ein Benutzer mit sudo-Rechten</value></data>
+  <data name="SshAuthPassword" xml:space="preserve"><value>Passwort</value></data>
+  <data name="SshAuthKey" xml:space="preserve"><value>Privater Schlüssel</value></data>
+  <data name="SshPassword" xml:space="preserve"><value>SSH-Passwort</value></data>
+  <data name="SshPrivateKey" xml:space="preserve"><value>Privater Schlüssel (OpenSSH oder PEM)</value></data>
+  <data name="SshPrivateKeyHelper" xml:space="preserve"><value>Inhalt der Schlüsseldatei einfügen, z. B. ~/.ssh/id_ed25519.</value></data>
+  <data name="SshPassphrase" xml:space="preserve"><value>Passphrase des Schlüssels (optional)</value></data>
+  <data name="SshSudoPassword" xml:space="preserve"><value>sudo-Passwort (optional)</value></data>
+  <data name="SshSudoPasswordHelper" xml:space="preserve"><value>Nur nötig, wenn es vom SSH-Passwort abweicht oder du dich mit einem Schlüssel anmeldest.</value></data>
+  <data name="SshDetect" xml:space="preserve"><value>Verbinden und erkennen</value></data>
+  <data name="SshConnecting" xml:space="preserve"><value>Verbinde…</value></data>
+  <data name="SshSetupRequiredFields" xml:space="preserve"><value>Host und Benutzer eingeben.</value></data>
+  <data name="SshHostKeyUnknown" xml:space="preserve"><value>Erste Verbindung: Host-Key bestätigen</value></data>
+  <data name="SshHostKeyChanged" xml:space="preserve"><value>Warnung: Der Host-Key hat sich geändert</value></data>
+  <data name="SshHostKeyExpected" xml:space="preserve"><value>Früher bestätigt: {0}. Wurde das Gerät nicht neu installiert, könnte jemand die Verbindung abfangen.</value></data>
+  <data name="SshHostKeyCompare" xml:space="preserve"><value>Vergleiche ihn mit der Ausgabe dieses Befehls an der Konsole des Geräts:</value></data>
+  <data name="SshHostKeyReplace" xml:space="preserve"><value>Ich habe das Gerät neu installiert und übernehme den neuen Host-Key</value></data>
+  <data name="SshHostKeyConfirm" xml:space="preserve"><value>Fingerprint stimmt, weiter</value></data>
+  <data name="SshDetected" xml:space="preserve"><value>Erkanntes System</value></data>
+  <data name="SshFactSystem" xml:space="preserve"><value>System</value></data>
+  <data name="SshFactNames" xml:space="preserve"><value>Namen</value></data>
+  <data name="SshFactAddresses" xml:space="preserve"><value>Adressen</value></data>
+  <data name="SshFactServices" xml:space="preserve"><value>Dienste</value></data>
+  <data name="SshFactPrivileges" xml:space="preserve"><value>Rechte</value></data>
+  <data name="SshFactScheduler" xml:space="preserve"><value>Zeitsteuerung</value></data>
+  <data name="SshNoServices" xml:space="preserve"><value>Kein bekannter Dienst gefunden</value></data>
+  <data name="SshPrivilegeRoot" xml:space="preserve"><value>Als root angemeldet</value></data>
+  <data name="SshPrivilegeSudo" xml:space="preserve"><value>sudo ohne Passwort</value></data>
+  <data name="SshPrivilegeSudoPassword" xml:space="preserve"><value>sudo mit Passwort</value></data>
+  <data name="SshPrivilegeNone" xml:space="preserve"><value>Keine root-Rechte</value></data>
+  <data name="SshSchedulerSystemd" xml:space="preserve"><value>systemd-Timer</value></data>
+  <data name="SshSchedulerCron" xml:space="preserve"><value>cron (/etc/cron.d)</value></data>
+  <data name="SshSchedulerNone" xml:space="preserve"><value>Keine gefunden</value></data>
+  <data name="SshWarningCurl" xml:space="preserve"><value>Auf dem Gerät fehlt curl. Installiere es vor der Einrichtung.</value></data>
+  <data name="SshWarningRoot" xml:space="preserve"><value>Der Benutzer ist nicht root und sudo ist nicht verfügbar.</value></data>
+  <data name="SshWarningScheduler" xml:space="preserve"><value>Weder systemd noch /etc/cron.d gefunden. Der Agent wird installiert, muss aber selbst regelmäßig gestartet werden.</value></data>
+  <data name="SshChooseCertificate" xml:space="preserve"><value>Zertifikat wählen</value></data>
+  <data name="SshNoMatchingCertificate" xml:space="preserve"><value>Kein vorhandenes Zertifikat passt zu diesem Gerät. Stelle jetzt eines mit vorgeschlagenem Profil und Namen aus.</value></data>
+  <data name="SshIssueNamesHelper" xml:space="preserve"><value>Vom Gerät erkannt; mehrere Namen mit Komma trennen.</value></data>
+  <data name="SshIssueNamesRequired" xml:space="preserve"><value>Mindestens einen DNS-Namen oder eine IP-Adresse eingeben.</value></data>
+  <data name="SshIssueCertificate" xml:space="preserve"><value>Zertifikat ausstellen</value></data>
+  <data name="SshSetupCertificateIssued" xml:space="preserve"><value>Zertifikat ausgestellt und ausgewählt.</value></data>
+  <data name="SshProfileWithoutShellScript" xml:space="preserve"><value>Das vorgeschlagene Profil hat kein Shell-Skript für dieses Gerät. Der Agent holt die Dateien, die Installation schließt du selbst ab.</value></data>
+  <data name="SshHomeCaUrl" xml:space="preserve"><value>HomeCA-URL aus Sicht des Geräts</value></data>
+  <data name="SshHomeCaUrlHelper" xml:space="preserve"><value>Unter dieser Adresse holt der Agent erneuerte Zertifikate ab.</value></data>
+  <data name="SshHomeCaUrlLocal" xml:space="preserve"><value>localhost funktioniert nur auf diesem Rechner. Gib die Adresse ein, die das Gerät verwendet.</value></data>
+  <data name="SshInstallRootCa" xml:space="preserve"><value>HomeCA-Root-CA in den Systemspeicher des Geräts aufnehmen</value></data>
+  <data name="SshInstallRootCaHelper" xml:space="preserve"><value>Damit vertrauen Programme auf dem Gerät HomeCA-Zertifikaten. Der Agent funktioniert auch ohne.</value></data>
+  <data name="SshInstallRootCaUnavailable" xml:space="preserve"><value>Kein unterstützter Vertrauensspeicher gefunden; der Agent nutzt eine eigene Kopie der Root-CA.</value></data>
+  <data name="SshBackupNotice" xml:space="preserve"><value>Vor jeder Änderung sichert HomeCA die betroffenen Dateien auf dem Gerät unter /var/backups/homeca/. Jedes Backup enthält restore.sh, das den vorherigen Zustand wiederherstellt.</value></data>
+  <data name="SshInstall" xml:space="preserve"><value>Agent installieren</value></data>
+  <data name="SshInstalling" xml:space="preserve"><value>Installiere…</value></data>
+  <data name="SshChangeConnection" xml:space="preserve"><value>Verbindung ändern</value></data>
+  <data name="SshInstallSucceeded" xml:space="preserve"><value>Das Gerät ist eingerichtet. Der Agent hat das Zertifikat abgeholt und prüft ab jetzt stündlich auf Erneuerungen.</value></data>
+  <data name="SshProbeResult" xml:space="preserve"><value>TLS-Prüfung: {0}</value></data>
+  <data name="SshOutput" xml:space="preserve"><value>Ausgabe</value></data>
+  <data name="SshRestoreHint" xml:space="preserve"><value>Um eine Änderung rückgängig zu machen, führe restore.sh im genannten Backup-Verzeichnis als root aus, das neueste Backup zuerst.</value></data>
+  <data name="SshTryAgain" xml:space="preserve"><value>Erneut versuchen</value></data>
+  <data name="SshUnexpectedResponse" xml:space="preserve"><value>Unerwartete Antwort von HomeCA.</value></data>
+  <data name="SshStatusAuthentication" xml:space="preserve"><value>Das Gerät hat Benutzername oder Zugangsdaten abgelehnt.</value></data>
+  <data name="SshStatusUnreachable" xml:space="preserve"><value>Keine SSH-Verbindung zum Gerät.</value></data>
+  <data name="SshStatusSudo" xml:space="preserve"><value>sudo hat das Passwort abgelehnt.</value></data>
+  <data name="SshStatusKey" xml:space="preserve"><value>Der private Schlüssel konnte nicht gelesen werden.</value></data>
+  <data name="SshStatusFailed" xml:space="preserve"><value>Die Einrichtung ist fehlgeschlagen.</value></data>
+  <data name="SshEnablePush" xml:space="preserve"><value>Erneuerungen sofort verteilen (empfohlen)</value></data>
+  <data name="SshEnablePushHelper" xml:space="preserve"><value>Trägt einen HomeCA-Schlüssel in authorized_keys von root ein, der nur diesen Agenten starten kann: keine Shell, keine Weiterleitung. Setzt root-Anmeldung per Schlüssel voraus. Der stündliche Timer bleibt als Rückfallweg.</value></data>
+  <data name="SshPushTestOk" xml:space="preserve"><value>Push funktioniert: HomeCA hat den Agenten mit seinem eingeschränkten Schlüssel gestartet.</value></data>
+  <data name="SshPushTestFailed" xml:space="preserve"><value>Push ist nicht verfügbar, es bleibt beim stündlichen Timer: {0}</value></data>
+  <data name="DeploymentPushNow" xml:space="preserve"><value>Jetzt verteilen</value></data>
+  <data name="DeploymentPushDisable" xml:space="preserve"><value>Push abschalten</value></data>
+  <data name="DeploymentPushConfirmDisable" xml:space="preserve"><value>Abschalten bestätigen</value></data>
+  <data name="DeploymentPushDisableHint" xml:space="preserve"><value>HomeCA verteilt nicht mehr per Push; der Schlüssel bleibt auf dem Gerät, bis du restore.sh ausführst oder ohne Push neu einrichtest. Zum Bestätigen erneut klicken.</value></data>
+  <data name="DeploymentPushActive" xml:space="preserve"><value>Push aktiv</value></data>
+  <data name="DeploymentPushOk" xml:space="preserve"><value>Push OK {0}</value></data>
+  <data name="DeploymentPushBusy" xml:space="preserve"><value>Push {0}: Agent lief bereits</value></data>
+  <data name="DeploymentPushFailed" xml:space="preserve"><value>Push fehlgeschlagen {0}</value></data>
+  <data name="NotificationEventLabelDeploymentPushFailed" xml:space="preserve"><value>Push fehlgeschlagen</value></data>
+  <data name="NotificationDeploymentPushFailedTitle" xml:space="preserve"><value>HomeCA: Push auf Gerät fehlgeschlagen</value></data>
+  <data name="NotificationDeploymentPushFailedMessage" xml:space="preserve"><value>Verteilungsziel „{0}“: {1}. Der stündliche Timer auf dem Gerät holt das Zertifikat trotzdem ab.</value></data>
+  <data name="DeploymentInstallHintWindows" xml:space="preserve"><value>In einer PowerShell mit Administratorrechten auf dem Gerät ausführen, lokal oder in einer eigenen Remoting-Sitzung (Enter-PSSession über WinRM). Der Agent läuft stündlich als geplante Aufgabe unter SYSTEM. Vertraut Windows dem TLS-Zertifikat von HomeCA noch nicht, installiere zuerst die Root-CA über die Trust-Seite.</value></data>
+  <data name="SshWindowsNotice" xml:space="preserve"><value>Windows: HomeCA installiert den PowerShell-Agenten als stündliche geplante Aufgabe unter SYSTEM. Push gibt es für Windows nicht.</value></data>
+  <data name="SshSchedulerTaskScheduler" xml:space="preserve"><value>Windows-Aufgabenplanung</value></data>
+  <data name="SshPrivilegeAdministrator" xml:space="preserve"><value>Administrator</value></data>
+  <data name="SshBackupNoticeWindows" xml:space="preserve"><value>Vor jeder Änderung sichert HomeCA die betroffenen Dateien, die geplante Aufgabe, Einträge im Zertifikatsspeicher und IIS-Bindungen auf dem Gerät unter %ProgramData%\HomeCA\Backups\. Jedes Backup enthält restore.ps1, das den vorherigen Zustand wiederherstellt.</value></data>
+  <data name="SshRestoreHintWindows" xml:space="preserve"><value>Um eine Änderung rückgängig zu machen, führe restore.ps1 im genannten Backup-Verzeichnis in einer PowerShell mit Administratorrechten aus, das neueste Backup zuerst.</value></data>
 </root>

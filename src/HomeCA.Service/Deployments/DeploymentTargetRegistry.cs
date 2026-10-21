@@ -148,6 +148,21 @@ public sealed class DeploymentTargetRegistry(HomeCaStorage storage, ILogger<Depl
     public Task RecordProbeAsync(string id, DeploymentProbeResult result, CancellationToken ct) =>
         UpdateStoredAsync(id, target => target with { LastProbe = result }, ct);
 
+    /// <summary>Remembers where and with which confirmed host key the guided SSH setup ran; never any credential.</summary>
+    public Task RecordSshSetupAsync(string id, SshSetupInfo info, CancellationToken ct) =>
+        UpdateStoredAsync(id, target => target with { Ssh = info }, ct);
+
+    public Task RecordPushAsync(string id, DeploymentPushResult result, CancellationToken ct) =>
+        UpdateStoredAsync(id, target => target.Ssh is null ? target : target with { Ssh = target.Ssh with { LastPush = result } }, ct);
+
+    /// <summary>Stops pushing to a target; the timer on the device keeps fetching renewals.</summary>
+    public async Task<bool> DisablePushAsync(string id, CancellationToken ct)
+    {
+        var found = false;
+        await UpdateStoredAsync(id, target => { found = true; return target.Ssh is null ? target : target with { Ssh = target.Ssh with { PushEnabled = false } }; }, ct);
+        return found;
+    }
+
     private async Task UpdateStoredAsync(string id, Func<StoredDeploymentTarget, StoredDeploymentTarget> update, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
@@ -196,17 +211,32 @@ public sealed class DeploymentTargetRegistry(HomeCaStorage storage, ILogger<Depl
 
     private sealed record StoredDeploymentTarget(
         string Id, string Name, string CertificateId, string TokenHash, string? Host, int Port, string? WebhookUrl, DateTimeOffset CreatedAt,
-        DateTimeOffset? LastCheckInAt = null, string? LastDownloadedFingerprint = null, DateTimeOffset? LastDownloadedAt = null, DeploymentProbeResult? LastProbe = null)
+        DateTimeOffset? LastCheckInAt = null, string? LastDownloadedFingerprint = null, DateTimeOffset? LastDownloadedAt = null, DeploymentProbeResult? LastProbe = null,
+        SshSetupInfo? Ssh = null)
     {
-        public DeploymentTarget ToPublic() => new(Id, Name, CertificateId, Host, Port, WebhookUrl, CreatedAt, LastCheckInAt, LastDownloadedFingerprint, LastDownloadedAt, LastProbe);
+        public DeploymentTarget ToPublic() => new(Id, Name, CertificateId, Host, Port, WebhookUrl, CreatedAt, LastCheckInAt, LastDownloadedFingerprint, LastDownloadedAt, LastProbe, Ssh);
     }
 }
 
 public sealed record SaveDeploymentTargetRequest(string Name, string CertificateId, string? Host = null, int Port = 443, string? WebhookUrl = null);
 public sealed record DeploymentTarget(
     string Id, string Name, string CertificateId, string? Host, int Port, string? WebhookUrl, DateTimeOffset CreatedAt,
-    DateTimeOffset? LastCheckInAt, string? LastDownloadedFingerprint, DateTimeOffset? LastDownloadedAt, DeploymentProbeResult? LastProbe);
+    DateTimeOffset? LastCheckInAt, string? LastDownloadedFingerprint, DateTimeOffset? LastDownloadedAt, DeploymentProbeResult? LastProbe,
+    SshSetupInfo? Ssh = null);
 public sealed record CreatedDeploymentTarget(DeploymentTarget Target, string Token);
+
+/// <summary>Connection details of the last guided SSH setup: no password, key or token, only the confirmed host key.</summary>
+public sealed record SshSetupInfo(string Host, int Port, string UserName, string HostKeyAlgorithm, string HostKeyFingerprint, DateTimeOffset LastSetupAt, int LastExitCode,
+    bool PushEnabled = false, DeploymentPushResult? LastPush = null);
+
+/// <summary>Result of starting the agent over SSH with HomeCA's push key.</summary>
+public sealed record DeploymentPushResult(DateTimeOffset PushedAt, string Status, int? ExitCode = null, string? Output = null)
+{
+    public const string Ok = "ok";
+    /// <summary>Another agent run (usually the timer) was in progress; it installs the certificate itself.</summary>
+    public const string Busy = "busy";
+    public const string Failed = "failed";
+}
 
 /// <summary>Result of connecting to a target and comparing the served certificate with the current one.</summary>
 public sealed record DeploymentProbeResult(DateTimeOffset CheckedAt, string Status, string? ServedFingerprint = null, DateTime? ServedNotAfter = null, string? Error = null)

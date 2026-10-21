@@ -24,6 +24,11 @@ In the simple mode, the root and issuing CA remain online in the protected HomeC
 
 ## Deployment tokens, trust page and outbound connections
 
+- The SSH setup uses password, key and sudo password only for the duration of the request; they are neither stored nor logged, and output is cleaned of them and of the target token. Only the confirmed host key is stored. Without a confirmed host key, or when it differs, HomeCA stops before signing in, so an attacker on the network cannot capture credentials or the private key. Compare the fingerprint on first contact through the device console.
+- Anyone who operates the administration interface can, with valid SSH credentials, run commands as root on the device. Every detection and setup is recorded in the audit log with user, host and host key.
+- The push key allows root logins on set-up devices, but through a forced command only starts the agent, without a terminal or forwarding. Whoever takes over HomeCA can trigger agent runs with it but cannot run commands. The private key exists only encrypted in the data directory and the backup.
+- The PFX for Windows agents is protected with the target token; whoever holds the token can fetch the key anyway. Token, agent and backups live under `%ProgramData%\HomeCA` with access for SYSTEM, Administrators and the account that set it up only.
+- Backups under `/var/backups/homeca/` contain earlier keys and tokens and are readable by root only (`700`).
 - A deployment-target token can fetch that target's private key. It is stored only as a SHA-256 hash, valid for one target and rotatable; treat the token file on the device like the key.
 - `/trust` and the trust-anchor endpoints stay on plain HTTP by design. Anyone in the path can swap the downloaded root, which is why every page and guide asks to compare the fingerprint through a second channel.
 - HomeCA opens outbound connections to configured webhook and notification URLs and to deployment-target hosts for the TLS check. Only administrators configure these addresses; payloads contain no secrets.

@@ -31,6 +31,8 @@ HomeCA is designed for people who run Proxmox, OPNsense, UniFi, HAProxy, IIS, Sy
 - CRL generation and HTTP distribution with CDP extension in issued certificates
 - Automatic renewal, on by default for new certificates, plus **Renew now**
 - Deployment targets: an agent on the device fetches renewed certificates with its own token, optional webhook, and a TLS check that shows whether the device serves the current certificate
+- Setup over SSH: HomeCA connects once with a confirmed host key, detects the services, suggests profile and names, installs the agent and backs up every file it changes on the device (with `restore.sh`); credentials are never stored; optional push with a restricted key starts the agent right after each renewal
+- Windows: PowerShell agent as a scheduled task, setup over OpenSSH or with copy-paste PowerShell commands, IIS rebinding and `restore.ps1` backups
 - Public trust page `/trust` with OS detection, Apple configuration profile and QR code
 - Name constraints for intermediate CAs, enforced at issuance
 - CSR signing for devices that create their own key
@@ -157,6 +159,8 @@ Key public (unauthenticated) endpoints:
 - `GET /trust` — Trust onboarding page for devices
 - `GET /api/v1/trust-anchor/mobileconfig` — Apple configuration profile with the Root CA
 - `GET /api/v1/deploy/{id}/…` — Agent endpoints, authenticated with the deployment target's own token
+- `POST /api/v1/deployment-targets/{id}/push`, `DELETE /api/v1/deployment-targets/{id}/push` — Push now, turn off push
+- `POST /api/v1/ssh-setup/detect`, `POST /api/v1/ssh-setup/install` — Guided setup over SSH (administrator token; credentials only in the request)
 
 All management endpoints require a Bearer token obtained via `POST /api/v1/login`.
 
