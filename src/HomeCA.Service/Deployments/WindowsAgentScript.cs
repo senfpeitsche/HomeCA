@@ -26,7 +26,21 @@ public static class WindowsAgentScript
     /// standard input as UTF-8, runs it from a temporary file in the user's profile and returns its exit code. The
     /// bootstrap is passed encoded, because cmd limits command lines to 8191 characters and the script is longer.
     /// </summary>
-    public static readonly string PowerShellCommand = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand "
+    /// <summary>
+    /// Runs a script that was uploaded over SFTP, whether the default shell is cmd or PowerShell, and returns its exit code.
+    /// Large scripts take this way, because Windows OpenSSH can stall while it passes a long standard input to PowerShell.
+    /// </summary>
+    public static string FileCommand(string path) => "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand "
+        + Convert.ToBase64String(Encoding.Unicode.GetBytes($$"""
+            $ProgressPreference = 'SilentlyContinue'
+            [Console]::OutputEncoding = [Text.Encoding]::UTF8
+            $code = 1
+            try { & '{{path.Replace("'", "''")}}'; $code = $LASTEXITCODE } catch { [Console]::Error.WriteLine($_.Exception.Message) }
+            if ($null -eq $code) { $code = 0 }
+            exit $code
+            """.Replace("\r\n", "\n")));
+
+    public static readonly string PowerShellCommand ="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand "
         + Convert.ToBase64String(Encoding.Unicode.GetBytes("""
             $ProgressPreference = 'SilentlyContinue'
             [Console]::OutputEncoding = [Text.Encoding]::UTF8

@@ -122,7 +122,20 @@ public sealed class SshSetupService(
                     request.InstallRootCa, Random.Shared.Next(0, 60), enablePush ? await pushKeys.GetPublicKeyAsync(ct) : null);
             targetId = target.Id;
             Report($"homeca: running the setup script on the device (up to {SetupTimeout.TotalMinutes:0} minutes)");
-            var result = await session.RunAsync(command, prefix + script, SetupTimeout, Report, ct);
+            // On Windows the script goes over SFTP and runs as a file; standard input remains the fallback without SFTP.
+            var uploaded = facts.IsWindows ? await session.UploadWindowsFileAsync($".homeca-setup-{Guid.NewGuid():N}.ps1", script, ct) : null;
+            SshCommandResult result;
+            if (uploaded is not null)
+            {
+                Report($"homeca: setup script uploaded over SFTP to {uploaded}");
+                try { result = await session.RunAsync(WindowsAgentScript.FileCommand(uploaded), null, SetupTimeout, Report, ct); }
+                finally { await session.DeleteWindowsFileAsync(uploaded, CancellationToken.None); }
+            }
+            else
+            {
+                if (facts.IsWindows) Report("homeca: SFTP is not available; sending the setup script over standard input");
+                result = await session.RunAsync(command, prefix + script, SetupTimeout, Report, ct);
+            }
             Report($"homeca: setup script finished with exit code {result.ExitCode}");
             var output = Clean(Combine(result.Output, result.Error), connection, token);
 

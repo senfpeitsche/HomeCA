@@ -51,6 +51,15 @@ public interface ISshSession : IDisposable
     /// <summary>Like <see cref="RunAsync(string, string?, TimeSpan, CancellationToken)"/>, and reports every output line as it arrives.</summary>
     Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, Action<string>? onOutput, CancellationToken ct) =>
         RunAsync(command, input, timeout, ct);
+
+    /// <summary>
+    /// Writes <paramref name="content"/> as UTF-8 with BOM to <paramref name="fileName"/> in the user's home directory over
+    /// SFTP and returns the local path on a Windows device, or null when the server offers no SFTP.
+    /// </summary>
+    Task<string?> UploadWindowsFileAsync(string fileName, string content, CancellationToken ct) => Task.FromResult<string?>(null);
+
+    /// <summary>Deletes a file written by <see cref="UploadWindowsFileAsync"/>; failures are ignored.</summary>
+    Task DeleteWindowsFileAsync(string path, CancellationToken ct) => Task.CompletedTask;
 }
 
 public interface ISshClientFactory
@@ -123,7 +132,7 @@ public sealed class SshNetClientFactory : ISshClientFactory
                     _ => ex
                 };
             }
-            return new SshNetSession(client, presented!, keyFile);
+            return new SshNetSession(client, info, presented!, keyFile);
         }
         catch
         {
@@ -132,9 +141,49 @@ public sealed class SshNetClientFactory : ISshClientFactory
         }
     }
 
-    private sealed class SshNetSession(SshClient client, SshHostKey hostKey, PrivateKeyFile? keyFile) : ISshSession
+    private sealed class SshNetSession(SshClient client, Renci.SshNet.ConnectionInfo info, SshHostKey hostKey, PrivateKeyFile? keyFile) : ISshSession
     {
         public SshHostKey HostKey { get; } = hostKey;
+        private SftpClient? _sftp;
+
+        public async Task<string?> UploadWindowsFileAsync(string fileName, string content, CancellationToken ct)
+        {
+            try
+            {
+                var sftp = await SftpAsync(ct);
+                var remote = sftp.WorkingDirectory.TrimEnd('/') + "/" + fileName;
+                using var stream = new MemoryStream(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(content)).ToArray());
+                await sftp.UploadFileAsync(stream, remote, ct);
+                // Windows OpenSSH reports paths as /C:/Users/name; PowerShell needs C:\Users\name.
+                return remote.Length > 3 && remote[0] == '/' && remote[2] == ':' ? remote[1..].Replace('/', '\\') : null;
+            }
+            catch (Exception ex) when (ex is SshException or SocketException or IOException or InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        public async Task DeleteWindowsFileAsync(string path, CancellationToken ct)
+        {
+            try
+            {
+                if (_sftp is null) return;
+                await _sftp.DeleteFileAsync("/" + path.Replace('\\', '/'), ct);
+            }
+            catch (Exception ex) when (ex is SshException or SocketException or IOException or InvalidOperationException) { }
+        }
+
+        // A second connection over the same authentication methods; it must present the host key confirmed for the session.
+        private async Task<SftpClient> SftpAsync(CancellationToken ct)
+        {
+            if (_sftp is { IsConnected: true }) return _sftp;
+            var sftp = new SftpClient(info);
+            sftp.HostKeyReceived += (_, e) => e.CanTrust = string.Equals("SHA256:" + e.FingerPrintSHA256, HostKey.Fingerprint, StringComparison.Ordinal);
+            try { await sftp.ConnectAsync(ct); }
+            catch { sftp.Dispose(); throw; }
+            _sftp = sftp;
+            return sftp;
+        }
 
         public Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, CancellationToken ct) =>
             RunAsync(command, input, timeout, null, ct);
@@ -194,6 +243,8 @@ public sealed class SshNetClientFactory : ISshClientFactory
 
         public void Dispose()
         {
+            if (_sftp is { IsConnected: true }) _sftp.Disconnect();
+            _sftp?.Dispose();
             if (client.IsConnected) client.Disconnect();
             client.Dispose();
             keyFile?.Dispose();

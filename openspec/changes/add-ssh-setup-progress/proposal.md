@@ -10,6 +10,7 @@ Eine Windows-Einrichtung endete nach zehn Minuten nur mit „The command did not
 - **Timeout mit Ausgabe:** Endet ein Befehl nicht rechtzeitig, liefert HomeCA die bis dahin gelesene Ausgabe mit der Meldung zurück.
 - **Dienstprotokoll:** Jede Zeile steht auch im Protokoll des HomeCA-Dienstes. Kennwörter, Schlüssel und Token werden vorher entfernt.
 - **Protokolle auf Windows:** Einrichtung und Agent schreiben nach `%ProgramData%\HomeCA\Logs` (`setup-<id>-<Zeitstempel>.log`, `agent-<id>.log` mit Ablösung ab 1 MB). Schritte tragen eine Uhrzeit; die Ausgabe von `install.ps1` und Fehlermeldungen landen im Protokoll.
+- **SFTP statt Standardeingabe auf Windows:** Das rund 19 KB große Einrichtungsskript kam per Standardeingabe nie vollständig bei PowerShell an. HomeCA lädt es per SFTP ins Benutzerprofil, startet es als Datei und löscht es danach.
 
 ## Nicht im Umfang
 

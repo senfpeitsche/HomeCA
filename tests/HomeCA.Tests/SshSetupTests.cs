@@ -437,6 +437,25 @@ public sealed class SshSetupTests : IDisposable
         Assert.Equal(DeploymentPushResult.Failed, (await targets.GetAsync(target.Id, CancellationToken.None))!.Ssh!.LastPush!.Status);
     }
 
+    [Fact]
+    public async Task Windows_setup_script_is_uploaded_over_sftp_and_removed_afterwards()
+    {
+        var (service, _, ssh, certificateId) = await CreateServiceAsync();
+        ssh.Platform = "windows";
+        ssh.SftpAvailable = true;
+        var progressId = Guid.NewGuid().ToString("N");
+
+        var result = await service.InstallAsync(InstallRequest(certificateId) with { ProgressId = progressId }, "https://ca.lab.test", CancellationToken.None);
+
+        var uploaded = Assert.Single(ssh.Uploads);
+        Assert.Equal(SshSetupResult.Ok, result.Status);
+        Assert.StartsWith("C:\\Users\\admin\\.homeca-setup-", uploaded.Key);
+        Assert.Contains("HomeCA guided setup", uploaded.Value);
+        Assert.Equal([uploaded.Key], ssh.Deleted);
+        Assert.DoesNotContain(ssh.Commands, command => command.Input?.Contains("HomeCA guided setup", StringComparison.Ordinal) == true);
+        Assert.Contains(_progress.Get(progressId, 0).Lines, line => line.Contains("uploaded over SFTP", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("windows")]
     [InlineData("mingw")]
@@ -548,7 +567,8 @@ public sealed class SshSetupTests : IDisposable
             ["setup.ps1"] = WindowsAgentScript.RenderSetup("https://ca.lab.test", target, "token", agent, "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----", true, 5),
             ["detect.ps1"] = WindowsAgentScript.DetectionScript,
             ["install-commands.ps1"] = WindowsAgentScript.RenderInstallCommands("https://ca.lab.test", target, "token"),
-            ["bootstrap.ps1"] = System.Text.Encoding.Unicode.GetString(Convert.FromBase64String(WindowsAgentScript.PowerShellCommand.Split(' ')[^1]))
+            ["bootstrap.ps1"] = System.Text.Encoding.Unicode.GetString(Convert.FromBase64String(WindowsAgentScript.PowerShellCommand.Split(' ')[^1])),
+            ["file-command.ps1"] = System.Text.Encoding.Unicode.GetString(Convert.FromBase64String(WindowsAgentScript.FileCommand("C:\\Users\\o'brien\\.homeca-setup-x.ps1").Split(' ')[^1]))
         };
         foreach (var profile in seed.Where(profile => ProfileScripts.Resolve(profile) == ProfileScripts.PowerShell))
             scripts[$"install-{profile.Id}.ps1"] = ProfileScripts.Render(profile, ProfileScripts.PowerShell);
@@ -684,6 +704,10 @@ public sealed class SshSetupTests : IDisposable
         public bool WindowsAdministrator { get; set; } = true;
         /// <summary>The setup script prints a line with the token and then hangs until the timeout.</summary>
         public bool SetupTimesOut { get; set; }
+        /// <summary>The device offers SFTP, so the Windows setup script is uploaded instead of sent over standard input.</summary>
+        public bool SftpAvailable { get; set; }
+        public Dictionary<string, string> Uploads { get; } = [];
+        public List<string> Deleted { get; } = [];
         public List<(string Command, string? Input)> Commands { get; } = [];
         public List<SshCredentials> PushConnections { get; } = [];
 
@@ -701,6 +725,20 @@ public sealed class SshSetupTests : IDisposable
         {
             public SshHostKey HostKey { get; } = hostKey;
 
+            public Task<string?> UploadWindowsFileAsync(string fileName, string content, CancellationToken ct)
+            {
+                if (!owner.SftpAvailable) return Task.FromResult<string?>(null);
+                var path = "C:\\Users\\admin\\" + fileName;
+                owner.Uploads[path] = content;
+                return Task.FromResult<string?>(path);
+            }
+
+            public Task DeleteWindowsFileAsync(string path, CancellationToken ct)
+            {
+                owner.Deleted.Add(path);
+                return Task.CompletedTask;
+            }
+
             public Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, CancellationToken ct)
             {
                 // The forced command on a real device runs the agent whatever HomeCA sends.
@@ -715,6 +753,8 @@ public sealed class SshSetupTests : IDisposable
                     if (command == "sh -s") return Task.FromResult(owner.Platform == "mingw"
                         ? new SshCommandResult(0, "kernel=MINGW64_NT-10.0-26100\nhostname=WIN01\n", "")
                         : new SshCommandResult(1, "", "'sh' is not recognized as an internal or external command"));
+                    if (owner.Uploads.Keys.FirstOrDefault(path => command == WindowsAgentScript.FileCommand(path)) is { } uploaded)
+                        return Task.FromResult(new SshCommandResult(0, "homeca-setup: done " + WindowsTokenFrom(owner.Uploads[uploaded]), ""));
                     if (command != WindowsAgentScript.PowerShellCommand) return Task.FromResult(new SshCommandResult(127, "", "unexpected command"));
                     if (input == WindowsAgentScript.DetectionScript)
                         return Task.FromResult(new SshCommandResult(0, $"platform=windows\nuser=WIN01\\admin\nuid={(owner.WindowsAdministrator ? 0 : 1000)}\nsudo={(owner.WindowsAdministrator ? "root" : "none")}\nhostname=WIN01\nfqdn=win01.lab.test\nos=Microsoft Windows Server 2022 Standard\nkernel=Windows\naddress=192.168.10.20\ntool=powershell\nscheduler=taskscheduler\ntruststore=windows\nservice=iis\nservice=rdp\n", ""));

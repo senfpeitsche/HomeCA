@@ -5,6 +5,7 @@
 - [x] SSH-Befehle lesen stdout und stderr zeilenweise mit; bei Timeout bleibt die Ausgabe erhalten.
 - [x] `SshSetupProgress` im Speicher, Abruf über `GET /api/v1/ssh-setup/progress/{id}`, IDs nur 32 Hex-Zeichen.
 - [x] Einrichtung meldet eigene Schritte und jede Zeile an Assistent und Dienstprotokoll, ohne Geheimnisse.
+- [x] Windows: Einrichtungsskript per SFTP hochladen und mit `-File` starten, weil Windows-OpenSSH lange Standardeingaben nicht vollständig an PowerShell weitergab; Standardeingabe bleibt Rückfallweg.
 
 ## 2. Oberfläche
 
