@@ -133,7 +133,8 @@ msg_info "Deploying verified HomeCA ${RESOLVED_TAG} …"
 rm -rf "${APP_DIR:?}"/*
 cp -a "$RELEASE_DIR/bundle/app/." "$APP_DIR/"
 chown -R root:root "$APP_DIR"
-chmod 0755 "$APP_DIR"
+# tar --no-same-permissions applies the caller's umask; the service user must read everything
+chmod -R u=rwX,go=rX "$APP_DIR"
 msg_ok "HomeCA ${RESOLVED_TAG} deployed"
 
 # ── Update systemd unit (in case it changed) ────────────────────────

@@ -110,8 +110,8 @@ msg_ok "Directories ready"
 # ── Backup encryption key ───────────────────────────────────────────
 if [[ ! -f "${CONFIG_DIR}/backup.key" ]]; then
   msg_info "Generating backup encryption key …"
-  umask 077
-  head -c 32 /dev/urandom > "${CONFIG_DIR}/backup.key"
+  # Subshell: a global umask 077 would make the extracted release unreadable for homeca
+  (umask 077 && head -c 32 /dev/urandom > "${CONFIG_DIR}/backup.key")
   chown homeca:homeca "${CONFIG_DIR}/backup.key"
   chmod 0600 "${CONFIG_DIR}/backup.key"
   msg_ok "Backup key generated — store a copy outside this container!"
@@ -122,8 +122,7 @@ fi
 # ── CA private-key protection key ────────────────────────────────────
 if [[ ! -f "${CONFIG_DIR}/ca.key" ]]; then
   msg_info "Generating CA private-key protection key …"
-  umask 077
-  head -c 32 /dev/urandom > "${CONFIG_DIR}/ca.key"
+  (umask 077 && head -c 32 /dev/urandom > "${CONFIG_DIR}/ca.key")
   chown homeca:homeca "${CONFIG_DIR}/ca.key"
   chmod 0600 "${CONFIG_DIR}/ca.key"
   msg_ok "CA key generated — store a copy outside this container!"
@@ -142,7 +141,8 @@ msg_info "Downloading and verifying HomeCA ${RESOLVED_TAG} …"
 download_and_verify_bundle "$RESOLVED_TAG" "$RELEASE_DIR"
 cp -a "$RELEASE_DIR/bundle/app/." "$APP_DIR/"
 chown -R root:root "$APP_DIR"
-chmod 0755 "$APP_DIR"
+# tar --no-same-permissions applies the caller's umask; the service user must read everything
+chmod -R u=rwX,go=rX "$APP_DIR"
 msg_ok "HomeCA ${RESOLVED_TAG} deployed to ${APP_DIR}"
 
 # ── TLS activation helper ──────────────────────────────────────────
