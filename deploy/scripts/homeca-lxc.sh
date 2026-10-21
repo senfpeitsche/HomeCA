@@ -74,16 +74,26 @@ msg_info "Using CT ID $CTID"
 
 # ── Download Debian 12 template if needed ───────────────────────────
 TEMPLATE_STORAGE="local"
-TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"
-TEMPLATE_PATH="/var/lib/vz/template/cache/${TEMPLATE}"
+TEMPLATE_PATTERN='debian-12-standard_[0-9.]+-[0-9]+_amd64\.tar\.zst'
 
-if [[ ! -f "$TEMPLATE_PATH" ]]; then
+# Prefer an already cached Debian 12 template (newest version wins)
+TEMPLATE=$(pveam list "$TEMPLATE_STORAGE" 2>/dev/null \
+  | grep -oP "${TEMPLATE_PATTERN}" | sort -V | tail -n1 || true)
+
+if [[ -z "$TEMPLATE" ]]; then
   msg_info "Downloading Debian 12 template …"
   pveam update >/dev/null
+  # Template versions rotate in the Proxmox index, so resolve the current one
+  TEMPLATE=$(pveam available --section system \
+    | grep -oP "${TEMPLATE_PATTERN}" | sort -V | tail -n1 || true)
+  if [[ -z "$TEMPLATE" ]]; then
+    msg_error "No Debian 12 template found in the Proxmox template index."
+    exit 1
+  fi
   pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null
-  msg_ok "Template downloaded"
+  msg_ok "Template ${TEMPLATE} downloaded"
 else
-  msg_ok "Debian 12 template already cached"
+  msg_ok "Debian 12 template ${TEMPLATE} already cached"
 fi
 
 # ── IP configuration ────────────────────────────────────────────────
