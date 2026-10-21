@@ -15,10 +15,12 @@ public sealed class DeploymentPackageService(TargetProfileRegistry profiles, ILo
 
         try
         {
-            var snapshot = new DeploymentProfileSnapshot(profile.Id, profile.Version, profile.DisplayName, profile.Documentation, profile.RenewalScriptTemplate, DateTimeOffset.UtcNow);
+            var scriptType = ProfileScripts.Resolve(profile);
+            var scriptFile = ProfileScripts.FileName(scriptType);
+            var snapshot = new DeploymentProfileSnapshot(profile.Id, profile.Version, profile.DisplayName, profile.Documentation, profile.RenewalScriptTemplate, DateTimeOffset.UtcNow, scriptType, scriptFile);
             await File.WriteAllTextAsync(Path.Combine(exportPath, "profile-snapshot.json"), JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true }), ct);
-            await File.WriteAllTextAsync(Path.Combine(exportPath, "README.md"), $"# Deployment package {certificateId}\n\n## Profile\n\n{profile.DisplayName} v{profile.Version}\n\n## Installation\n\n{profile.Documentation}\n\n## Dry run\n\nReview the files and run the target-specific script with its `-WhatIf` or dry-run option where supported. No remote action is performed by HomeCA.\n\n## Rollback\n\nKeep the previous certificate and key until the service has been restarted and verified. Restore those previous files and restart the target service if verification fails.\n", ct);
-            await File.WriteAllTextAsync(Path.Combine(exportPath, "install.ps1"), $"# Profile: {profile.Id} v{profile.Version}\n# Review this script before running it.\n{profile.RenewalScriptTemplate}\n", ct);
+            await File.WriteAllTextAsync(Path.Combine(exportPath, "README.md"), $"# Deployment package {certificateId}\n\n## Profile\n\n{profile.DisplayName} v{profile.Version}\n\n## Installation\n\n{profile.Documentation}\n\n## Script\n\n{ScriptInstructions(scriptType, scriptFile)}\n\n## Dry run\n\nReview the files and the script before running it, and use a `-WhatIf` or dry-run option where the target supports one. No remote action is performed by HomeCA.\n\n## Rollback\n\nKeep the previous certificate and key until the service has been restarted and verified. Restore those previous files and restart the target service if verification fails.\n", ct);
+            await File.WriteAllTextAsync(Path.Combine(exportPath, scriptFile), ProfileScripts.Render(profile, scriptType), ct);
             var files = Directory.EnumerateFiles(exportPath).Select(path => new { file = Path.GetFileName(path), sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant() });
             await File.WriteAllTextAsync(Path.Combine(exportPath, "checksums.json"), JsonSerializer.Serialize(files, new JsonSerializerOptions { WriteIndented = true }), ct);
             logger.LogInformation("Created deployment package for certificate {CertificateId} with profile {ProfileId}", certificateId, profile.Id);
@@ -29,6 +31,13 @@ public sealed class DeploymentPackageService(TargetProfileRegistry profiles, ILo
             throw;
         }
     }
+
+    private static string ScriptInstructions(string scriptType, string scriptFile) => scriptType switch
+    {
+        ProfileScripts.PowerShell => $"Run `{scriptFile}` in an elevated PowerShell on the target system: `powershell -ExecutionPolicy Bypass -File .\\{scriptFile}`.",
+        ProfileScripts.DeviceCli => $"`{scriptFile}` lists the commands to enter on the device CLI. It is not a script to execute.",
+        _ => $"Copy this folder to the target system and run `sh {scriptFile}` as a user allowed to replace the certificate files."
+    };
 
     /// <summary>Creates an in-memory ZIP of the immutable deployment snapshot for download.</summary>
     public async Task<byte[]?> CreateArchiveAsync(string exportPath, CancellationToken ct)
@@ -57,4 +66,4 @@ public sealed class DeploymentPackageService(TargetProfileRegistry profiles, ILo
     }
 }
 
-public sealed record DeploymentProfileSnapshot(string Id, string Version, string DisplayName, string Documentation, string RenewalScriptTemplate, DateTimeOffset CreatedAt);
+public sealed record DeploymentProfileSnapshot(string Id, string Version, string DisplayName, string Documentation, string RenewalScriptTemplate, DateTimeOffset CreatedAt, string? ScriptType = null, string? ScriptFile = null);

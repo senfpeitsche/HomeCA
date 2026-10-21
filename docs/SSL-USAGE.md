@@ -340,6 +340,10 @@ Bei Reverse Proxy: Verwende das PEM-Profil des Proxys (z. B. nginx oder HAProxy)
 
 ## 4. Automatische Erneuerung einrichten
 
+Beim Ausstellen über die Weboberfläche ist **Vor Ablauf automatisch erneuern** vorausgewählt. HomeCA legt dann sofort einen Erneuerungsplan an: 30 Tage vor Ablauf, bei kürzeren Laufzeiten nach zwei Dritteln der Laufzeit. Über die API gilt dasselbe; `"autoRenew": false` schaltet es ab, `"renewBeforeDays"` setzt ein eigenes Fenster (kürzer als die Laufzeit). Die Antwort enthält `renewalPlanId`, wenn ein Plan angelegt wurde.
+
+Die folgenden Schritte brauchst du nur für Zertifikate ohne Plan oder um einen Plan anzupassen.
+
 ### 4.1 Erneuerungsplan über die Weboberfläche
 
 1. Navigiere zu **Erneuerungsautomatik**.
@@ -390,10 +394,10 @@ Jedes ausgestellte Zertifikat — ob manuell oder automatisch erneuert — erzeu
 | `bundle.pem` | Key + Zertifikat + Kette |
 | `profile-snapshot.json` | Profilstand zum Zeitpunkt der Ausstellung |
 | `README.md` | Installationsanleitung |
-| `install.ps1` | Profilspezifisches Erneuerungsskript |
+| `install.sh`, `install.ps1` oder `device-commands.txt` | Profilspezifisches Skript: Shell-Skript, PowerShell-Skript oder Befehle für die Geräte-CLI |
 | `checksums.json` | SHA-256-Prüfsummen aller Dateien |
 
-Die Verteilung auf die Zielsysteme liegt beim Betreiber. Das `install.ps1`-Skript enthält profilspezifische Befehle als Vorlage — prüfe und passe es vor der Ausführung an.
+Die Verteilung auf die Zielsysteme liegt beim Betreiber. Das Skript enthält profilspezifische Befehle als Vorlage — prüfe und passe es vor der Ausführung an. Welche Datei entsteht, legt der Skripttyp des Zielprofils fest: `install.sh` (mit `set -eu`) für Linux- und Appliance-Shells, `install.ps1` für Windows und `device-commands.txt` für Switches und Weboberflächen, deren Befehle von Hand eingegeben werden.
 
 Über **Paket ZIP** im Zertifikatsinventar lässt sich dieser vollständige Snapshot für ein ausgestelltes Zertifikat als einzelnes Archiv herunterladen.
 
@@ -457,6 +461,6 @@ Zusammenfassung für die erste Inbetriebnahme:
 5. **Zertifikat ausstellen** — Profil wählen, DNS-Namen eingeben, ausstellen
 6. **Exportdateien auf Zielsystem übertragen** — PEM, Key, Chain je nach Zielsystem
 7. **Dienst neu starten** — nginx, HAProxy, Proxmox, IIS etc.
-8. **Erneuerungsplan anlegen** — Automatische Neuausstellung vor Ablauf
+8. **Erneuerungsplan prüfen** — Wird beim Ausstellen standardmäßig angelegt; erneuerte Pakete auf dem Zielsystem einspielen
 9. **Monitoring einrichten** — Ablaufwarnungen regelmäßig abrufen
 10. **Backup erstellen** — Verschlüsseltes Backup nach jeder Konfigurationsänderung, siehe [OPERATIONS.md](OPERATIONS.md)

@@ -201,7 +201,7 @@ public sealed class CertificateIssuanceTests : IDisposable
         Assert.Subset(new HashSet<string>(StringComparer.Ordinal)
         {
             "certificate.pem", "key.pem", "chain.pem", "fullchain.pem", "bundle.pem",
-            "profile-snapshot.json", "README.md", "install.ps1", "checksums.json"
+            "profile-snapshot.json", "README.md", "install.sh", "checksums.json"
         }, entries);
     }
 

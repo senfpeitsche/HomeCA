@@ -23,7 +23,16 @@ trusts the HomeCA root CA.
 
 ## Renewal and revocation
 
-Create a renewal plan in the UI or through the API. After renewal, deploy the
+Issuing a certificate creates a renewal plan by default: 30 days before expiry,
+or after two thirds of a shorter validity. Through the API, send
+`"autoRenew": false` to opt out or `"renewBeforeDays"` for a custom window
+shorter than the validity; the response contains `renewalPlanId` when a plan was
+created. Existing certificates get a plan in the UI or through
+`/api/v1/renewal-plans`.
+
+Each deployment package contains the profile script as `install.sh`,
+`install.ps1` or `device-commands.txt` (device CLI commands to enter by hand),
+depending on the target profile's script type. After renewal, deploy the
 new export and reload the target service; HomeCA cannot reload arbitrary
 targets automatically. Monitor expiring certificates through the warnings API.
 

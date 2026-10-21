@@ -37,16 +37,8 @@ namespace HomeCA.Service.Endpoints;
             var details = await certificates.GetDetailsAsync(id, ct);
             return details is null ? Results.NotFound() : Results.Ok(details);
         });
-        api.MapPost("/certificates", async (IssueCertificateRequest request, CertificateIssuanceService certificates, ILogger<global::Program> logger, CancellationToken ct) =>
-        {
-            try { return Results.Ok(await certificates.IssueAsync(request, ct)); }
-            catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["certificate"] = [ex.Message] }); }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Certificate issuance failed");
-                throw;
-            }
-        });
+        api.MapPost("/certificates", (IssueCertificateApiRequest request, CertificateIssuanceService certificates, RenewalPlanRegistry renewalPlans, ILogger<global::Program> logger, CancellationToken ct) =>
+            IssueWithRenewalAsync(request, certificates, renewalPlans, logger, ct));
         api.MapPost("/certificates/{id}/revoke", async (string id, HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
         {
             var reason = httpRequest.Query["reason"].FirstOrDefault() ?? "unspecified";
@@ -155,6 +147,39 @@ namespace HomeCA.Service.Endpoints;
 
     internal static bool IsCertificateId(string? id) =>
         !string.IsNullOrEmpty(id) && id.Length <= 64 && id.All(Uri.IsHexDigit);
+
+    /// <summary>
+    /// Issues a certificate and, unless the caller opts out, adds a renewal plan for it, so that a certificate does not
+    /// silently expire because nobody created a plan.
+    /// </summary>
+    internal static async Task<IResult> IssueWithRenewalAsync(IssueCertificateApiRequest request, CertificateIssuanceService certificates, RenewalPlanRegistry renewalPlans, ILogger logger, CancellationToken ct)
+    {
+        if (request.AutoRenew && request.RenewBeforeDays is { } requested && (requested < 1 || requested >= request.ValidityDays))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["renewBeforeDays"] = ["The renewal window must be at least one day and shorter than the validity."] });
+        var renewBeforeDays = request.AutoRenew ? request.RenewBeforeDays ?? RenewalPlanRegistry.DefaultRenewBeforeDays(request.ValidityDays) : null;
+
+        IssueResult result;
+        try { result = await certificates.IssueAsync(request.ToIssueRequest(), ct); }
+        catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["certificate"] = [ex.Message] }); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Certificate issuance failed");
+            throw;
+        }
+
+        if (renewBeforeDays is not { } window) return Results.Ok(result);
+        try
+        {
+            var plan = await renewalPlans.AddAsync(new CreateRenewalPlanRequest(result.Id, window), ct);
+            return Results.Ok(result with { RenewalPlanId = plan.Id });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The certificate exists either way; the response without a plan ID tells the client to add one manually.
+            logger.LogError(ex, "Certificate {CertificateId} was issued but its renewal plan could not be created", result.Id);
+            return Results.Ok(result);
+        }
+    }
 
     private static string CertificateDownloadName(HomeCaStorage storage, string id)
     {

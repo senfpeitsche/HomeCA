@@ -18,6 +18,12 @@ public sealed class RenewalPlanRegistry(HomeCaStorage storage, ILogger<RenewalPl
         finally { _gate.Release(); }
     }
 
+    /// <summary>
+    /// Renews 30 days before expiry, or after two thirds of a shorter validity, so short-lived certificates are not
+    /// renewed on every hourly check. Returns null when the validity is too short for a renewal window.
+    /// </summary>
+    public static int? DefaultRenewBeforeDays(int validityDays) => validityDays < 2 ? null : Math.Clamp(validityDays / 3, 1, 30);
+
     public async Task<RenewalPlan> AddAsync(CreateRenewalPlanRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.CertificateId) || request.RenewBeforeDays is < 1 or > 365)

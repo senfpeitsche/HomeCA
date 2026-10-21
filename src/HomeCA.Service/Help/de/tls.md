@@ -30,7 +30,7 @@ Nutze die einzelnen Exporte, wenn das Zielsystem getrennte Dateien erwartet:
 
 ## Erneuerung und Sperrung
 
-Lege nach der erfolgreichen Installation einen Erneuerungsplan an. HomeCA erneuert aktive Pläne mit den ursprünglichen Zertifikatseinstellungen. Bei einem Verdacht auf kompromittierte Schlüssel das Zertifikat im Inventar sperren und einen Ersatz ausrollen; anschließend wird die CRL aktualisiert.
+Beim Ausstellen ist **Vor Ablauf automatisch erneuern** vorausgewählt: HomeCA legt dann direkt einen Erneuerungsplan an und stellt 30 Tage vor Ablauf (bei kurzen Laufzeiten nach zwei Dritteln) einen Nachfolger mit den ursprünglichen Zertifikatseinstellungen aus. Das neue Paket musst du anschließend selbst auf dem Zielsystem einspielen. Das Deployment-Paket enthält je nach Zielprofil `install.sh`, `install.ps1` oder `device-commands.txt` mit Gerätebefehlen. Bei einem Verdacht auf kompromittierte Schlüssel das Zertifikat im Inventar sperren und einen Ersatz ausrollen; anschließend wird die CRL aktualisiert.
 
 Für automatisierte Prüfungen mit `GET /api/v1/warnings/expiring` Zertifikate mit bevorstehendem Ablauf kontrollieren. Zertifikats-CRLs werden über den im Zertifikat konfigurierten CRL-Verteilungspunkt veröffentlicht; diesen Endpunkt nicht durch einen übersetzten Wert ersetzen.
 

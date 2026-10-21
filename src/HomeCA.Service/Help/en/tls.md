@@ -30,7 +30,7 @@ Use the individual exports when the target requires separate files:
 
 ## Renewal and revocation
 
-Create a renewal plan after validating the installation. HomeCA renews active plans with the original certificate settings. If a key is suspected to be compromised, revoke the certificate from the inventory and deploy a replacement; the CRL is then updated.
+**Renew automatically before expiry** is preselected when issuing: HomeCA then creates a renewal plan right away and issues a successor with the original certificate settings 30 days before expiry (after two thirds of a shorter validity). You still deploy the new package to the target system yourself. Depending on the target profile, the deployment package contains `install.sh`, `install.ps1` or `device-commands.txt` with device commands. If a key is suspected to be compromised, revoke the certificate from the inventory and deploy a replacement; the CRL is then updated.
 
 For automated checks, use `GET /api/v1/warnings/expiring` to review certificates approaching expiry. Certificate CRLs are published through the certificate's configured CRL distribution point; do not replace that endpoint with a translated value.
 

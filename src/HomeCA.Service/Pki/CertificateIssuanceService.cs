@@ -283,7 +283,12 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
 }
 
 public sealed record IssueCertificateRequest(string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, int ValidityDays = 365, string KeyAlgorithm = "ECC", int RsaKeySize = 2048, string? TargetProfileId = null);
-public sealed record IssueResult(string Id, string Subject, DateTime ExpiresAt, string Usage, string KeyAlgorithm, string ExportPath);
+/// <summary>Issuance request of the management API. Unlike <see cref="IssueCertificateRequest"/> it also creates a renewal plan unless <paramref name="AutoRenew"/> is false.</summary>
+public sealed record IssueCertificateApiRequest(string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, int ValidityDays = 365, string KeyAlgorithm = "ECC", int RsaKeySize = 2048, string? TargetProfileId = null, bool AutoRenew = true, int? RenewBeforeDays = null)
+{
+    public IssueCertificateRequest ToIssueRequest() => new(Usage, DnsNames, IpAddresses, ValidityDays, KeyAlgorithm, RsaKeySize, TargetProfileId);
+}
+public sealed record IssueResult(string Id, string Subject, DateTime ExpiresAt, string Usage, string KeyAlgorithm, string ExportPath, string? RenewalPlanId = null);
 public sealed record CertificateInventoryItem(string Id, string Subject, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, string ExportPath);
 public sealed record CertificateDetails(string Id, string Subject, string Issuer, string SerialNumber, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, int KeySize, string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, IReadOnlyList<string> EnhancedKeyUsages, string ExportPath);
 public sealed record PfxExportRequest(string Password);

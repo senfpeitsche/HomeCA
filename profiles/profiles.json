@@ -1,14 +1,98 @@
 [
-  { "id": "generic-tls", "version": "1.1", "displayName": "Generisches TLS", "purpose": "Webdienste und Appliances", "keyAlgorithm": "ECC", "exportFormats": ["PEM", "PFX"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "Installiere certificate.pem, key.pem und chain.pem auf dem Zielsystem und starte den Dienst neu.", "renewalScriptTemplate": "# Zertifikatsdateien austauschen und Zielservice neu starten." },
-  { "id": "iis", "version": "1.1", "displayName": "Windows IIS", "purpose": "IIS, RDP und Windows-Dienste", "keyAlgorithm": "RSA", "exportFormats": ["PFX"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "Importiere die PFX in den Zertifikatsspeicher Lokaler Computer und weise sie der IIS-Bindung zu.", "renewalScriptTemplate": "Import-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\\LocalMachine\\My" },
-  { "id": "proxmox", "version": "1.1", "displayName": "Proxmox VE", "purpose": "Proxmox-Weboberfläche", "keyAlgorithm": "ECC", "exportFormats": ["PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 }, "documentation": "Kopiere certificate.pem nach /etc/pve/local/pveproxy-ssl.pem und key.pem nach /etc/pve/local/pveproxy-ssl.key, dann pveproxy neu starten.", "renewalScriptTemplate": "cp certificate.pem /etc/pve/local/pveproxy-ssl.pem\ncp key.pem /etc/pve/local/pveproxy-ssl.key\nsystemctl restart pveproxy" },
-  { "id": "opnsense", "version": "1.0", "displayName": "OPNsense", "purpose": "Firewall-Weboberfläche", "keyAlgorithm": "RSA", "exportFormats": ["PFX", "PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "Importiere Zertifikat und Schlüssel über System > Trust > Certificates und wähle es für die Web-GUI.", "renewalScriptTemplate": "# Import über die OPNsense-Weboberfläche oder API durchführen." },
-  { "id": "home-assistant", "version": "1.0", "displayName": "Home Assistant", "purpose": "Home-Assistant-Frontend", "keyAlgorithm": "ECC", "exportFormats": ["PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 }, "documentation": "Lege certificate.pem und key.pem im konfigurierten SSL-Verzeichnis ab und setze ssl_certificate sowie ssl_key in configuration.yaml.", "renewalScriptTemplate": "ha core restart" },
-  { "id": "unifi", "version": "1.0", "displayName": "UniFi OS", "purpose": "UniFi Network Controller und UniFi OS Console", "keyAlgorithm": "ECC", "exportFormats": ["PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 }, "documentation": "Kopiere certificate.pem und key.pem auf die UniFi-Appliance. Bei UniFi OS: Einstellungen > System > Erweitert > TLS-Zertifikat hochladen. Bei selbst gehostetem Controller: Erstelle einen PKCS12-Keystore und importiere ihn in /var/lib/unifi/keystore.", "renewalScriptTemplate": "# UniFi OS: Upload über die Weboberfläche unter System > Advanced > Custom Certificate.\n# Self-hosted Controller:\nopenssl pkcs12 -export -in certificate.pem -inkey key.pem -out unifi.p12 -name unifi -password pass:aircontrolenterprise\nkeytool -importkeystore -srckeystore unifi.p12 -srcstoretype PKCS12 -srcstorepass aircontrolenterprise -destkeystore /var/lib/unifi/keystore -deststorepass aircontrolenterprise -destkeypass aircontrolenterprise -noprompt\nsystemctl restart unifi" },
-  { "id": "haproxy", "version": "1.0", "displayName": "HAProxy", "purpose": "HAProxy TLS-Terminierung", "keyAlgorithm": "ECC", "exportFormats": ["PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "HAProxy erwartet eine einzelne PEM-Datei mit Schlüssel, Zertifikat und Chain. Lade die fullchain.pem und key.pem herunter und füge sie zusammen: cat key.pem certificate.pem chain.pem > /etc/haproxy/certs/dienst.pem. Alternativ verwende den kombinierten Export (bundle.pem).", "renewalScriptTemplate": "cat key.pem certificate.pem chain.pem > /etc/haproxy/certs/dienst.pem\nsystemctl reload haproxy" },
-  { "id": "nginx", "version": "1.0", "displayName": "nginx", "purpose": "nginx Reverse Proxy und Webserver", "keyAlgorithm": "ECC", "exportFormats": ["PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "Kopiere certificate.pem und key.pem in das nginx-SSL-Verzeichnis (z. B. /etc/nginx/ssl/). Setze in der Server-Block-Konfiguration ssl_certificate auf fullchain.pem und ssl_certificate_key auf key.pem. Dann nginx neu laden.", "renewalScriptTemplate": "cp fullchain.pem /etc/nginx/ssl/fullchain.pem\ncp key.pem /etc/nginx/ssl/key.pem\nnginx -t && systemctl reload nginx" },
-  { "id": "cisco-switch", "version": "1.0", "displayName": "Cisco Switch", "purpose": "Cisco IOS/IOS-XE Weboberfläche und SSH", "keyAlgorithm": "RSA", "exportFormats": ["PEM", "PFX"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "Importiere das Zertifikat und den Schlüssel über die Cisco CLI. Erstelle einen Trustpoint, importiere das PKCS12-Archiv mit 'crypto pki import <trustpoint> pkcs12' und weise den Trustpoint dem HTTPS-Server zu.", "renewalScriptTemplate": "# Cisco IOS/IOS-XE:\nconf t\nno crypto pki certificate chain HOMECA\ncrypto pki import HOMECA pkcs12 terminal password <pfx-kennwort>\nip http secure-trustpoint HOMECA\nend\nwrite memory" },
-  { "id": "huawei-switch", "version": "1.0", "displayName": "Huawei Switch", "purpose": "Huawei VRP Weboberfläche", "keyAlgorithm": "RSA", "exportFormats": ["PEM", "PFX"], "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 }, "documentation": "Lade das PEM-Zertifikat und den Schlüssel per SFTP/SCP auf den Switch. Importiere sie über das PKI-Realm mit 'pki import-certificate'. Die genauen Befehle variieren je nach VRP-Version.", "renewalScriptTemplate": "# Huawei VRP:\nsystem-view\npki realm homeca\n certificate-file import file certificate.pem\n private-key-file import file key.pem\nquit\nreturn\nsave" },
-  { "id": "synology", "version": "1.0", "displayName": "Synology DSM", "purpose": "Synology NAS-Oberfläche und Dienste", "keyAlgorithm": "RSA", "exportFormats": ["PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 }, "documentation": "Öffne DSM > Systemsteuerung > Sicherheit > Zertifikat. Klicke auf Hinzufügen > Vorhandenes Zertifikat importieren. Lade certificate.pem als Zertifikat, key.pem als privaten Schlüssel und chain.pem als Zwischenzertifikat hoch.", "renewalScriptTemplate": "# Synology DSM: Import über die Weboberfläche unter Systemsteuerung > Sicherheit > Zertifikat.\n# Alternativ per CLI (als root):\ncp certificate.pem /usr/syno/etc/certificate/_archive/<cert-id>/cert.pem\ncp key.pem /usr/syno/etc/certificate/_archive/<cert-id>/privkey.pem\ncp chain.pem /usr/syno/etc/certificate/_archive/<cert-id>/chain.pem\nsynosystemctl restart nginx" },
-  { "id": "teamcity", "version": "1.0", "displayName": "TeamCity", "purpose": "TeamCity CI/CD Server", "keyAlgorithm": "RSA", "exportFormats": ["PFX", "PEM"], "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 }, "documentation": "TeamCity nutzt einen Java-Keystore oder einen vorgeschalteten Reverse Proxy. Bei direktem HTTPS: Importiere das PFX in einen Java-Keystore und konfiguriere internal.properties mit den Keystore-Parametern. Bei Reverse Proxy: Verwende das PEM-Profil des Proxys.", "renewalScriptTemplate": "# TeamCity mit direktem HTTPS (Java-Keystore):\nkeytool -importkeystore -srckeystore certificate.pfx -srcstoretype PKCS12 -destkeystore /opt/teamcity/conf/keystore.jks -deststoretype JKS -deststorepass changeit -noprompt\nsystemctl restart teamcity" }
+  {
+    "id": "generic-tls", "version": "1.2", "displayName": "Generic TLS", "purpose": "Web services and appliances", "keyAlgorithm": "ECC", "exportFormats": ["PEM", "PFX"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Install certificate.pem, key.pem and chain.pem on the target system and restart the service.",
+    "renewalScriptTemplate": "# Replace the certificate files on the target system and restart the service.",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Generisches TLS", "purpose": "Webdienste und Appliances", "documentation": "Installiere certificate.pem, key.pem und chain.pem auf dem Zielsystem und starte den Dienst neu." } }
+  },
+  {
+    "id": "iis", "version": "1.2", "displayName": "Windows IIS", "purpose": "IIS, RDP and Windows services", "keyAlgorithm": "RSA", "exportFormats": ["PFX"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Export the PFX from HomeCA as certificate.pfx, import it into the Local Computer certificate store and assign it to the IIS binding.",
+    "renewalScriptTemplate": "# Export the PFX from HomeCA as certificate.pfx into this folder first.\n#Requires -RunAsAdministrator\n$password = Read-Host -AsSecureString 'PFX password'\nImport-PfxCertificate -FilePath certificate.pfx -CertStoreLocation Cert:\\LocalMachine\\My -Password $password",
+    "scriptType": "ps1",
+    "localizations": { "de": { "displayName": "Windows IIS", "purpose": "IIS, RDP und Windows-Dienste", "documentation": "Exportiere die PFX aus HomeCA als certificate.pfx, importiere sie in den Zertifikatsspeicher Lokaler Computer und weise sie der IIS-Bindung zu." } }
+  },
+  {
+    "id": "proxmox", "version": "1.2", "displayName": "Proxmox VE", "purpose": "Proxmox web interface", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "Copy fullchain.pem to /etc/pve/local/pveproxy-ssl.pem and key.pem to /etc/pve/local/pveproxy-ssl.key, then restart pveproxy.",
+    "renewalScriptTemplate": "cp fullchain.pem /etc/pve/local/pveproxy-ssl.pem\ncp key.pem /etc/pve/local/pveproxy-ssl.key\nsystemctl restart pveproxy",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Proxmox VE", "purpose": "Proxmox-Weboberfläche", "documentation": "Kopiere fullchain.pem nach /etc/pve/local/pveproxy-ssl.pem und key.pem nach /etc/pve/local/pveproxy-ssl.key, dann pveproxy neu starten." } }
+  },
+  {
+    "id": "opnsense", "version": "1.1", "displayName": "OPNsense", "purpose": "Firewall web interface", "keyAlgorithm": "RSA", "exportFormats": ["PFX", "PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Import the certificate and key under System > Trust > Certificates and select it for the web GUI.",
+    "renewalScriptTemplate": "# Import the certificate in the OPNsense web interface:\n# System > Trust > Certificates > Add > Import an existing certificate\n# Then select it under System > Settings > Administration > SSL Certificate.",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "OPNsense", "purpose": "Firewall-Weboberfläche", "documentation": "Importiere Zertifikat und Schlüssel über System > Trust > Certificates und wähle es für die Web-GUI." } }
+  },
+  {
+    "id": "home-assistant", "version": "1.1", "displayName": "Home Assistant", "purpose": "Home Assistant frontend", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "Place fullchain.pem and key.pem in the configured SSL directory and set ssl_certificate and ssl_key in configuration.yaml.",
+    "renewalScriptTemplate": "cp fullchain.pem /ssl/fullchain.pem\ncp key.pem /ssl/privkey.pem\nha core restart",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Home Assistant", "purpose": "Home-Assistant-Frontend", "documentation": "Lege fullchain.pem und key.pem im konfigurierten SSL-Verzeichnis ab und setze ssl_certificate sowie ssl_key in configuration.yaml." } }
+  },
+  {
+    "id": "unifi", "version": "1.1", "displayName": "UniFi OS", "purpose": "UniFi Network Controller and UniFi OS Console", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "Copy certificate.pem and key.pem to the UniFi appliance. On UniFi OS: Settings > System > Advanced > upload the TLS certificate. For a self-hosted controller: create a PKCS12 keystore and import it into /var/lib/unifi/keystore.",
+    "renewalScriptTemplate": "# UniFi OS: upload through the web interface under System > Advanced > Custom Certificate.\n# Self-hosted controller:\nopenssl pkcs12 -export -in certificate.pem -inkey key.pem -certfile chain.pem -out unifi.p12 -name unifi -password pass:aircontrolenterprise\nkeytool -importkeystore -srckeystore unifi.p12 -srcstoretype PKCS12 -srcstorepass aircontrolenterprise -destkeystore /var/lib/unifi/keystore -deststorepass aircontrolenterprise -destkeypass aircontrolenterprise -noprompt\nsystemctl restart unifi",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "UniFi OS", "purpose": "UniFi Network Controller und UniFi OS Console", "documentation": "Kopiere certificate.pem und key.pem auf die UniFi-Appliance. Bei UniFi OS: Einstellungen > System > Erweitert > TLS-Zertifikat hochladen. Bei selbst gehostetem Controller: Erstelle einen PKCS12-Keystore und importiere ihn in /var/lib/unifi/keystore." } }
+  },
+  {
+    "id": "haproxy", "version": "1.1", "displayName": "HAProxy", "purpose": "HAProxy TLS termination", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "HAProxy expects a single PEM file containing key, certificate and chain. Use the combined export (bundle.pem) or concatenate the files: cat key.pem certificate.pem chain.pem > /etc/haproxy/certs/service.pem.",
+    "renewalScriptTemplate": "cp bundle.pem /etc/haproxy/certs/service.pem\nsystemctl reload haproxy",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "HAProxy", "purpose": "HAProxy-TLS-Terminierung", "documentation": "HAProxy erwartet eine einzelne PEM-Datei mit Schlüssel, Zertifikat und Chain. Verwende den kombinierten Export (bundle.pem) oder füge die Dateien zusammen: cat key.pem certificate.pem chain.pem > /etc/haproxy/certs/service.pem." } }
+  },
+  {
+    "id": "nginx", "version": "1.1", "displayName": "nginx", "purpose": "nginx reverse proxy and web server", "keyAlgorithm": "ECC", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Copy fullchain.pem and key.pem into the nginx SSL directory (for example /etc/nginx/ssl/). In the server block, set ssl_certificate to fullchain.pem and ssl_certificate_key to key.pem, then reload nginx.",
+    "renewalScriptTemplate": "cp fullchain.pem /etc/nginx/ssl/fullchain.pem\ncp key.pem /etc/nginx/ssl/key.pem\nnginx -t && systemctl reload nginx",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "nginx", "purpose": "nginx-Reverse-Proxy und Webserver", "documentation": "Kopiere fullchain.pem und key.pem in das nginx-SSL-Verzeichnis (z. B. /etc/nginx/ssl/). Setze im Server-Block ssl_certificate auf fullchain.pem und ssl_certificate_key auf key.pem. Dann nginx neu laden." } }
+  },
+  {
+    "id": "cisco-switch", "version": "1.1", "displayName": "Cisco Switch", "purpose": "Cisco IOS/IOS-XE web interface and SSH", "keyAlgorithm": "RSA", "exportFormats": ["PEM", "PFX"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Import certificate and key through the Cisco CLI. Create a trustpoint, import the PKCS12 archive with 'crypto pki import <trustpoint> pkcs12' and assign the trustpoint to the HTTPS server.",
+    "renewalScriptTemplate": "conf t\nno crypto pki certificate chain HOMECA\ncrypto pki import HOMECA pkcs12 terminal password <pfx-password>\nip http secure-trustpoint HOMECA\nend\nwrite memory",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "Cisco-Switch", "purpose": "Cisco-IOS/IOS-XE-Weboberfläche und SSH", "documentation": "Importiere Zertifikat und Schlüssel über die Cisco-CLI. Erstelle einen Trustpoint, importiere das PKCS12-Archiv mit 'crypto pki import <trustpoint> pkcs12' und weise den Trustpoint dem HTTPS-Server zu." } }
+  },
+  {
+    "id": "huawei-switch", "version": "1.1", "displayName": "Huawei Switch", "purpose": "Huawei VRP web interface", "keyAlgorithm": "RSA", "exportFormats": ["PEM", "PFX"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": true, "maximumValidityDays": 730 },
+    "documentation": "Upload the PEM certificate and key to the switch via SFTP/SCP and import them into the PKI realm with 'pki import-certificate'. The exact commands vary by VRP version.",
+    "renewalScriptTemplate": "system-view\npki realm homeca\n certificate-file import file certificate.pem\n private-key-file import file key.pem\nquit\nreturn\nsave",
+    "scriptType": "cli",
+    "localizations": { "de": { "displayName": "Huawei-Switch", "purpose": "Huawei-VRP-Weboberfläche", "documentation": "Lade das PEM-Zertifikat und den Schlüssel per SFTP/SCP auf den Switch und importiere sie über das PKI-Realm mit 'pki import-certificate'. Die genauen Befehle variieren je nach VRP-Version." } }
+  },
+  {
+    "id": "synology", "version": "1.1", "displayName": "Synology DSM", "purpose": "Synology NAS interface and services", "keyAlgorithm": "RSA", "exportFormats": ["PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "Open DSM > Control Panel > Security > Certificate. Click Add > Import certificate. Upload certificate.pem as the certificate, key.pem as the private key and chain.pem as the intermediate certificate.",
+    "renewalScriptTemplate": "# DSM web interface: Control Panel > Security > Certificate.\n# Alternatively as root, with CERT_ID set to the directory name below _archive:\nCERT_DIR=\"/usr/syno/etc/certificate/_archive/${CERT_ID:?set CERT_ID to the DSM certificate directory}\"\ncp certificate.pem \"$CERT_DIR/cert.pem\"\ncp key.pem \"$CERT_DIR/privkey.pem\"\ncp chain.pem \"$CERT_DIR/chain.pem\"\nsynosystemctl restart nginx",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "Synology DSM", "purpose": "Synology-NAS-Oberfläche und Dienste", "documentation": "Öffne DSM > Systemsteuerung > Sicherheit > Zertifikat. Klicke auf Hinzufügen > Zertifikat importieren. Lade certificate.pem als Zertifikat, key.pem als privaten Schlüssel und chain.pem als Zwischenzertifikat hoch." } }
+  },
+  {
+    "id": "teamcity", "version": "1.1", "displayName": "TeamCity", "purpose": "TeamCity CI/CD server", "keyAlgorithm": "RSA", "exportFormats": ["PFX", "PEM"],
+    "validation": { "requiresDnsName": true, "allowsIpAddress": false, "maximumValidityDays": 730 },
+    "documentation": "TeamCity uses a Java keystore or an upstream reverse proxy. For direct HTTPS: export the PFX from HomeCA as certificate.pfx, import it into a Java keystore and configure the keystore parameters. Behind a reverse proxy: use the proxy's profile.",
+    "renewalScriptTemplate": "# Export the PFX from HomeCA as certificate.pfx into this folder first.\nkeytool -importkeystore -srckeystore certificate.pfx -srcstoretype PKCS12 -destkeystore /opt/teamcity/conf/keystore.jks -deststoretype JKS -deststorepass changeit -noprompt\nsystemctl restart teamcity",
+    "scriptType": "sh",
+    "localizations": { "de": { "displayName": "TeamCity", "purpose": "TeamCity-CI/CD-Server", "documentation": "TeamCity nutzt einen Java-Keystore oder einen vorgeschalteten Reverse Proxy. Bei direktem HTTPS: Exportiere die PFX aus HomeCA als certificate.pfx, importiere sie in einen Java-Keystore und konfiguriere die Keystore-Parameter. Bei Reverse Proxy: Verwende das Profil des Proxys." } }
+  }
 ]
