@@ -59,7 +59,9 @@ jobs:
           cp deploy/systemd/homeca.service release-bundle/deploy/systemd/
           cp deploy/sudoers/homeca-tls release-bundle/deploy/sudoers/
           tar -czf homeca-release-bundle.tar.gz -C release-bundle .
-          cp deploy/scripts/homeca-lxc.sh homeca-lxc.sh
+          # The LXC entry script defaults to the release it is attached to
+          sed "s/^HOMECA_RELEASE=\"latest\"/HOMECA_RELEASE=\"${GITHUB_REF_NAME}\"/" deploy/proxmox/ct/homeca.sh > homeca-lxc.sh
+          grep -q "^HOMECA_RELEASE=\"${GITHUB_REF_NAME}\"" homeca-lxc.sh
           cp deploy/scripts/homeca-install.sh homeca-install.sh
           sha256sum homeca-linux-x64.tar.gz homeca-release-bundle.tar.gz homeca-lxc.sh homeca-install.sh > SHA256SUMS
 

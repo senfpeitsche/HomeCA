@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # HomeCA — in-container install script
 #
-# Called automatically by homeca-lxc.sh, or run manually from a versioned GitHub Release asset.
+# Called by deploy/proxmox/install/homeca-install.sh during the LXC setup (homeca-lxc.sh),
+# or run manually from a versioned GitHub Release asset on Debian 12 or 13.
 #
 # Environment overrides:
 #   HOMECA_VERSION    — release tag (default: latest)
@@ -71,13 +72,15 @@ apt-get full-upgrade -y -qq
 msg_ok "System updated"
 
 msg_info "Installing dependencies …"
-apt-get install -y -qq ca-certificates curl openssh-client apt-transport-https sudo
+apt-get install -y -qq ca-certificates curl openssh-client sudo
 msg_ok "Dependencies installed"
 
 # ── .NET 10 Runtime ─────────────────────────────────────────────────
 if ! command -v dotnet &>/dev/null; then
   msg_info "Installing .NET 10 Runtime …"
-  curl -fsSL https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb
+  # Microsoft publishes one repository per Debian release (12, 13, …)
+  DEBIAN_MAJOR=$(. /etc/os-release && echo "${VERSION_ID%%.*}")
+  curl -fsSL "https://packages.microsoft.com/config/debian/${DEBIAN_MAJOR}/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
   dpkg -i /tmp/packages-microsoft-prod.deb
   rm -f /tmp/packages-microsoft-prod.deb
   apt-get update -qq

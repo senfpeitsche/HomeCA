@@ -1,6 +1,6 @@
 # HomeCA in einem Proxmox-Debian-LXC
 
-Diese Anleitung richtet eine einzelne HomeCA-Instanz in einem Debian-12-LXC ein. HomeCA ist eine private CA: sichere den Container wie ein administratives Kernsystem und veröffentliche ihn nicht direkt im Internet.
+Diese Anleitung richtet eine einzelne HomeCA-Instanz in einem Debian-13-LXC ein. HomeCA ist eine private CA: sichere den Container wie ein administratives Kernsystem und veröffentliche ihn nicht direkt im Internet.
 
 ## Schnellstart — versionierte Installation
 
@@ -13,11 +13,13 @@ curl -fsSLO "https://github.com/senfpeitsche/HomeCA/releases/download/${HOMECA_V
 bash ./homeca-lxc.sh
 ```
 
-Das Script erstellt automatisch einen unprivilegierten Debian-12-LXC, installiert .NET 10, HomeCA und den systemd-Dienst. Danach ist HomeCA im LAN auf Port `5080` erreichbar. Dieser HTTP-Zugang ist nur für die Ersteinrichtung gedacht: aktiviere danach TLS und begrenze den Zugriff auf Admin- und Servernetze.
+Das Script nutzt die Engine der [Proxmox VE Helper-Scripts](https://community-scripts.org/) (`community-scripts/core`, auf einen Commit festgelegt). Sie fragt per Dialog nach Standard- oder erweiterten Einstellungen: Storage für Container und Template, aktuelles Debian-13-Template, Netzwerk (DHCP oder statisch, VLAN, MTU), SSH-Schlüssel und Ressourcen. Danach installiert sie im unprivilegierten Container .NET 10, HomeCA mit dem Dienstbenutzer `homeca` und den systemd-Dienst, alles aus dem gewählten Release mit SHA256-Prüfung. HomeCA ist dann im LAN auf Port `5080` erreichbar. Dieser HTTP-Zugang ist nur für die Ersteinrichtung gedacht: aktiviere danach TLS und begrenze den Zugriff auf Admin- und Servernetze.
+
+Die Engine kann anonyme Diagnosedaten an community-scripts senden und fragt beim ersten Lauf danach.
 
 ### Standardwerte anpassen
 
-Alle Einstellungen lassen sich über Umgebungsvariablen überschreiben:
+Standardwerte lassen sich über Umgebungsvariablen vorgeben, die Dialoge übernehmen sie:
 
 ```bash
 HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 bash ./homeca-lxc.sh
@@ -25,15 +27,19 @@ HOMECA_CTID=110 HOMECA_HOSTNAME=pki HOMECA_RAM=2048 bash ./homeca-lxc.sh
 
 | Variable | Standard | Beschreibung |
 | --- | --- | --- |
-| `HOMECA_CTID` | nächste freie ID | Container-ID |
-| `HOMECA_HOSTNAME` | `homeca` | Hostname des LXC |
-| `HOMECA_DISK` | `8` | Root-Disk in GiB |
-| `HOMECA_RAM` | `1024` | Arbeitsspeicher in MiB |
-| `HOMECA_CORES` | `1` | CPU-Kerne |
-| `HOMECA_STORAGE` | `local-lvm` | Proxmox-Speicherpool |
-| `HOMECA_BRIDGE` | `vmbr0` | Netzwerkbrücke |
-| `HOMECA_NET` | `dhcp` | IP-Konfiguration (`dhcp` oder CIDR, z. B. `10.0.0.50/24,gw=10.0.0.1`) |
-| `HOMECA_VERSION` | `latest` | Release-Tag (z. B. `v1.2.0`) |
+| `HOMECA_CTID` | nächste freie ID | Container-ID (`var_ctid`) |
+| `HOMECA_HOSTNAME` | `homeca` | Hostname des LXC (`var_hostname`) |
+| `HOMECA_DISK` | `8` | Root-Disk in GiB (`var_disk`) |
+| `HOMECA_RAM` | `1024` | Arbeitsspeicher in MiB (`var_ram`) |
+| `HOMECA_CORES` | `1` | CPU-Kerne (`var_cpu`) |
+| `HOMECA_STORAGE` | Abfrage | Storage für die Container-Disk (`var_container_storage`) |
+| `HOMECA_BRIDGE` | `vmbr0` | Netzwerkbrücke (`var_brg`) |
+| `HOMECA_NET` | `dhcp` | `dhcp` oder CIDR, z. B. `10.0.0.50/24,gw=10.0.0.1` (`var_net`, `var_gateway`) |
+| `HOMECA_VERSION` | Release des Scripts | Release-Tag (z. B. `v1.2.0`) |
+
+Alle weiteren Einstellungen der Engine funktionieren ebenfalls als `var_*`-Variable, etwa `var_template_storage`, `var_vlan` oder `var_ssh=yes`.
+
+Ein bestehender Debian-12-Container bleibt auf Debian 12; `homeca-update.sh` funktioniert dort weiter.
 
 ### Nur den Container einrichten (ohne Proxmox-Host-Script)
 
@@ -185,7 +191,8 @@ Für Wiederherstellung und regelmäßige Prüfungen siehe [OPERATIONS.md](OPERAT
 
 | Script | Zweck | Ausführungsort |
 | --- | --- | --- |
-| `deploy/scripts/homeca-lxc.sh` | LXC erstellen + Installation anstoßen | Proxmox-Shell |
+| `deploy/proxmox/ct/homeca.sh` (Release: `homeca-lxc.sh`) | LXC über community-scripts/core erstellen + Installation anstoßen | Proxmox-Shell |
+| `deploy/proxmox/install/homeca-install.sh` | Container vorbereiten und `homeca-install.sh` aus dem Release starten | Im LXC, von der Engine aufgerufen |
 | `deploy/scripts/homeca-install.sh` | HomeCA im Container installieren | Im LXC (root) |
 | `deploy/scripts/homeca-update.sh` | HomeCA aktualisieren mit Backup + Rollback | Im LXC (root) oder via `pct push`/`pct exec` |
 | `deploy/scripts/homeca-activate-tls.sh` | TLS-Listener aus der vorbereiteten TLS-Konfiguration aktivieren | Im LXC (root), normalerweise über die Weboberfläche ausgelöst |
