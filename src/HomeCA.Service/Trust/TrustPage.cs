@@ -81,7 +81,7 @@ public static class TrustPage
             """);
         Section("windows", text["TrustPagePlatform_windows"], $"""
             <p>{T("TrustPageWindowsText")}</p>
-            {Code($"Invoke-WebRequest -UseBasicParsing {der} -OutFile $env:TEMP\\homeca-root-ca.cer\nImport-Certificate -FilePath $env:TEMP\\homeca-root-ca.cer -CertStoreLocation Cert:\\LocalMachine\\Root", html)}
+            {Code($"curl.exe --fail --silent --show-error --insecure -o $env:TEMP\\homeca-root-ca.cer {der}\nif ((Get-FileHash $env:TEMP\\homeca-root-ca.cer -Algorithm SHA256).Hash -ne '{sha256.Replace(":", string.Empty)}') {{ throw 'Fingerprint mismatch' }}\nImport-Certificate -FilePath $env:TEMP\\homeca-root-ca.cer -CertStoreLocation Cert:\\LocalMachine\\Root", html)}
             <p><a class="button secondary" href="{html.Encode(der)}">{T("TrustPageDownloadCertificate")}</a></p>
             """);
         Section("macos", text["TrustPagePlatform_macos"], $"""
