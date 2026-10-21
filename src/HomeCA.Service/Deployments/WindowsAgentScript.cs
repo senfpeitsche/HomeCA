@@ -91,9 +91,19 @@ public static class WindowsAgentScript
         if (Test-Path -LiteralPath $SettingsFile) { $CaFile = (Get-Content -Raw -LiteralPath $SettingsFile | ConvertFrom-Json).caFile }
         if ($env:HOMECA_CA_FILE) { $CaFile = $env:HOMECA_CA_FILE }
 
+        # Every run is appended to a log next to the agent folder; it holds no token and rotates at 1 MB.
+        $LogFile = Join-Path (Join-Path (Split-Path -Parent $Root) 'Logs') 'agent-{{DeploymentAgentScript.ShortId(target.Id)}}.log'
+        try {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $LogFile) | Out-Null
+            if ((Test-Path -LiteralPath $LogFile) -and (Get-Item -LiteralPath $LogFile).Length -gt 1MB) { Move-Item -LiteralPath $LogFile -Destination "$LogFile.old" -Force }
+            Start-Transcript -LiteralPath $LogFile -Append | Out-Null
+        } catch { }
+        function Write-Step([string] $Text) { Write-Output ('homeca-agent: [' + (Get-Date -Format 'HH:mm:ss') + '] ' + $Text) }
+
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
         if ($CaFile) {
             # Windows does not trust the HomeCA root CA yet: accept a server certificate only if it chains to this copy.
+            Write-Step "checking HomeCA's TLS certificate against $CaFile"
             Add-Type -TypeDefinition @"
         using System.Net.Security;
         using System.Security.Cryptography.X509Certificates;
@@ -132,6 +142,7 @@ public static class WindowsAgentScript
         $incoming = Join-Path $StateDir ('.incoming-' + [Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $incoming | Out-Null
         try {
+            Write-Step "fetching the manifest from $HomeCaUrl"
             Get-HomeCAFile 'manifest' (Join-Path $incoming 'manifest.json')
             $manifest = Get-Content -Raw -LiteralPath (Join-Path $incoming 'manifest.json') | ConvertFrom-Json
             $fingerprint = [string] $manifest.fingerprint
@@ -142,6 +153,7 @@ public static class WindowsAgentScript
                 if ($env:SSH_CONNECTION) { Write-Output "homeca-agent: certificate $fingerprint is already installed" }
             }
             else {
+                Write-Step "downloading $(@($manifest.files).Count) files for certificate $fingerprint"
                 foreach ($file in @($manifest.files)) { Get-HomeCAFile "files/$file" (Join-Path $incoming $file) }
                 $certificate = New-Object Security.Cryptography.X509Certificates.X509Certificate2 (Join-Path $incoming 'certificate.pem')
                 $sha256 = [Security.Cryptography.SHA256]::Create()
@@ -160,8 +172,12 @@ public static class WindowsAgentScript
                     $env:HOMECA_PFX_PASSWORD = $token
                     $shell = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
                     Push-Location -LiteralPath $current
-                    try { & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\install.ps1; $scriptExit = $LASTEXITCODE }
-                    finally { Pop-Location; Remove-Item Env:\HOMECA_PFX_PASSWORD -ErrorAction SilentlyContinue }
+                    Write-Step 'running install.ps1'
+                    # Piped, so the output also reaches the log; stderr lines must not stop the agent here.
+                    $ErrorActionPreference = 'Continue'
+                    try { & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\install.ps1 2>&1 | ForEach-Object { "$_" }; $scriptExit = $LASTEXITCODE }
+                    finally { $ErrorActionPreference = 'Stop'; Pop-Location; Remove-Item Env:\HOMECA_PFX_PASSWORD -ErrorAction SilentlyContinue }
+                    Write-Step "install.ps1 finished with exit code $scriptExit"
                     if ($scriptExit -ne 0) { throw "homeca-agent: install.ps1 ended with exit code $scriptExit" }
                     if (Test-Path -LiteralPath (Join-Path $env:HOMECA_BACKUP_DIR 'restore.ps1')) { Write-Output "homeca-agent: backup in $($env:HOMECA_BACKUP_DIR) (undo with restore.ps1)" }
                 }
@@ -169,7 +185,8 @@ public static class WindowsAgentScript
             }
         }
         catch {
-            [Console]::Error.WriteLine($_.Exception.Message)
+            # Standard output, because the log (a transcript) does not record writes to the console's error stream.
+            Write-Step ('failed: ' + ($_.Exception.Message -replace '^homeca-agent: ', ''))
             $exitCode = 1
         }
         finally {
@@ -179,6 +196,7 @@ public static class WindowsAgentScript
             }
             $lock.Dispose()
         }
+        try { Stop-Transcript | Out-Null } catch { }
         exit $exitCode
 
         """.Replace("\r\n", "\n");
@@ -221,6 +239,16 @@ public static class WindowsAgentScript
                 [Console]::Error.WriteLine('homeca-setup: the user must be an administrator')
                 exit {{NotAdministratorExitCode}}
             }
+            # The whole setup is also written to a log on the device, readable by SYSTEM and Administrators only.
+            $LogDir = Join-Path $env:ProgramData 'HomeCA\Logs'
+            New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+            & icacls.exe $LogDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+            $SetupLog = Join-Path $LogDir ('setup-{{shortId}}-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+            try { Start-Transcript -LiteralPath $SetupLog | Out-Null } catch { }
+            function Write-Step([string] $Text) { Write-Output ('homeca-setup: [' + (Get-Date -Format 'HH:mm:ss') + '] ' + $Text) }
+            Write-Step "log in $SetupLog"
+            # An unexpected error ends the setup with its message in the output and in the log.
+            trap { Write-Step ('failed: ' + $_.Exception.Message); try { Stop-Transcript | Out-Null } catch { }; exit 1 }
             $env:HOMECA_BACKUP_DIR = Join-Path $env:ProgramData ('HomeCA\Backups\{{shortId}}\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-setup')
             {{ProfileScripts.PowerShellBackupHelpers}}
             $Root = Join-Path $env:ProgramData 'HomeCA\Agent'
@@ -237,6 +265,7 @@ public static class WindowsAgentScript
                 New-Item -ItemType Directory -Force -Path $directory | Out-Null
                 & icacls.exe $directory /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
             }
+            Write-Step 'saving the current state for restore.ps1'
             Backup-HomeCAFile @($TokenFile, $SettingsFile, $CaCopy, $AgentFile)
             $existingTask = Get-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction SilentlyContinue
             if ($existingTask) {
@@ -267,6 +296,7 @@ public static class WindowsAgentScript
             {{agentScript.Replace("\r\n", "\n").TrimEnd('\n')}}
             '@
 
+            Write-Step "checking the connection to HomeCA at {{url}}"
             # Use the Windows trust store when it already trusts HomeCA's TLS certificate, otherwise the HomeCA root CA.
             [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
             $settings = @{}
@@ -275,7 +305,7 @@ public static class WindowsAgentScript
             try { [void] $client.DownloadString($ManifestUrl) }
             catch [Net.WebException] {
                 if ($_.Exception.Status -eq [Net.WebExceptionStatus]::TrustFailure -or $_.Exception.Status -eq [Net.WebExceptionStatus]::SecureChannelFailure) { $settings.caFile = $CaCopy }
-                else { [Console]::Error.WriteLine("homeca-setup: the device cannot reach HomeCA at {{url}}: $($_.Exception.Message)"); exit 21 }
+                else { Write-Step "failed: the device cannot reach HomeCA at {{url}}: $($_.Exception.Message)"; try { Stop-Transcript | Out-Null } catch { }; exit 21 }
             }
             finally { $client.Dispose() }
             Set-Content -LiteralPath $SettingsFile -Value ($settings | ConvertTo-Json)
@@ -288,8 +318,13 @@ public static class WindowsAgentScript
             Write-Output "homeca-setup: scheduled task $TaskPath$TaskName runs the agent hourly as SYSTEM"
 
             Write-Output 'homeca-setup: running the agent once'
-            & ([Diagnostics.Process]::GetCurrentProcess().MainModule.FileName) -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $AgentFile
-            exit $LASTEXITCODE
+            # Piped, so the agent output also reaches the setup log; its stderr lines must not stop the setup here.
+            $ErrorActionPreference = 'Continue'
+            & ([Diagnostics.Process]::GetCurrentProcess().MainModule.FileName) -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $AgentFile 2>&1 | ForEach-Object { "$_" }
+            $agentExit = $LASTEXITCODE
+            Write-Step "agent finished with exit code $agentExit"
+            try { Stop-Transcript | Out-Null } catch { }
+            exit $agentExit
 
             """.Replace("\r\n", "\n");
     }

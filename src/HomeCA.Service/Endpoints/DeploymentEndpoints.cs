@@ -50,6 +50,8 @@ static class DeploymentEndpoints
             try { return Results.Ok(await service.DetectAsync(request, ct)); }
             catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["connection"] = [ex.Message] }); }
         });
+        setup.MapGet("/progress/{id}", (string id, int? from, SshSetupProgress progress) =>
+            SshSetupProgress.IsValidId(id) ? Results.Ok(progress.Get(id, from ?? 0)) : Results.NotFound());
         setup.MapPost("/install", async (SshInstallRequest request, HttpRequest httpRequest, SshSetupService service, HomeCaStorage storage, CancellationToken ct) =>
         {
             try { return Results.Ok(await service.InstallAsync(request, PublicBaseUrl(storage, httpRequest), ct)); }

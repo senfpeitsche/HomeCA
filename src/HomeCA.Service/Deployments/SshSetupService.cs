@@ -22,7 +22,8 @@ public sealed class SshSetupService(
     SshPushKeyService pushKeys,
     DeploymentPushService pushes,
     HomeCaStorage storage,
-    ILogger<SshSetupService> logger)
+    ILogger<SshSetupService> logger,
+    SshSetupProgress? progress = null)
 {
     private static readonly TimeSpan DetectionTimeout = TimeSpan.FromMinutes(1);
     internal static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(10);
@@ -47,6 +48,12 @@ public sealed class SshSetupService(
     }
 
     public async Task<SshInstallResponse> InstallAsync(SshInstallRequest request, string requestBaseUrl, CancellationToken ct)
+    {
+        try { return await InstallCoreAsync(request, requestBaseUrl, ct); }
+        finally { progress?.Complete(request.ProgressId); }
+    }
+
+    private async Task<SshInstallResponse> InstallCoreAsync(SshInstallRequest request, string requestBaseUrl, CancellationToken ct)
     {
         var connection = Validate(request.Connection);
         var baseUrl = !string.IsNullOrWhiteSpace(request.HomeCaUrl) ? request.HomeCaUrl.Trim() : !string.IsNullOrWhiteSpace(storage.PublicUrl) ? storage.PublicUrl : requestBaseUrl;
@@ -74,10 +81,21 @@ public sealed class SshSetupService(
         var rootFingerprint = rootCertificate.GetCertHashString(System.Security.Cryptography.HashAlgorithmName.SHA256);
 
         string? token = null;
+        string? targetId = existing?.Id;
+        // Every line reaches the wizard and the service log, without credentials and without the target token.
+        void Report(string line)
+        {
+            var clean = Clean(line, connection, token);
+            progress?.Append(request.ProgressId, clean);
+            logger.LogInformation("SSH setup {TargetId} on {Connection}: {Line}", targetId ?? "(new)", connection.ToString(), clean);
+        }
         try
         {
+            Report($"homeca: connecting to {connection}");
             using var session = await ConnectAsync(connection, existing, ct);
+            Report($"homeca: connected, host key {session.HostKey.Algorithm} {session.HostKey.Fingerprint}; detecting the system");
             var facts = await DetectFactsAsync(session, ct);
+            Report($"homeca: detected {(facts.IsWindows ? "Windows" : "Linux")} ({facts.OperatingSystem})");
             if (!facts.IsWindows && !facts.HasCurl) return new SshInstallResponse(SshSetupResult.Unsupported, "curl is not installed on the device. Install curl and try again.", session.HostKey);
             var (command, prefix) = await PrivilegedShellAsync(session, connection, facts, ct);
 
@@ -102,7 +120,10 @@ public sealed class SshSetupService(
                 ? WindowsAgentScript.RenderSetup(baseUrl, target, token, WindowsAgentScript.Render(baseUrl, target), rootCaPem, request.InstallRootCa, Random.Shared.Next(0, 60))
                 : SshSetupScripts.RenderSetup(baseUrl, target, token, DeploymentAgentScript.Render(baseUrl, target), rootCaPem, rootFingerprint,
                     request.InstallRootCa, Random.Shared.Next(0, 60), enablePush ? await pushKeys.GetPublicKeyAsync(ct) : null);
-            var result = await session.RunAsync(command, prefix + script, SetupTimeout, ct);
+            targetId = target.Id;
+            Report($"homeca: running the setup script on the device (up to {SetupTimeout.TotalMinutes:0} minutes)");
+            var result = await session.RunAsync(command, prefix + script, SetupTimeout, Report, ct);
+            Report($"homeca: setup script finished with exit code {result.ExitCode}");
             var output = Clean(Combine(result.Output, result.Error), connection, token);
 
             var setupInfo = new SshSetupInfo(connection.Host, connection.Port, connection.UserName,
@@ -136,7 +157,12 @@ public sealed class SshSetupService(
             var response = HostKeyResponse(ex);
             return new SshInstallResponse(response.Status, response.Message, response.HostKey, ExpectedHostKey: response.ExpectedHostKey);
         }
-        catch (SshSetupConnectionException ex) { return new SshInstallResponse(ex.Status, Clean(ex.Message, connection, token)); }
+        catch (SshSetupConnectionException ex)
+        {
+            Report("homeca: " + ex.Message);
+            var output = ex.Output is null ? null : Clean(WithoutPowerShellProgress(ex.Output), connection, token);
+            return new SshInstallResponse(ex.Status, Clean(ex.Message, connection, token), Output: output);
+        }
     }
 
     private async Task<ISshSession> ConnectAsync(SshCredentials connection, DeploymentTarget? existing, CancellationToken ct)
@@ -264,7 +290,8 @@ public sealed record SshDetectRequest(SshCredentials Connection, string? TargetI
 
 public sealed record SshInstallRequest(
     SshCredentials Connection, string? TargetId = null, string? Name = null, string? CertificateId = null,
-    string? ProbeHost = null, int? ProbePort = null, bool InstallRootCa = false, string? HomeCaUrl = null, bool EnablePush = false);
+    string? ProbeHost = null, int? ProbePort = null, bool InstallRootCa = false, string? HomeCaUrl = null, bool EnablePush = false,
+    string? ProgressId = null);
 
 public sealed record SshDetectResponse(
     string Status, string? Message, SshHostKey? HostKey = null, string? ExpectedHostKey = null,

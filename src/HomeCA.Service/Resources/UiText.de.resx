@@ -1115,6 +1115,8 @@
   <data name="SshChangeConnection" xml:space="preserve"><value>Verbindung ändern</value></data>
   <data name="SshInstallSucceeded" xml:space="preserve"><value>Das Gerät ist eingerichtet. Der Agent hat das Zertifikat abgeholt und prüft ab jetzt stündlich auf Erneuerungen.</value></data>
   <data name="SshProbeResult" xml:space="preserve"><value>TLS-Prüfung: {0}</value></data>
+  <data name="SshLiveOutput" xml:space="preserve"><value>Bisherige Ausgabe</value></data>
+  <data name="SshDeviceLogWindows" xml:space="preserve"><value>Protokoll auf dem Gerät: %ProgramData%\HomeCA\Logs (setup-*.log für die Einrichtung, agent-*.log für jeden Agentenlauf).</value></data>
   <data name="SshOutput" xml:space="preserve"><value>Ausgabe</value></data>
   <data name="SshRestoreHint" xml:space="preserve"><value>Um eine Änderung rückgängig zu machen, führe restore.sh im genannten Backup-Verzeichnis als root aus, das neueste Backup zuerst.</value></data>
   <data name="SshTryAgain" xml:space="preserve"><value>Erneut versuchen</value></data>

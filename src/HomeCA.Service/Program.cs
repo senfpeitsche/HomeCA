@@ -45,6 +45,7 @@ builder.Services.AddSingleton<DeploymentTargetRegistry>();
 builder.Services.AddSingleton<DeploymentProbeService>();
 builder.Services.AddSingleton<DeploymentWebhookService>();
 builder.Services.AddSingleton<ISshClientFactory, SshNetClientFactory>();
+builder.Services.AddSingleton<SshSetupProgress>();
 builder.Services.AddSingleton<SshSetupService>();
 builder.Services.AddSingleton<SshPushKeyService>();
 builder.Services.AddSingleton<DeploymentPushService>();

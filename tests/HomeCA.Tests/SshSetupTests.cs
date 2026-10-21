@@ -333,10 +333,11 @@ public sealed class SshSetupTests : IDisposable
         _pushKeys = new SshPushKeyService(storage, NullLogger<SshPushKeyService>.Instance);
         _notifications = new DeploymentTargetTests.RecordingHandler();
         _pushes = new DeploymentPushService(ssh, _pushKeys, targets, probes, CreateNotifications(storage, _notifications), NullLogger<DeploymentPushService>.Instance) { BusyRetryDelay = TimeSpan.Zero };
-        var service = new SshSetupService(ssh, targets, profiles, certificates, authorities, probes, administration, _pushKeys, _pushes, storage, NullLogger<SshSetupService>.Instance);
+        var service = new SshSetupService(ssh, targets, profiles, certificates, authorities, probes, administration, _pushKeys, _pushes, storage, NullLogger<SshSetupService>.Instance, _progress);
         return (service, targets, ssh, issued.Id);
     }
 
+    private readonly SshSetupProgress _progress = new();
     private SshPushKeyService? _pushKeys;
     private DeploymentPushService? _pushes;
     private DeploymentTargetTests.RecordingHandler? _notifications;
@@ -606,6 +607,51 @@ public sealed class SshSetupTests : IDisposable
     }
 
     [Fact]
+    public async Task Setup_reports_progress_lines_for_the_wizard()
+    {
+        var (service, _, _, certificateId) = await CreateServiceAsync();
+        var progressId = Guid.NewGuid().ToString("N");
+
+        var result = await service.InstallAsync(InstallRequest(certificateId) with { ProgressId = progressId }, "https://ca.lab.test", CancellationToken.None);
+
+        var progress = _progress.Get(progressId, 0);
+        Assert.Equal(SshSetupResult.Ok, result.Status);
+        Assert.True(progress.Done);
+        Assert.Contains(progress.Lines, line => line.EndsWith("homeca: connecting to admin@pve01.lab.test:22", StringComparison.Ordinal));
+        Assert.Contains(progress.Lines, line => line.EndsWith("homeca: setup script finished with exit code 0", StringComparison.Ordinal));
+        Assert.DoesNotContain(progress.Lines, line => line.Contains(SshPassword, StringComparison.Ordinal));
+        Assert.Empty(_progress.Get(progressId, progress.Next).Lines);
+    }
+
+    [Fact]
+    public async Task Setup_timeout_returns_the_output_so_far_without_the_token()
+    {
+        var (service, _, ssh, certificateId) = await CreateServiceAsync();
+        ssh.SetupTimesOut = true;
+        var progressId = Guid.NewGuid().ToString("N");
+
+        var result = await service.InstallAsync(InstallRequest(certificateId) with { ProgressId = progressId }, "https://ca.lab.test", CancellationToken.None);
+
+        Assert.Equal(SshSetupResult.Failed, result.Status);
+        Assert.Contains("did not finish", result.Message);
+        Assert.Contains("homeca-setup: backup done", result.Output);
+        Assert.Contains("token *** written", result.Output);
+        Assert.Contains(_progress.Get(progressId, 0).Lines, line => line.Contains("did not finish", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Progress_ignores_ids_that_are_not_32_hex_digits()
+    {
+        var progress = new SshSetupProgress();
+
+        progress.Append("../../etc", "line");
+        progress.Append("0123456789abcdef0123456789abcdef", "line");
+
+        Assert.False(SshSetupProgress.IsValidId("../../etc"));
+        Assert.Single(progress.Get("0123456789abcdef0123456789abcdef", 0).Lines);
+    }
+
+    [Fact]
     public async Task Failed_queued_push_sends_a_notification_and_disabled_push_is_skipped()
     {
         var (service, targets, ssh, certificateId) = await CreateServiceAsync();
@@ -636,6 +682,8 @@ public sealed class SshSetupTests : IDisposable
         /// <summary>linux, windows (cmd as default shell) or mingw (Windows with Git for Windows in the PATH).</summary>
         public string Platform { get; set; } = "linux";
         public bool WindowsAdministrator { get; set; } = true;
+        /// <summary>The setup script prints a line with the token and then hangs until the timeout.</summary>
+        public bool SetupTimesOut { get; set; }
         public List<(string Command, string? Input)> Commands { get; } = [];
         public List<SshCredentials> PushConnections { get; } = [];
 
@@ -658,6 +706,9 @@ public sealed class SshSetupTests : IDisposable
                 // The forced command on a real device runs the agent whatever HomeCA sends.
                 if (push && owner.BusyRuns > 0) { owner.BusyRuns--; return Task.FromResult(new SshCommandResult(DeploymentPushService.AgentBusyExitCode, "", "homeca-agent: another run is in progress")); }
                 if (push) return Task.FromResult(new SshCommandResult(owner.AgentExitCode, "homeca-agent: certificate abc is already installed", ""));
+                if (owner.SetupTimesOut && input?.Contains("STATE_DIR=", StringComparison.Ordinal) == true)
+                    throw new SshSetupConnectionException(SshSetupResult.Failed, "The command did not finish within 10 minutes; the output so far is below.",
+                        output: $"homeca-setup: backup done\nhomeca-setup: token {TokenFrom(input)} written\n");
                 owner.Commands.Add((command, input));
                 if (owner.Platform != "linux")
                 {

@@ -1115,6 +1115,8 @@
   <data name="SshChangeConnection" xml:space="preserve"><value>Change connection</value></data>
   <data name="SshInstallSucceeded" xml:space="preserve"><value>The device is set up. The agent fetched the certificate and now checks for renewals every hour.</value></data>
   <data name="SshProbeResult" xml:space="preserve"><value>TLS check: {0}</value></data>
+  <data name="SshLiveOutput" xml:space="preserve"><value>Output so far</value></data>
+  <data name="SshDeviceLogWindows" xml:space="preserve"><value>Log on the device: %ProgramData%\HomeCA\Logs (setup-*.log for the setup, agent-*.log for every agent run).</value></data>
   <data name="SshOutput" xml:space="preserve"><value>Output</value></data>
   <data name="SshRestoreHint" xml:space="preserve"><value>To undo a change, run restore.sh in the backup directory named in the output as root, newest backup first.</value></data>
   <data name="SshTryAgain" xml:space="preserve"><value>Try again</value></data>

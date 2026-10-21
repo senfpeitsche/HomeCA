@@ -33,9 +33,12 @@ public sealed class SshHostKeyNotTrustedException(SshHostKey presented, string? 
     public string? Expected { get; } = expected;
 }
 
-public sealed class SshSetupConnectionException(string status, string message, Exception? inner = null) : Exception(message, inner)
+public sealed class SshSetupConnectionException(string status, string message, Exception? inner = null, string? output = null) : Exception(message, inner)
 {
     public string Status { get; } = status;
+
+    /// <summary>What the command printed before it failed, for example before a timeout.</summary>
+    public string? Output { get; } = output;
 }
 
 public interface ISshSession : IDisposable
@@ -44,6 +47,10 @@ public interface ISshSession : IDisposable
 
     /// <summary>Runs a command; <paramref name="input"/> is written to its standard input, which is then closed.</summary>
     Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, CancellationToken ct);
+
+    /// <summary>Like <see cref="RunAsync(string, string?, TimeSpan, CancellationToken)"/>, and reports every output line as it arrives.</summary>
+    Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, Action<string>? onOutput, CancellationToken ct) =>
+        RunAsync(command, input, timeout, ct);
 }
 
 public interface ISshClientFactory
@@ -129,12 +136,19 @@ public sealed class SshNetClientFactory : ISshClientFactory
     {
         public SshHostKey HostKey { get; } = hostKey;
 
-        public async Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, CancellationToken ct)
+        public Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, CancellationToken ct) =>
+            RunAsync(command, input, timeout, null, ct);
+
+        public async Task<SshCommandResult> RunAsync(string command, string? input, TimeSpan timeout, Action<string>? onOutput, CancellationToken ct)
         {
             using var sshCommand = client.CreateCommand(command);
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
             limit.CancelAfter(timeout);
             var execution = sshCommand.ExecuteAsync(limit.Token);
+            // Read both streams while the command runs, so the output is known line by line and survives a timeout.
+            var output = new StringBuilder();
+            var error = new StringBuilder();
+            var pumps = Task.WhenAll(Pump(sshCommand.OutputStream, output), Pump(sshCommand.ExtendedOutputStream, error));
             await using (var stdin = sshCommand.CreateInputStream())
             {
                 if (input is not null)
@@ -143,12 +157,39 @@ public sealed class SshNetClientFactory : ISshClientFactory
                     await stdin.WriteAsync(bytes, limit.Token);
                 }
             }
-            try { await execution; }
+            try
+            {
+                await execution;
+                await pumps.WaitAsync(TimeSpan.FromSeconds(5), ct);
+            }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                throw new SshSetupConnectionException(SshSetupResult.Failed, $"The command did not finish within {timeout.TotalMinutes:0} minutes.");
+                var limitText = timeout.TotalMinutes >= 1 ? $"{timeout.TotalMinutes:0} minutes" : $"{timeout.TotalSeconds:0} seconds";
+                throw new SshSetupConnectionException(SshSetupResult.Failed, $"The command did not finish within {limitText}; the output so far is below.",
+                    output: Snapshot(output) + Snapshot(error));
             }
-            return new SshCommandResult(sshCommand.ExitStatus ?? -1, sshCommand.Result, sshCommand.Error);
+            catch (TimeoutException)
+            {
+                // The command ended but a stream stayed open; keep what arrived.
+            }
+            return new SshCommandResult(sshCommand.ExitStatus ?? -1, Snapshot(output), Snapshot(error));
+
+            async Task Pump(Stream stream, StringBuilder target)
+            {
+                try
+                {
+                    using var reader = new StreamReader(stream, Encoding.UTF8, false, 4096, leaveOpen: true);
+                    while (await reader.ReadLineAsync(limit.Token) is { } line)
+                    {
+                        lock (target) target.Append(line).Append('\n');
+                        if (!line.StartsWith("#< CLIXML", StringComparison.Ordinal) && !line.StartsWith("<Objs ", StringComparison.Ordinal)) onOutput?.Invoke(line);
+                    }
+                }
+                catch (OperationCanceledException) { }
+                catch (ObjectDisposedException) { }
+            }
+
+            static string Snapshot(StringBuilder text) { lock (text) return text.ToString(); }
         }
 
         public void Dispose()

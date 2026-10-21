@@ -116,6 +116,11 @@
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || !CanInstall)" OnClick="InstallAsync" StartIcon="@Icons.Material.Filled.RocketLaunch">@(_busy ? Text["SshInstalling"] : Text["SshInstall"])</MudButton>
                     <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="ResetConnection">@Text["SshChangeConnection"]</MudButton>
                 </MudStack>
+                @if (_liveOutput.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">@Text["SshLiveOutput"]</MudText>
+                    <CodePreview Text="@LiveOutputText" Lines="12" />
+                }
             }
         </div>
     }
@@ -133,6 +138,15 @@
         @if (_result.Probe is { } probe)
         {
             <MudText Class="mb-2">@Text["SshProbeResult", ProbeLabel(probe.Status)]</MudText>
+        }
+        @if (string.IsNullOrWhiteSpace(_result.Output) && _liveOutput.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mb-1">@Text["SshLiveOutput"]</MudText>
+            <CodePreview Text="@LiveOutputText" Lines="12" />
+        }
+        @if (_result.Status != SshSetupResult.Ok && _facts?.IsWindows == true)
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-2">@Text["SshDeviceLogWindows"]</MudText>
         }
         @if (!string.IsNullOrWhiteSpace(_result.Output))
         {
@@ -169,6 +183,8 @@
     private string _name = "", _certificateId = "", _probeHost = "", _homeCaUrl = "", _issueProfileId = "", _issueDnsNames = "", _issueIpAddresses = "";
     private int _probePort = 443;
     private SshInstallResponse? _result;
+    private readonly List<string> _liveOutput = [];
+    private string LiveOutputText => string.Join('\n', _liveOutput);
 
     protected override async Task OnInitializedAsync()
     {
@@ -289,13 +305,36 @@
     private async Task InstallAsync()
     {
         _busy = true;
+        _liveOutput.Clear();
         try
         {
             using var client = Client();
+            var progressId = Guid.NewGuid().ToString("N");
             var request = new SshInstallRequest(Credentials(), Target?.Id, Target is null ? _name.Trim() : null, Target is null ? _certificateId : null,
                 Target is null && !string.IsNullOrWhiteSpace(_probeHost) ? _probeHost.Trim() : null, Target is null ? _probePort : null, _installRootCa,
-                string.IsNullOrWhiteSpace(_homeCaUrl) ? null : _homeCaUrl.Trim(), _enablePush);
-            var response = await client.PostAsJsonAsync("api/v1/ssh-setup/install", request, _json);
+                string.IsNullOrWhiteSpace(_homeCaUrl) ? null : _homeCaUrl.Trim(), _enablePush, progressId);
+            var install = client.PostAsJsonAsync("api/v1/ssh-setup/install", request, _json);
+            // The install request stays open for the whole setup; meanwhile show what the device prints.
+            using var poller = Client();
+            var next = 0;
+            async Task PollAsync()
+            {
+                try
+                {
+                    if (await poller.GetFromJsonAsync<SshSetupProgressSnapshot>($"api/v1/ssh-setup/progress/{progressId}?from={next}", _json) is not { } snapshot) return;
+                    _liveOutput.AddRange(snapshot.Lines);
+                    next = snapshot.Next;
+                    StateHasChanged();
+                }
+                catch (HttpRequestException) { }
+            }
+            while (!install.IsCompleted)
+            {
+                await Task.WhenAny(install, Task.Delay(1500));
+                await PollAsync();
+            }
+            await PollAsync();
+            var response = await install;
             if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
             var result = await response.Content.ReadFromJsonAsync<SshInstallResponse>(_json) ?? throw new InvalidOperationException(Text["SshUnexpectedResponse"]);
             if (result.Status is SshSetupResult.HostKeyUnknown or SshSetupResult.HostKeyChanged)
