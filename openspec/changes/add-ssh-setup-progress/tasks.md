@@ -22,4 +22,4 @@
 - [x] Windows-Agent unter PowerShell 5.1 gegen einen Testserver: Protokoll, Uhrzeiten, Fehlerfall.
 - [x] Live-Ausgabe im Assistenten im Browser gegen einen Test-Container.
 - [x] Doku DEPLOYMENT (de/en).
-- [ ] Windows-Einrichtung auf dem Server des Betreibers wiederholen und Ursache des Hängers anhand der Protokolle klären (extern).
+- [x] Windows-Einrichtung auf dem Server des Betreibers wiederholen und Ursache des Hängers klären: Standardeingabe kam nicht vollständig an; mit SFTP erfolgreich (v0.8.3).
