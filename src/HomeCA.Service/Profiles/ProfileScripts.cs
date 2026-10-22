@@ -157,16 +157,30 @@ public static class ProfileScripts
                 }
             }
         }
-        # Adds a certificate with its key to LocalMachine\<Store>; restore.ps1 removes it again if it was new.
+        # Adds a certificate with its key to LocalMachine\<Store> and the issuing CA from the PFX to LocalMachine\CA, so
+        # Schannel services such as RDP or IIS send the full chain; restore.ps1 removes both again if they were new.
         function Import-HomeCACertificate([string] $PfxPath, [string] $Store = 'My') {
             $password = if ($env:HOMECA_PFX_PASSWORD) { $env:HOMECA_PFX_PASSWORD } else { [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host -AsSecureString 'PFX password'))) }
             $flags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]'MachineKeySet,PersistKeySet'
-            $certificate = New-Object Security.Cryptography.X509Certificates.X509Certificate2 ((Resolve-Path -LiteralPath $PfxPath).Path, $password, $flags)
+            $collection = New-Object Security.Cryptography.X509Certificates.X509Certificate2Collection
+            $collection.Import((Resolve-Path -LiteralPath $PfxPath).Path, $password, $flags)
+            $certificate = @($collection | Where-Object { $_.HasPrivateKey })[0]
+            if (-not $certificate) { throw "homeca-install: $PfxPath contains no certificate with a private key" }
             if (-not (Test-Path -LiteralPath ("Cert:\LocalMachine\$Store\" + $certificate.Thumbprint))) {
                 Add-HomeCARestoreStep ('Remove-Item -LiteralPath ' + (ConvertTo-HomeCALiteral ("Cert:\LocalMachine\$Store\" + $certificate.Thumbprint)) + ' -DeleteKey -ErrorAction SilentlyContinue')
                 $target = New-Object Security.Cryptography.X509Certificates.X509Store ($Store, 'LocalMachine')
                 $target.Open('ReadWrite')
                 try { $target.Add($certificate) } finally { $target.Close() }
+            }
+            # Only intermediates: a self-signed root never goes to LocalMachine\CA, trusting it stays a separate decision.
+            foreach ($issuer in @($collection | Where-Object { -not $_.HasPrivateKey -and $_.Subject -ne $_.Issuer })) {
+                if (-not (Test-Path -LiteralPath ('Cert:\LocalMachine\CA\' + $issuer.Thumbprint))) {
+                    Add-HomeCARestoreStep ('Remove-Item -LiteralPath ' + (ConvertTo-HomeCALiteral ('Cert:\LocalMachine\CA\' + $issuer.Thumbprint)) + ' -ErrorAction SilentlyContinue')
+                    $intermediate = New-Object Security.Cryptography.X509Certificates.X509Store ('CA', 'LocalMachine')
+                    $intermediate.Open('ReadWrite')
+                    try { $intermediate.Add($issuer) } finally { $intermediate.Close() }
+                }
+                [Console]::Out.WriteLine("homeca-install: issuing CA $($issuer.Thumbprint) is in LocalMachine\CA")
             }
             # Written to the console directly, so the function returns only the certificate.
             [Console]::Out.WriteLine("homeca-install: certificate $($certificate.Thumbprint) is in LocalMachine\$Store")
