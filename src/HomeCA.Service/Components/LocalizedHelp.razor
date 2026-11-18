@@ -35,7 +35,7 @@ else
         var localizedArticle = ReadArticle(locale, Topic);
         var article = localizedArticle ?? ReadArticle(LocaleCatalog.DefaultCulture, Topic);
         _usedFallback = article is not null && locale != LocaleCatalog.DefaultCulture && localizedArticle is null;
-        _html = article is null ? string.Empty : SafeMarkdown.Render(article.Replace("{{ACME_DIRECTORY_URL}}", AcmeDirectoryUrl()));
+        _html = article is null ? string.Empty : SafeMarkdown.Render(article.Replace("{{ACME_DIRECTORY_URL}}", AcmeDirectoryUrl()).Replace("{{HOMECA_URL}}", BaseUrl()));
         _copyButtonsAttached = false;
     }
 
@@ -53,12 +53,9 @@ else
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
-    private string AcmeDirectoryUrl()
-    {
-        var configured = Storage.PublicUrl;
-        var baseUrl = Uri.TryCreate(configured, UriKind.Absolute, out var publicUrl)
-            ? publicUrl.AbsoluteUri.TrimEnd('/')
-            : Navigation.BaseUri.TrimEnd('/');
-        return $"{baseUrl}/acme/directory";
-    }
+    private string AcmeDirectoryUrl() => $"{BaseUrl()}/acme/directory";
+
+    private string BaseUrl() => Uri.TryCreate(Storage.PublicUrl, UriKind.Absolute, out var publicUrl)
+        ? publicUrl.AbsoluteUri.TrimEnd('/')
+        : Navigation.BaseUri.TrimEnd('/');
 }

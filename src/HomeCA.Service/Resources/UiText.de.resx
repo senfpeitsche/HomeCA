@@ -1147,4 +1147,31 @@
   <data name="SshPrivilegeAdministrator" xml:space="preserve"><value>Administrator</value></data>
   <data name="SshBackupNoticeWindows" xml:space="preserve"><value>Vor jeder Änderung sichert HomeCA die betroffenen Dateien, die geplante Aufgabe, Einträge im Zertifikatsspeicher und IIS-Bindungen auf dem Gerät unter %ProgramData%\HomeCA\Backups\. Jedes Backup enthält restore.ps1, das den vorherigen Zustand wiederherstellt.</value></data>
   <data name="SshRestoreHintWindows" xml:space="preserve"><value>Um eine Änderung rückgängig zu machen, führe restore.ps1 im genannten Backup-Verzeichnis in einer PowerShell mit Administratorrechten aus, das neueste Backup zuerst.</value></data>
+  <data name="NavIssuanceTokens" xml:space="preserve"><value>Ausstellungs-Tokens</value></data>
+  <data name="HelpTabIssuanceTokens" xml:space="preserve"><value>Ausstellungs-Tokens</value></data>
+  <data name="IssuanceTokensKicker" xml:space="preserve"><value>Automatisierung</value></data>
+  <data name="IssuanceTokensTitle" xml:space="preserve"><value>Ausstellungs-Tokens</value></data>
+  <data name="IssuanceTokensDescription" xml:space="preserve"><value>Mit einem Ausstellungs-Token kann ein automatischer Client, etwa eine Test-VM oder ein CI-Job, Zertifikate für einen festen Satz von Namen ausstellen, CSRs signieren und die eigenen PFX-Dateien exportieren. Er kann die CA nicht verwalten, keine Zertifikate widerrufen und keine fremden Zertifikate lesen. Er gilt nur für die API unter /api/v1/issuance.</value></data>
+  <data name="IssuanceTokenCreate" xml:space="preserve"><value>Token erstellen</value></data>
+  <data name="IssuanceTokenSuffixes" xml:space="preserve"><value>Erlaubte DNS-Suffixe</value></data>
+  <data name="IssuanceTokenSuffixesHelper" xml:space="preserve"><value>Eines pro Zeile, zum Beispiel test.home.lan. Erlaubt sind das Suffix selbst und alle Subdomains.</value></data>
+  <data name="IssuanceTokenNetworks" xml:space="preserve"><value>Erlaubte IP-Netze (optional)</value></data>
+  <data name="IssuanceTokenNetworksHelper" xml:space="preserve"><value>CIDR-Netze für IP-SANs, zum Beispiel 10.0.5.0/24. Ohne Netz werden IP-SANs abgelehnt.</value></data>
+  <data name="IssuanceTokenAllowMtls" xml:space="preserve"><value>Auch mTLS-Client-Zertifikate erlauben</value></data>
+  <data name="IssuanceTokenMaxValidity" xml:space="preserve"><value>Maximale Gültigkeit (Tage)</value></data>
+  <data name="IssuanceTokenMaxValidityHelper" xml:space="preserve"><value>Für Tests reichen 30 Tage. Token-Zertifikate werden nicht automatisch erneuert und lösen keine Ablaufwarnungen aus.</value></data>
+  <data name="IssuanceTokenExpiresAt" xml:space="preserve"><value>Token läuft ab am (optional)</value></data>
+  <data name="IssuanceTokenExpiresHelper" xml:space="preserve"><value>Nach diesem Tag wird der Token abgelehnt. Bereits ausgestellte Zertifikate bleiben gültig.</value></data>
+  <data name="IssuanceTokenSecretOnce" xml:space="preserve"><value>Speichern Sie den Token für „{0}“ jetzt. HomeCA speichert nur seinen Hash und kann ihn nicht erneut anzeigen.</value></data>
+  <data name="IssuanceTokenUsageExample" xml:space="preserve"><value>Beispiel: Zertifikat ausstellen</value></data>
+  <data name="IssuanceTokenSecretStored" xml:space="preserve"><value>Ich habe den Token gespeichert</value></data>
+  <data name="IssuanceTokenList" xml:space="preserve"><value>Tokens</value></data>
+  <data name="IssuanceTokenScope" xml:space="preserve"><value>Geltungsbereich</value></data>
+  <data name="IssuanceTokenLastUsed" xml:space="preserve"><value>Letzte Nutzung</value></data>
+  <data name="IssuanceTokenNeverUsed" xml:space="preserve"><value>Nie genutzt</value></data>
+  <data name="IssuanceTokenExpired" xml:space="preserve"><value>Abgelaufen</value></data>
+  <data name="IssuanceTokenNone" xml:space="preserve"><value>Noch keine Ausstellungs-Tokens.</value></data>
+  <data name="IssuanceTokenRevokeHint" xml:space="preserve"><value>Zum Widerrufen erneut klicken. Anfragen mit diesem Token werden sofort abgelehnt; ausgestellte Zertifikate bleiben gültig.</value></data>
+  <data name="IssuanceTokenRequiredFields" xml:space="preserve"><value>Geben Sie einen Namen und mindestens ein DNS-Suffix oder IP-Netz an.</value></data>
+  <data name="IssuanceTokenIssuedBy" xml:space="preserve"><value>Ausgestellt mit Token {0}</value></data>
 </root>

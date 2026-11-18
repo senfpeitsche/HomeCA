@@ -34,6 +34,14 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         return result;
     }
 
+    /// <summary>Inventory entry of one certificate, or null when it is unknown.</summary>
+    public async Task<CertificateInventoryItem?> FindAsync(string id, CancellationToken cancellationToken) =>
+        (await LoadInventoryAsync(cancellationToken)).FirstOrDefault(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>IDs of certificates issued through an issuance token; they are short-lived and excluded from expiry warnings.</summary>
+    public async Task<IReadOnlySet<string>> TokenIssuedIdsAsync(CancellationToken cancellationToken) =>
+        (await LoadInventoryAsync(cancellationToken)).Where(item => item.IssuedByTokenId is not null).Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Adds a certificate already retained in HomeCA storage to the shared inventory.
     /// This is used for ACME certificates, whose private key remains with the ACME client.</summary>
     public async Task RegisterExistingCertificateAsync(string id, CancellationToken cancellationToken)
@@ -131,7 +139,8 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         return true;
     }
 
-    public async Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken)
+    /// <param name="issuedByTokenId">Issuance token that requested the certificate; null for administrators and automation.</param>
+    public async Task<IssueResult> IssueAsync(IssueCertificateRequest request, CancellationToken cancellationToken, string? issuedByTokenId = null)
     {
         ValidateNames(request.DnsNames, request.IpAddresses, request.ValidityDays);
         var subject = request.DnsNames.FirstOrDefault() ?? request.IpAddresses.First();
@@ -147,7 +156,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         var keyPem = ecc is not null ? ecc.ExportPkcs8PrivateKeyPem() : rsa!.ExportPkcs8PrivateKeyPem();
 
         var exportPath = WriteFiles(certificate, signed.Id, keyPem, signed.ChainPem, csrPem: null);
-        await FinishAsync(certificate, signed.Id, exportPath, request.TargetProfileId, cancellationToken);
+        await FinishAsync(certificate, signed.Id, exportPath, request.TargetProfileId, issuedByTokenId, cancellationToken);
         return new IssueResult(signed.Id, certificate.Subject, certificate.NotAfter, request.Usage, request.KeyAlgorithm, exportPath);
     }
 
@@ -155,7 +164,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
     /// Signs a certificate signing request from a device that keeps its own private key. Only the public key is
     /// taken from the CSR; subject, SANs and extensions are set by HomeCA, so a CSR cannot request CA rights.
     /// </summary>
-    public async Task<IssueResult> SignCsrAsync(SignCsrRequest request, CancellationToken cancellationToken)
+    public async Task<IssueResult> SignCsrAsync(SignCsrRequest request, CancellationToken cancellationToken, string? issuedByTokenId = null)
     {
         CertificateRequest csr;
         try
@@ -179,7 +188,7 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         var signed = await SignAsync(csr.PublicKey, request.Usage, dnsNames, ipAddresses, request.ValidityDays, cancellationToken);
         using var certificate = signed.Certificate;
         var exportPath = WriteFiles(certificate, signed.Id, keyPem: null, signed.ChainPem, request.CsrPem.Trim() + "\n");
-        await FinishAsync(certificate, signed.Id, exportPath, request.TargetProfileId, cancellationToken);
+        await FinishAsync(certificate, signed.Id, exportPath, request.TargetProfileId, issuedByTokenId, cancellationToken);
         return new IssueResult(signed.Id, certificate.Subject, certificate.NotAfter, request.Usage, keyAlgorithm, exportPath);
     }
 
@@ -298,10 +307,10 @@ public sealed class CertificateIssuanceService(HomeCaStorage storage, Deployment
         return exportPath;
     }
 
-    private async Task FinishAsync(X509Certificate2 certificate, string id, string exportPath, string? targetProfileId, CancellationToken cancellationToken)
+    private async Task FinishAsync(X509Certificate2 certificate, string id, string exportPath, string? targetProfileId, string? issuedByTokenId, CancellationToken cancellationToken)
     {
         await deployments.CreateAsync(exportPath, id, targetProfileId, cancellationToken);
-        await AddToInventoryAsync(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", exportPath), cancellationToken);
+        await AddToInventoryAsync(new CertificateInventoryItem(id, certificate.Subject, certificate.NotBefore, certificate.NotAfter, certificate.PublicKey.Oid?.FriendlyName ?? "Unknown", exportPath, issuedByTokenId), cancellationToken);
         logger.LogInformation("Issued certificate {CertificateId} for {Subject}, valid until {ExpiresAt:yyyy-MM-dd}", id, certificate.Subject, certificate.NotAfter);
     }
 
@@ -385,7 +394,8 @@ public sealed record IssueCertificateApiRequest(string Usage, IReadOnlyList<stri
     public IssueCertificateRequest ToIssueRequest() => new(Usage, DnsNames, IpAddresses, ValidityDays, KeyAlgorithm, RsaKeySize, TargetProfileId);
 }
 public sealed record IssueResult(string Id, string Subject, DateTime ExpiresAt, string Usage, string KeyAlgorithm, string ExportPath, string? RenewalPlanId = null);
-public sealed record CertificateInventoryItem(string Id, string Subject, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, string ExportPath);
+/// <param name="IssuedByTokenId">Issuance token that requested the certificate; older versions ignore the field.</param>
+public sealed record CertificateInventoryItem(string Id, string Subject, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, string ExportPath, string? IssuedByTokenId = null);
 public sealed record CertificateDetails(string Id, string Subject, string Issuer, string SerialNumber, string Sha256Fingerprint, DateTime ValidFrom, DateTime ExpiresAt, string KeyAlgorithm, int KeySize, string Usage, IReadOnlyList<string> DnsNames, IReadOnlyList<string> IpAddresses, IReadOnlyList<string> EnhancedKeyUsages, string ExportPath);
 public sealed record PfxExportRequest(string Password);
 /// <summary>Signs a CSR. Without DNS names or IP addresses, the SANs requested in the CSR (or its CN) are used.</summary>

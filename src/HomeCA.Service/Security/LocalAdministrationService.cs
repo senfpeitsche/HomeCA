@@ -153,7 +153,7 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
         var snapshot = await GetSnapshotAsync(cancellationToken);
         var isValid = snapshot.Sessions.Any(session => session.ExpiresAt > DateTimeOffset.UtcNow && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(session.TokenHash), tokenHash));
         if (!isValid || snapshot.Administrator is null) return new(false, false);
-        return new(true, snapshot.Administrator.MustChangePassword);
+        return new(true, snapshot.Administrator.MustChangePassword, snapshot.Administrator.UserName);
     }
 
     private async Task<StateSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
@@ -246,7 +246,7 @@ public sealed record SetupRequest(string UserName, string Password);
 public sealed record LoginRequest(string UserName, string Password);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public sealed record LoginResponse(string AccessToken, int ExpiresInSeconds, bool MustChangePassword);
-public sealed record SessionValidation(bool IsValid, bool MustChangePassword);
+public sealed record SessionValidation(bool IsValid, bool MustChangePassword, string? UserName = null);
 internal sealed record AdministratorRecord(string UserName, string PasswordHash, DateTimeOffset CreatedAt, bool MustChangePassword = false);
 internal sealed record SessionRecord(string TokenHash, string UserName, DateTimeOffset ExpiresAt);
 public sealed record AuditEvent(DateTimeOffset OccurredAt, string Action, string Subject);

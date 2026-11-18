@@ -36,7 +36,8 @@ public sealed class AttentionService(
         var planned = allPlans.Where(plan => plan.Enabled).Select(plan => plan.CertificateId).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // A renewed certificate stays in the inventory until it expires; only the newest one per subject counts.
-        foreach (var certificate in active.GroupBy(certificate => certificate.Subject, StringComparer.OrdinalIgnoreCase).Select(group => group.OrderBy(item => item.ExpiresAt).ThenBy(item => item.ValidFrom).Last()))
+        // Token-issued certificates are short-lived test certificates that their client replaces, so they never warn.
+        foreach (var certificate in active.Where(certificate => certificate.IssuedByTokenId is null).GroupBy(certificate => certificate.Subject, StringComparer.OrdinalIgnoreCase).Select(group => group.OrderBy(item => item.ExpiresAt).ThenBy(item => item.ValidFrom).Last()))
         {
             var expiresAt = new DateTimeOffset(certificate.ExpiresAt.ToUniversalTime(), TimeSpan.Zero);
             if (expiresAt <= now)

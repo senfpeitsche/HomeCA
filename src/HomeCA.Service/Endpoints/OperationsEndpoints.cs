@@ -18,7 +18,8 @@ namespace HomeCA.Service.Endpoints;
     {
         var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>();
         
-        api.MapGet("/warnings/expiring", (CertificateExpiryService expiry) => Results.Ok(expiry.GetWarnings()));
+        api.MapGet("/warnings/expiring", async (CertificateExpiryService expiry, CertificateIssuanceService certificates, CancellationToken ct) =>
+            Results.Ok(expiry.GetWarnings(excludedIds: await certificates.TokenIssuedIdsAsync(ct))));
         api.MapGet("/revocations", async (RevocationRegistry registry, CancellationToken ct) => Results.Ok(await registry.ListAsync(ct)));
         api.MapPost("/revocations/{serial}/{reason}", async (string serial, string reason, RevocationRegistry registry, CancellationToken ct) => Results.Ok(await registry.RevokeAsync(serial, reason, ct)));
         api.MapPost("/crl", async (CrlService crl, ILogger<global::Program> logger, CancellationToken ct) =>

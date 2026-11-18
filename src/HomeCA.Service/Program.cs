@@ -71,6 +71,8 @@ builder.Services.AddSingleton<AttentionService>();
 builder.Services.AddSingleton<RevocationRegistry>();
 builder.Services.AddSingleton<CrlService>();
 builder.Services.AddSingleton<BearerTokenFilter>();
+builder.Services.AddSingleton<IssuanceTokenRegistry>();
+builder.Services.AddSingleton<IssuanceTokenFilter>();
 builder.Services.AddSingleton<LoginRateLimiter>();
 builder.Services.AddSingleton<UpdateCheckService>();
 // UiText is the resource marker in the Resources namespace, so the embedded
@@ -190,6 +192,7 @@ app.MapRfc8555AcmeEndpoints();
 app.MapSetupEndpoints();
 app.MapAuthorityEndpoints();
 app.MapCertificateEndpoints();
+app.MapIssuanceEndpoints();
 app.MapDeploymentEndpoints();
 app.MapDomainEndpoints();
 app.MapConnectorEndpoints();

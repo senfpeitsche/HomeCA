@@ -22,7 +22,7 @@ Im einfachen Modus liegen Root-CA und Issuing-CA online im geschuetzten HomeCA-D
 - CRLs helfen nur bei Clients und Diensten, die den Abruf und die Auswertung auch unterstuetzen.
 - HomeCA sichert keine privaten Schluessel, nachdem ein Deployment-Paket auf ein Zielsystem kopiert wurde.
 
-## Verteilungs-Tokens, Trust-Seite und ausgehende Verbindungen
+## Verteilungs- und Ausstellungs-Tokens, Trust-Seite und ausgehende Verbindungen
 
 - Die Einrichtung per SSH nutzt Passwort, Schlüssel und sudo-Passwort nur für die Dauer der Anfrage; sie werden weder gespeichert noch protokolliert, und Ausgaben werden um sie und das Ziel-Token bereinigt. Gespeichert wird nur der bestätigte Host-Key. Ohne bestätigten oder bei abweichendem Host-Key bricht HomeCA vor der Anmeldung ab, damit kein Angreifer im Netz Zugangsdaten oder den privaten Schlüssel abgreift. Den Fingerprint beim ersten Kontakt über die Gerätekonsole vergleichen.
 - Wer die Verwaltungsoberfläche bedient, kann mit gültigen SSH-Zugangsdaten Befehle als root auf dem Gerät ausführen lassen. Jede Erkennung und Einrichtung steht mit Benutzer, Host und Host-Key im Audit-Log.
@@ -32,6 +32,7 @@ Im einfachen Modus liegen Root-CA und Issuing-CA online im geschuetzten HomeCA-D
 - Ein Token eines Verteilungsziels kann den privaten Schlüssel dieses Ziels abrufen. Es wird nur als SHA-256-Hash gespeichert, gilt für genau ein Ziel und lässt sich rotieren; die Token-Datei auf dem Gerät ist wie der Schlüssel zu behandeln.
 - `/trust` und die Trust-Anchor-Endpunkte bleiben bewusst auf einfachem HTTP. Wer im Netzpfad sitzt, kann die heruntergeladene Root austauschen; deshalb fordern Seite und Anleitungen den Fingerprint-Vergleich über einen zweiten Kanal.
 - HomeCA baut ausgehende Verbindungen zu konfigurierten Webhook- und Benachrichtigungs-URLs sowie für die TLS-Prüfung zu den Hosts der Verteilungsziele auf. Diese Adressen legen nur Administratoren fest; die Nutzlasten enthalten keine Geheimnisse.
+- Ein Ausstellungs-Token (`hca_it_…`) gilt nur für `/api/v1/issuance` und nur für die DNS-Suffixe, IP-Netze, Verwendungen und die maximale Gültigkeit, die ein Administrator festgelegt hat. Namen werden vor dem Vergleich normalisiert (IDN nach ASCII, Kleinschreibung, ohne abschließenden Punkt); bei CSRs werden CN und alle SANs geprüft. Der Token kann die CA nicht verwalten, nichts widerrufen und nur die selbst ausgestellten Zertifikate lesen und exportieren; fremde liefern `404`. Gespeichert wird nur sein SHA-256-Hash in `state/issuance-tokens.json` (Teil des Backups). Wird ein Token bekannt, kann ein Angreifer bis zum Widerruf Zertifikate für genau diesen Geltungsbereich ausstellen: Token unter **Ausstellungs-Tokens** widerrufen, die im Audit-Log (`issuance-token.*`) aufgeführten Zertifikate bei Bedarf sperren und einen neuen Token anlegen. Kurze maximale Gültigkeit, ein Ablaufdatum und das erkennbare Präfix (für Secret-Scanner) begrenzen den Schaden. Ungültige Tokens werden pro Client-Adresse gedrosselt, Ausstellungen pro Token begrenzt.
 - Name Constraints auf der ausstellenden CA begrenzen den Schaden eines gestohlenen Issuing-Schlüssels auf die erlaubten Domains und Netze.
 
 ## Verbindliche Betriebsregeln

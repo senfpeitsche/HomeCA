@@ -47,6 +47,34 @@ takes the public key from the CSR; names come from the CSR's SANs (or its CN)
 unless `dnsNames`/`ipAddresses` are given. These certificates have no
 `key.pem` and cannot be renewed by HomeCA; renew them with a new CSR.
 
+## Issuance tokens for automated clients
+
+Test VMs and CI jobs do not need an administrator session. Under **Issuance
+tokens**, create a token with allowed DNS suffixes (for example
+`test.home.lan`), optional IP networks, allowed usages and a maximum validity
+(default 30 days). The token starts with `hca_it_` and is shown once. It works
+only under `/api/v1/issuance`; every other endpoint rejects it with `401`.
+
+```bash
+TOKEN=hca_it_...
+
+# Issue key and certificate (no automatic renewal)
+curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"usage":"TLS","dnsNames":["app.test.home.lan"],"ipAddresses":[],"validityDays":2}'
+
+# Sign a CSR: its CN and all SANs must be in scope
+curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/csr   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d "{\"csrPem\":$(jq -Rs . < request.csr),\"validityDays\":2}"
+
+# Details and PFX export of an own certificate
+curl -sS https://homeca.local:5443/api/v1/issuance/certificates/<id> -H "Authorization: Bearer $TOKEN"
+curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/<id>/export/pfx   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"password":"pfx-password"}' -o app.pfx
+```
+
+Responses: `403` naming the rejected name for scope violations (also
+`eviltest.home.lan` or `test.home.lan.attacker.tld`), `404` for certificates of
+other clients, `401` for unknown, revoked or expired tokens, `429` after 30
+issuance requests per hour and token (`IssuanceTokens__RequestsPerHour`).
+Token certificates raise no expiry warnings. See **Help › Issuance tokens**.
+
 Revoke a compromised certificate in HomeCA and publish the CRL. The retained
 certificate record remains available for audit. See [OPERATIONS.md](OPERATIONS.md)
 for backups and operational recovery.

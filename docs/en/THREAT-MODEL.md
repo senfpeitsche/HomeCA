@@ -22,7 +22,7 @@ In the simple mode, the root and issuing CA remain online in the protected HomeC
 - CRLs help only clients and services that support fetching and evaluating them.
 - HomeCA cannot protect private keys after a deployment package has been copied to a target system.
 
-## Deployment tokens, trust page and outbound connections
+## Deployment and issuance tokens, trust page and outbound connections
 
 - The SSH setup uses password, key and sudo password only for the duration of the request; they are neither stored nor logged, and output is cleaned of them and of the target token. Only the confirmed host key is stored. Without a confirmed host key, or when it differs, HomeCA stops before signing in, so an attacker on the network cannot capture credentials or the private key. Compare the fingerprint on first contact through the device console.
 - Anyone who operates the administration interface can, with valid SSH credentials, run commands as root on the device. Every detection and setup is recorded in the audit log with user, host and host key.
@@ -32,6 +32,7 @@ In the simple mode, the root and issuing CA remain online in the protected HomeC
 - A deployment-target token can fetch that target's private key. It is stored only as a SHA-256 hash, valid for one target and rotatable; treat the token file on the device like the key.
 - `/trust` and the trust-anchor endpoints stay on plain HTTP by design. Anyone in the path can swap the downloaded root, which is why every page and guide asks to compare the fingerprint through a second channel.
 - HomeCA opens outbound connections to configured webhook and notification URLs and to deployment-target hosts for the TLS check. Only administrators configure these addresses; payloads contain no secrets.
+- An issuance token (`hca_it_…`) works only for `/api/v1/issuance` and only for the DNS suffixes, IP networks, usages and maximum validity an administrator set. Names are normalized before the comparison (IDN to ASCII, lower case, no trailing dot); for CSRs, the CN and all SANs are checked. The token cannot administer the CA, revoke anything, or read certificates other than its own; others return `404`. Only its SHA-256 hash is stored, in `state/issuance-tokens.json` (part of the backup). If a token leaks, an attacker can issue certificates for exactly that scope until it is revoked: revoke it under **Issuance tokens**, revoke the certificates listed in the audit log (`issuance-token.*`) if needed, and create a new token. A short maximum validity, an expiry date and the recognizable prefix (for secret scanners) limit the damage. Invalid tokens are throttled per client address, and issuance is rate-limited per token.
 - Name constraints on the issuing CA limit the damage of a stolen issuing key to the permitted domains and networks.
 
 ## Mandatory operating rules

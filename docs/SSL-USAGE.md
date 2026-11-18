@@ -415,6 +415,26 @@ Damit erneuerte Zertifikate von selbst auf das Gerät kommen, lege ein Verteilun
 
 Appliances wie iDRAC, iLO oder Switches erzeugen den Schlüssel oft selbst und bieten einen Certificate Signing Request an. Füge ihn unter **Zertifikate ausstellen › CSR signieren** ein oder sende ihn mit `csrPem` an `POST /api/v1/certificates/csr`. HomeCA übernimmt nur den öffentlichen Schlüssel; die Namen stammen aus den SANs des CSR (oder seinem CN), sofern nicht `dnsNames`/`ipAddresses` angegeben sind. Diese Zertifikate haben kein `key.pem` und lassen sich von HomeCA nicht erneuern; erneuere sie mit einem neuen CSR.
 
+### 4.6 Ausstellungs-Tokens für automatische Clients
+
+Test-VMs oder CI-Jobs brauchen keine Administratorsitzung. Lege unter **Ausstellungs-Tokens** einen Token mit erlaubten DNS-Suffixen (z. B. `abnahme.home.lan`), optionalen IP-Netzen, erlaubten Verwendungen und einer maximalen Gültigkeit (Vorgabe 30 Tage) an. Der Token beginnt mit `hca_it_` und wird nur einmal angezeigt. Er gilt ausschließlich unter `/api/v1/issuance`; alle anderen Endpunkte lehnen ihn mit `401` ab.
+
+```bash
+TOKEN=hca_it_...
+
+# Schlüssel und Zertifikat ausstellen (keine automatische Erneuerung)
+curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"usage":"TLS","dnsNames":["mp.abnahme.home.lan"],"ipAddresses":[],"validityDays":2}'
+
+# CSR signieren: CN und alle SANs des CSR müssen im Geltungsbereich liegen
+curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/csr   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d "{\"csrPem\":$(jq -Rs . < request.csr),\"validityDays\":2}"
+
+# Details und PFX-Export eines selbst ausgestellten Zertifikats
+curl -sS https://homeca.local:5443/api/v1/issuance/certificates/<id> -H "Authorization: Bearer $TOKEN"
+curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/<id>/export/pfx   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"password":"pfx-kennwort"}' -o mp.pfx
+```
+
+Antworten: `403` mit dem abgelehnten Namen bei Verstößen gegen den Geltungsbereich (auch `evilabnahme.home.lan` oder `abnahme.home.lan.attacker.tld`), `404` für fremde Zertifikate, `401` für unbekannte, widerrufene oder abgelaufene Tokens, `429` bei mehr als 30 Ausstellungen pro Stunde und Token (`IssuanceTokens__RequestsPerHour`). Token-Zertifikate erscheinen nicht in Ablaufwarnungen. Hilfe: **Hilfe › Ausstellungs-Tokens**.
+
 ## 5. Zertifikat sperren
 
 ### Über die Weboberfläche

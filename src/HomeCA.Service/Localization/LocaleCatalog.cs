@@ -16,7 +16,7 @@ public static class LocaleCatalog
     ];
 
     public static readonly IReadOnlyList<string> HelpTopics =
-    ["tls", "ssh", "trust", "acme", "ca-rotation"];
+    ["tls", "ssh", "trust", "acme", "ca-rotation", "issuance-tokens"];
 
     public static IReadOnlyList<CultureInfo> Cultures => Locales
         .Select(locale => CultureInfo.GetCultureInfo(locale.Culture)).ToArray();

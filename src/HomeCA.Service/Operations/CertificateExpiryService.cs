@@ -7,7 +7,8 @@ public sealed class CertificateExpiryService(HomeCaStorage storage, ILogger<Cert
 {
     private readonly string _root = Path.Combine(storage.RootPath, "certificates");
 
-    public IReadOnlyList<CertificateExpiryWarning> GetWarnings(int days = 30)
+    /// <param name="excludedIds">Certificates that never warn, such as those issued through an issuance token.</param>
+    public IReadOnlyList<CertificateExpiryWarning> GetWarnings(int days = 30, IReadOnlySet<string>? excludedIds = null)
     {
         if (!Directory.Exists(_root)) return [];
 
@@ -16,6 +17,7 @@ public sealed class CertificateExpiryService(HomeCaStorage storage, ILogger<Cert
 
         foreach (var path in Directory.EnumerateFiles(_root, "certificate.pfx", SearchOption.AllDirectories))
         {
+            if (excludedIds?.Contains(Path.GetFileName(Path.GetDirectoryName(path))!) == true) continue;
             try
             {
                 using var certificate = X509CertificateLoader.LoadPkcs12FromFile(path, null);

@@ -17,13 +17,7 @@ namespace HomeCA.Service.Endpoints;
 {
     public static void MapCertificateEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>()
-            .AddEndpointFilter(async (context, next) =>
-                // Certificate and SSH IDs are hex strings. They become path segments below the data
-                // directory, so anything else (e.g. "..", or "..\" on Windows) is rejected up front.
-                context.HttpContext.Request.RouteValues.TryGetValue("id", out var id) && !IsCertificateId(id as string)
-                    ? Results.NotFound()
-                    : await next(context));
+        var api = endpoints.MapGroup("/api/v1").AddEndpointFilter<BearerTokenFilter>().AddEndpointFilter(RejectInvalidCertificateId);
 
         api.MapGet("/certificates", async (HttpRequest httpRequest, CertificateIssuanceService certificates, CancellationToken ct) =>
         {
@@ -103,27 +97,7 @@ namespace HomeCA.Service.Endpoints;
             var name = CertificateDownloadName(storage, id);
             return Results.File(archive, "application/zip", $"{name}-deployment-package.zip");
         });
-        api.MapPost("/certificates/{id}/export/pfx", async (string id, PfxExportRequest request, HomeCaStorage storage) =>
-        {
-            var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
-            if (!File.Exists(pfxPath)) return Results.NotFound();
-            if (string.IsNullOrEmpty(request.Password))
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["A PFX password is required."] });
-            X509Certificate2 certificate;
-            try { certificate = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(pfxPath); }
-            catch (InvalidOperationException)
-            {
-                // ACME clients generate and keep their own key; HomeCA only retains the certificate.
-                return Results.Conflict(new { detail = "HomeCA does not hold the private key of this certificate (for example an ACME certificate), so no PFX can be exported." });
-            }
-            using (certificate)
-            {
-                var chainPath = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
-                var bytes = CertificatePfxExporter.ExportWithIssuingCertificate(certificate, chainPath, request.Password);
-                var name = CertificateDownloadName(storage, id);
-                return Results.File(bytes, "application/x-pkcs12", $"{name}.pfx");
-            }
-        });
+        api.MapPost("/certificates/{id}/export/pfx", (string id, PfxExportRequest request, HomeCaStorage storage) => ExportPfx(id, request, storage));
         
         // SSH
         api.MapGet("/ssh-certificates", async (SshCertificateService certificates, CancellationToken ct) => Results.Ok(await certificates.ListAsync(ct)));
@@ -157,6 +131,38 @@ namespace HomeCA.Service.Endpoints;
         });
         
         // Domains
+    }
+
+    /// <summary>
+    /// Certificate and SSH IDs are hex strings. They become path segments below the data
+    /// directory, so anything else (e.g. "..", or "..\" on Windows) is rejected up front.
+    /// </summary>
+    internal static async ValueTask<object?> RejectInvalidCertificateId(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+        context.HttpContext.Request.RouteValues.TryGetValue("id", out var id) && !IsCertificateId(id as string)
+            ? Results.NotFound()
+            : await next(context);
+
+    /// <summary>Exports a certificate with its private key and issuing CA as a password-protected PFX.</summary>
+    internal static IResult ExportPfx(string id, PfxExportRequest request, HomeCaStorage storage)
+    {
+        var pfxPath = Path.Combine(storage.RootPath, "certificates", id, "certificate.pfx");
+        if (!File.Exists(pfxPath)) return Results.NotFound();
+        if (string.IsNullOrEmpty(request.Password))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["A PFX password is required."] });
+        X509Certificate2 certificate;
+        try { certificate = CertificatePfxExporter.LoadCertificateWithExportablePrivateKey(pfxPath); }
+        catch (InvalidOperationException)
+        {
+            // ACME clients generate and keep their own key; HomeCA only retains the certificate.
+            return Results.Conflict(new { detail = "HomeCA does not hold the private key of this certificate (for example an ACME certificate), so no PFX can be exported." });
+        }
+        using (certificate)
+        {
+            var chainPath = Path.Combine(storage.RootPath, "exports", id, "chain.pem");
+            var bytes = CertificatePfxExporter.ExportWithIssuingCertificate(certificate, chainPath, request.Password);
+            var name = CertificateDownloadName(storage, id);
+            return Results.File(bytes, "application/x-pkcs12", $"{name}.pfx");
+        }
     }
 
     internal static bool IsCertificateId(string? id) =>

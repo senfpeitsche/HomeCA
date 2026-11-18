@@ -1,0 +1,157 @@
+@using HomeCA.Service.Security
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject HomeCaInternalHttpClient InternalHttpClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeCA.Service.Resources.UiText> Text
+
+<MudText Typo="Typo.overline" Class="section-kicker">@Text["IssuanceTokensKicker"]</MudText>
+<MudText Typo="Typo.h3" Class="page-title">@Text["IssuanceTokensTitle"]</MudText>
+<MudText Class="mud-text-secondary mb-4">@Text["IssuanceTokensDescription"]</MudText>
+
+@if (_created is { } created)
+{
+    <MudPaper Class="panel" Elevation="0">
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@Text["IssuanceTokenSecretOnce", created.Token.Name]</MudAlert>
+        <CodePreview Text="@created.Secret" Lines="1" />
+        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">@Text["IssuanceTokenUsageExample"]</MudText>
+        <CodePreview Text="@ExampleCommand(created)" Lines="5" />
+        <div class="mt-3"><MudButton Variant="Variant.Text" OnClick="@(() => _created = null)">@Text["IssuanceTokenSecretStored"]</MudButton></div>
+    </MudPaper>
+}
+
+<MudGrid>
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="panel" Elevation="0">
+            <div class="form-stack">
+                <MudText Typo="Typo.h6">@Text["IssuanceTokenCreate"]</MudText>
+                <MudTextField @bind-Value="_name" Label="@Text["Name"]" Required="true" />
+                <MudTextField @bind-Value="_suffixes" Label="@Text["IssuanceTokenSuffixes"]" HelperText="@Text["IssuanceTokenSuffixesHelper"]" Lines="3" />
+                <MudTextField @bind-Value="_networks" Label="@Text["IssuanceTokenNetworks"]" HelperText="@Text["IssuanceTokenNetworksHelper"]" Lines="2" />
+                <MudCheckBox T="bool" @bind-Value="_allowMtls" Label="@Text["IssuanceTokenAllowMtls"]" />
+                <MudNumericField T="int" @bind-Value="_maxValidityDays" Label="@Text["IssuanceTokenMaxValidity"]" HelperText="@Text["IssuanceTokenMaxValidityHelper"]" Min="1" Max="@IssuanceTokenRegistry.MaximumValidityDays" />
+                <MudDatePicker @bind-Date="_expiresAt" Label="@Text["IssuanceTokenExpiresAt"]" HelperText="@Text["IssuanceTokenExpiresHelper"]" MinDate="DateTime.Today.AddDays(1)" Clearable="true" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateAsync">@Text["IssuanceTokenCreate"]</MudButton>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="panel" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-2">@Text["IssuanceTokenList"]</MudText>
+            <MudTable Items="_tokens" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>@Text["Name"]</MudTh><MudTh>@Text["IssuanceTokenScope"]</MudTh><MudTh>@Text["IssuanceTokenLastUsed"]</MudTh><MudTh>@Text["Status"]</MudTh><MudTh></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="@Text["Name"]">@context.Name<MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@Date(context.CreatedAt) · @context.CreatedBy</MudText></MudTd>
+                    <MudTd DataLabel="@Text["IssuanceTokenScope"]">
+                        @string.Join(", ", context.AllowedDnsSuffixes.Concat(context.AllowedIpCidrs))
+                        <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@string.Join(", ", context.AllowedUsages) · ≤ @context.MaxValidityDays @Text["Days"]</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="@Text["IssuanceTokenLastUsed"]">@(context.LastUsedAt is { } used ? Date(used) : Text["IssuanceTokenNeverUsed"])</MudTd>
+                    <MudTd DataLabel="@Text["Status"]">
+                        <MudChip T="string" Size="Size.Small" Color="@StatusColor(context)">@StatusLabel(context)</MudChip>
+                        @if (context.ExpiresAt is { } expires && context.RevokedAt is null) { <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@Text["Expires"]: @Date(expires)</MudText> }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.RevokedAt is null)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" Disabled="_busy" OnClick="@(() => RevokeAsync(context))">@(_revokeId == context.Id ? Text["ConfirmRevoke"] : Text["Revoke"])</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Class="pa-4">@Text["IssuanceTokenNone"]</MudText></NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter, EditorRequired] public string Token { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly System.Text.Json.JsonSerializerOptions _json = new(System.Text.Json.JsonSerializerDefaults.Web);
+    private List<IssuanceToken> _tokens = [];
+    private CreatedIssuanceToken? _created;
+    private string _name = "", _suffixes = "", _networks = "";
+    private string? _revokeId;
+    private bool _allowMtls, _busy;
+    private int _maxValidityDays = IssuanceTokenRegistry.DefaultMaxValidityDays;
+    private DateTime? _expiresAt;
+
+    private string BaseUrl => Navigation.BaseUri.TrimEnd('/');
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private HttpClient Client()
+    {
+        var client = InternalHttpClient.Create(new Uri(Navigation.BaseUri));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        return client;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            using var client = Client();
+            _tokens = await client.GetFromJsonAsync<List<IssuanceToken>>("api/v1/issuance-tokens", _json) ?? [];
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+    }
+
+    private async Task CreateAsync()
+    {
+        var suffixes = Lines(_suffixes);
+        var networks = Lines(_networks);
+        if (string.IsNullOrWhiteSpace(_name) || suffixes.Count + networks.Count == 0) { Snackbar.Add(Text["IssuanceTokenRequiredFields"], Severity.Warning); return; }
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            // The date picker yields a local date; the token stays valid until the end of that day.
+            DateTimeOffset? expiresAt = _expiresAt is { } date ? new DateTimeOffset(date.Date.AddDays(1).AddSeconds(-1), TimeZoneInfo.Local.GetUtcOffset(date)) : null;
+            var payload = new CreateIssuanceTokenRequest(_name, suffixes, networks, _allowMtls ? ["TLS", "mTLS"] : ["TLS"], _maxValidityDays, expiresAt);
+            var response = await client.PostAsJsonAsync("api/v1/issuance-tokens", payload);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            _created = await response.Content.ReadFromJsonAsync<CreatedIssuanceToken>(_json);
+            _name = ""; _suffixes = ""; _networks = ""; _allowMtls = false; _maxValidityDays = IssuanceTokenRegistry.DefaultMaxValidityDays; _expiresAt = null;
+            Snackbar.Add(Text["ChangesSaved"], Severity.Success);
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task RevokeAsync(IssuanceToken token)
+    {
+        if (_revokeId != token.Id) { _revokeId = token.Id; Snackbar.Add(Text["IssuanceTokenRevokeHint"], Severity.Warning); return; }
+        _revokeId = null;
+        _busy = true;
+        try
+        {
+            using var client = Client();
+            var response = await client.PostAsync($"api/v1/issuance-tokens/{Uri.EscapeDataString(token.Id)}/revoke", null);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ApiError.ReadAsync(response, Text));
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private string ExampleCommand(CreatedIssuanceToken created)
+    {
+        var name = created.Token.AllowedDnsSuffixes.FirstOrDefault() is { } suffix ? "host." + suffix : "host.example";
+        return $"curl -sS -X POST {BaseUrl}/api/v1/issuance/certificates \\\n  -H 'Authorization: Bearer {created.Secret}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{{\"usage\":\"TLS\",\"dnsNames\":[\"{name}\"],\"ipAddresses\":[],\"validityDays\":{Math.Min(2, created.Token.MaxValidityDays)}}}'";
+    }
+
+    private static List<string> Lines(string value) =>
+        value.Split(['\n', '\r', ',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private string StatusLabel(IssuanceToken token) =>
+        token.RevokedAt is not null ? Text["Revoked"] : token.IsUsable(DateTimeOffset.UtcNow) ? Text["Active"] : Text["IssuanceTokenExpired"];
+
+    private static Color StatusColor(IssuanceToken token) =>
+        token.RevokedAt is not null ? Color.Error : token.IsUsable(DateTimeOffset.UtcNow) ? Color.Success : Color.Default;
+
+    private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+}

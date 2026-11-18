@@ -1147,4 +1147,31 @@
   <data name="SshPrivilegeAdministrator" xml:space="preserve"><value>Administrator</value></data>
   <data name="SshBackupNoticeWindows" xml:space="preserve"><value>Before every change, HomeCA saves the affected files, the scheduled task, certificate store entries and IIS bindings under %ProgramData%\HomeCA\Backups\ on the device. Each backup contains restore.ps1, which restores the previous state.</value></data>
   <data name="SshRestoreHintWindows" xml:space="preserve"><value>To undo a change, run restore.ps1 in the backup directory named in the output in an elevated PowerShell, newest backup first.</value></data>
+  <data name="NavIssuanceTokens" xml:space="preserve"><value>Issuance tokens</value></data>
+  <data name="HelpTabIssuanceTokens" xml:space="preserve"><value>Issuance tokens</value></data>
+  <data name="IssuanceTokensKicker" xml:space="preserve"><value>Automation</value></data>
+  <data name="IssuanceTokensTitle" xml:space="preserve"><value>Issuance tokens</value></data>
+  <data name="IssuanceTokensDescription" xml:space="preserve"><value>An issuance token lets an automated client, such as a test VM or a CI job, issue certificates, sign CSRs and export its own PFX files for a fixed set of names. It cannot administer the CA, revoke certificates or read other certificates. Use it only with the API under /api/v1/issuance.</value></data>
+  <data name="IssuanceTokenCreate" xml:space="preserve"><value>Create token</value></data>
+  <data name="IssuanceTokenSuffixes" xml:space="preserve"><value>Allowed DNS suffixes</value></data>
+  <data name="IssuanceTokenSuffixesHelper" xml:space="preserve"><value>One per line, for example test.home.lan. The suffix itself and all its subdomains are allowed.</value></data>
+  <data name="IssuanceTokenNetworks" xml:space="preserve"><value>Allowed IP networks (optional)</value></data>
+  <data name="IssuanceTokenNetworksHelper" xml:space="preserve"><value>CIDR networks for IP SANs, for example 10.0.5.0/24. Without a network, IP SANs are rejected.</value></data>
+  <data name="IssuanceTokenAllowMtls" xml:space="preserve"><value>Also allow mTLS client certificates</value></data>
+  <data name="IssuanceTokenMaxValidity" xml:space="preserve"><value>Maximum validity (days)</value></data>
+  <data name="IssuanceTokenMaxValidityHelper" xml:space="preserve"><value>30 days are enough for test use. Token certificates are not renewed automatically and raise no expiry warnings.</value></data>
+  <data name="IssuanceTokenExpiresAt" xml:space="preserve"><value>Token expires on (optional)</value></data>
+  <data name="IssuanceTokenExpiresHelper" xml:space="preserve"><value>After this day the token is rejected. Certificates it issued stay valid.</value></data>
+  <data name="IssuanceTokenSecretOnce" xml:space="preserve"><value>Store the token for “{0}” now. HomeCA keeps only its hash and cannot show it again.</value></data>
+  <data name="IssuanceTokenUsageExample" xml:space="preserve"><value>Example: issue a certificate</value></data>
+  <data name="IssuanceTokenSecretStored" xml:space="preserve"><value>I have stored the token</value></data>
+  <data name="IssuanceTokenList" xml:space="preserve"><value>Tokens</value></data>
+  <data name="IssuanceTokenScope" xml:space="preserve"><value>Scope</value></data>
+  <data name="IssuanceTokenLastUsed" xml:space="preserve"><value>Last use</value></data>
+  <data name="IssuanceTokenNeverUsed" xml:space="preserve"><value>Never used</value></data>
+  <data name="IssuanceTokenExpired" xml:space="preserve"><value>Expired</value></data>
+  <data name="IssuanceTokenNone" xml:space="preserve"><value>No issuance tokens yet.</value></data>
+  <data name="IssuanceTokenRevokeHint" xml:space="preserve"><value>Click again to revoke. Requests with this token are rejected immediately; issued certificates stay valid.</value></data>
+  <data name="IssuanceTokenRequiredFields" xml:space="preserve"><value>Enter a name and at least one DNS suffix or IP network.</value></data>
+  <data name="IssuanceTokenIssuedBy" xml:space="preserve"><value>Issued by token {0}</value></data>
 </root>
