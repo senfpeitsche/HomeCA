@@ -132,6 +132,27 @@ public sealed class SecurityTests
         Assert.False(session.IsValid);
     }
 
+    [Fact]
+    public async Task ResetAdministrator_Restores_Default_Login_And_Ends_Sessions()
+    {
+        using var fixture = new TestFixture();
+        var storage = fixture.CreateStorage();
+        var service = new LocalAdministrationService(storage, new TestHostEnvironment(), NullLogger<LocalAdministrationService>.Instance);
+        Assert.True(await service.SetupAsync(new SetupRequest("owner", "a-forgotten-password"), CancellationToken.None));
+        var oldSession = await service.LoginAsync(new LoginRequest("owner", "a-forgotten-password"), CancellationToken.None);
+        Assert.NotNull(oldSession);
+
+        await service.ResetAdministratorAsync(CancellationToken.None);
+
+        // A fresh instance reads the files, as the restarted service would.
+        var restarted = new LocalAdministrationService(storage, new TestHostEnvironment(), NullLogger<LocalAdministrationService>.Instance);
+        Assert.False((await restarted.ValidateSessionAsync(oldSession.AccessToken, CancellationToken.None)).IsValid);
+        Assert.Null(await restarted.LoginAsync(new LoginRequest("owner", "a-forgotten-password"), CancellationToken.None));
+        var login = await restarted.LoginAsync(new LoginRequest("admin", "admin"), CancellationToken.None);
+        Assert.NotNull(login);
+        Assert.True(login.MustChangePassword);
+    }
+
     private sealed class TestHostEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = Environments.Production;

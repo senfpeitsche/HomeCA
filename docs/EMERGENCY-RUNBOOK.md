@@ -27,6 +27,28 @@ Hinweis: Nicht jeder Client wertet eine CRL aus. Deshalb ist der Austausch auf d
 4. Bei moeglichem Zugriff auf den Root-Schluessel die Root-CA als kompromittiert behandeln: neue PKI aufbauen und den neuen Root-Trust kontrolliert verteilen.
 5. Ursache auf dem Host beheben und nur aus einem verifizierten Backup oder einer Neuinstallation wiederherstellen.
 
+## Administratorpasswort vergessen
+
+`--reset-admin` setzt den Zugang auf `admin` / `admin` zurueck, beendet alle Sitzungen und schreibt `administrator.reset` ins Audit-Log. CA, Zertifikate und Einstellungen bleiben unveraendert. Der Dienst muss dabei gestoppt sein, sonst haelt er den alten Zugang im Speicher.
+
+LXC/systemd:
+
+```bash
+sudo systemctl stop homeca
+sudo -u homeca env $(systemctl show homeca -p Environment --value) /usr/bin/dotnet /opt/homeca/HomeCA.Service.dll --reset-admin
+sudo systemctl start homeca
+```
+
+Docker Compose:
+
+```bash
+docker compose stop homeca
+docker compose run --rm homeca --reset-admin
+docker compose start homeca
+```
+
+Danach sofort als `admin` / `admin` anmelden und ein neues Passwort setzen. Bis dahin kann sich jeder mit Netzwerkzugriff auf den Port mit dem Standardpasswort anmelden.
+
 ## HomeCA-Container oder Datenplatte verloren
 
 1. Neuen, aktuellen Container nach der LXC-Anleitung erstellen, aber HomeCA noch nicht initialisieren.

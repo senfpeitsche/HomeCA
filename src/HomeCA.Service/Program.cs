@@ -21,6 +21,10 @@ using HomeCA.Service.Localization;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 
+// --reset-admin restores admin/admin and exits; it is removed so the configuration parser never sees it.
+var resetAdministrator = args.Contains("--reset-admin", StringComparer.Ordinal);
+args = args.Where(argument => argument != "--reset-admin").ToArray();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
@@ -180,6 +184,13 @@ app.MapOpenApi();
 using (var scope = app.Services.CreateScope())
 {
     var administration = scope.ServiceProvider.GetRequiredService<LocalAdministrationService>();
+    if (resetAdministrator)
+    {
+        // The running service keeps the administrator in memory, so this must run while it is stopped.
+        await administration.ResetAdministratorAsync(CancellationToken.None);
+        Console.WriteLine("HomeCA administrator reset to admin / admin. Start the service and change the password immediately.");
+        return;
+    }
     await administration.EnsureDefaultAdministratorAsync(CancellationToken.None);
 }
 

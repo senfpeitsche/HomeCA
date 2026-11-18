@@ -39,6 +39,25 @@ public sealed class LocalAdministrationService(HomeCaStorage storage, IHostEnvir
         finally { _gate.Release(); }
     }
 
+    /// <summary>
+    /// Resets the administrator to admin/admin with a mandatory password change and ends every session.
+    /// Used by the <c>--reset-admin</c> command line option while the service is stopped.
+    /// </summary>
+    public async Task ResetAdministratorAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var administrator = new AdministratorRecord("admin", PasswordHasher.Hash("admin"), DateTimeOffset.UtcNow, MustChangePassword: true);
+            await WriteJsonAsync(_adminPath, administrator, cancellationToken);
+            await WriteJsonAsync(_sessionPath, new List<SessionRecord>(), cancellationToken);
+            _snapshot = new StateSnapshot(administrator, []);
+            await AuditAsync("administrator.reset", "admin", cancellationToken);
+            logger.LogWarning("Administrator reset to the default account — password change required on next login");
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task<bool> SetupAsync(SetupRequest request, CancellationToken cancellationToken)
     {
         var passwordHash = PasswordHasher.Hash(request.Password);
