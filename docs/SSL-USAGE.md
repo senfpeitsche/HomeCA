@@ -431,6 +431,9 @@ curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/csr   -H
 # Details und PFX-Export eines selbst ausgestellten Zertifikats
 curl -sS https://homeca.local:5443/api/v1/issuance/certificates/<id> -H "Authorization: Bearer $TOKEN"
 curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/<id>/export/pfx   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"password":"pfx-kennwort"}' -o mp.pfx
+
+# Zertifikat mit Ausstellerkette als PEM (ohne Schlüssel) – für CSR-Zertifikate, für die kein PFX-Export möglich ist
+curl -sS https://homeca.local:5443/api/v1/issuance/certificates/<id>/export/fullchain -H "Authorization: Bearer $TOKEN" -o fullchain.pem
 ```
 
 Antworten: `403` mit dem abgelehnten Namen bei Verstößen gegen den Geltungsbereich (auch `evilabnahme.home.lan` oder `abnahme.home.lan.attacker.tld`), `404` für fremde Zertifikate, `401` für unbekannte, widerrufene oder abgelaufene Tokens, `429` bei mehr als 30 Ausstellungen pro Stunde und Token (`IssuanceTokens__RequestsPerHour`). Token-Zertifikate erscheinen nicht in Ablaufwarnungen. Hilfe: **Hilfe › Ausstellungs-Tokens**.

@@ -4,7 +4,7 @@ Ein Ausstellungs-Token ist ein API-Schlüssel für genau einen automatischen Cli
 
 - einen Schlüssel mit Zertifikat ausstellen,
 - einen CSR signieren,
-- die selbst ausgestellten Zertifikate lesen und als PFX exportieren,
+- die selbst ausgestellten Zertifikate lesen und als PFX oder PEM-Kette exportieren,
 
 und das nur für die Namen in seinem Geltungsbereich. Er kann die CA nicht verwalten, keine Zertifikate widerrufen, keine Einstellungen ändern und keine fremden Zertifikate lesen. Gelangt der Token in falsche Hände, bleibt der Schaden auf seinen Geltungsbereich begrenzt.
 
@@ -34,6 +34,7 @@ curl -sS -X POST {{HOMECA_URL}}/api/v1/issuance/certificates \
 | `POST /api/v1/issuance/certificates/csr` | CSR signieren; CN und alle SANs müssen im Geltungsbereich liegen |
 | `GET /api/v1/issuance/certificates/{id}` | Details eines eigenen Zertifikats |
 | `POST /api/v1/issuance/certificates/{id}/export/pfx` | PFX-Export eines eigenen Zertifikats mit Passwort |
+| `GET /api/v1/issuance/certificates/{id}/export/fullchain` | Zertifikat mit Ausstellerkette als PEM, ohne Schlüssel; für CSR-Zertifikate, für die kein PFX-Export möglich ist |
 
 Anfragen außerhalb des Geltungsbereichs liefern `403` mit dem abgelehnten Namen. Zertifikate anderer Clients liefern `404`. Ein unbekannter, widerrufener oder abgelaufener Token liefert `401`. Zu viele Ausstellungen pro Stunde liefern `429`.
 

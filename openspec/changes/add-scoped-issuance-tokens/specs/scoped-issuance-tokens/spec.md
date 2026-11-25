@@ -69,15 +69,22 @@ the CSR as well as any names in the request satisfy the token scope.
 
 ### Requirement: Access only to own certificates
 The system SHALL allow `GET /api/v1/issuance/certificates/{id}` and
-`POST /api/v1/issuance/certificates/{id}/export/pfx` only for certificates issued with the calling token.
+`POST /api/v1/issuance/certificates/{id}/export/pfx` and `GET /api/v1/issuance/certificates/{id}/export/fullchain`
+only for certificates issued with the calling token.
 
 #### Scenario: Foreign certificate
-- **WHEN** a client requests details or PFX export of a certificate issued by an administrator or another token
+- **WHEN** a client requests details, PFX or full-chain export of a certificate issued by an administrator or another token,
+  or of an unknown id
 - **THEN** the response is `404`
 
 #### Scenario: Own certificate export
 - **WHEN** a client exports a PFX for a certificate it issued, with a password
 - **THEN** the PFX is returned and an audit event `issuance-token.exported` is written
+
+#### Scenario: Full chain of a CSR certificate
+- **WHEN** a client requests `export/fullchain` for a certificate it had signed from a CSR
+- **THEN** the PEM certificate and its issuer chain are returned without any private key, and an audit event
+  `issuance-token.exported` is written
 
 ### Requirement: No expiry notifications for token-issued certificates
 The system SHALL exclude certificates issued with an issuance token from expiry warnings, notifications and

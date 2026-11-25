@@ -47,6 +47,9 @@ static class IssuanceEndpoints
         issuance.MapPost("/certificates/{id}/export/pfx", ExportPfxAsync)
             .WithSummary("PFX export of a certificate issued with this token; others return 404.")
             .Produces(StatusCodes.Status200OK, contentType: "application/x-pkcs12").Produces(StatusCodes.Status404NotFound).ProducesValidationProblem();
+        issuance.MapGet("/certificates/{id}/export/fullchain", ExportFullChainAsync)
+            .WithSummary("PEM certificate and issuer chain (no key) of a certificate issued with this token; for CSR certificates, which have no PFX export. Others return 404.")
+            .Produces(StatusCodes.Status200OK, contentType: "application/x-pem-file").Produces(StatusCodes.Status404NotFound);
     }
 
     internal static async Task<IResult> CreateTokenAsync(CreateIssuanceTokenRequest request, HttpContext http, IssuanceTokenRegistry tokens, LocalAdministrationService administration, CancellationToken ct)
@@ -124,6 +127,16 @@ static class IssuanceEndpoints
         if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status200OK } or IFileHttpResult)
             await administration.RecordAuditAsync("issuance-token.exported", $"{IssuanceTokenFilter.Describe(token)}: PFX of certificate {id}", ct);
         return result;
+    }
+
+    internal static async Task<IResult> ExportFullChainAsync(string id, HttpContext http, CertificateIssuanceService certificates, HomeCaStorage storage, LocalAdministrationService administration, CancellationToken ct)
+    {
+        var token = CallerToken(http);
+        if (!await OwnsAsync(token, id, certificates, ct)) return Results.NotFound();
+        var path = Path.Combine(storage.RootPath, "exports", id, "fullchain.pem");
+        if (!File.Exists(path)) return Results.NotFound();
+        await administration.RecordAuditAsync("issuance-token.exported", $"{IssuanceTokenFilter.Describe(token)}: full chain of certificate {id}", ct);
+        return Results.File(path, "application/x-pem-file", $"{id}-fullchain.pem");
     }
 
     /// <summary>Foreign certificates look exactly like missing ones, so a token learns nothing about them.</summary>

@@ -208,6 +208,37 @@ public sealed class IssuanceTokenTests : IDisposable
     }
 
     [Fact]
+    public async Task Csr_certificates_export_their_full_chain_without_a_key()
+    {
+        var env = await SetupAsync();
+        var (_, http) = await CallerAsync(env, "abnahme", ["abnahme.home.lan"]);
+        var (_, otherHttp) = await CallerAsync(env, "other", ["other.lan"]);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var signed = (IssueResult)Assert.IsAssignableFrom<IValueHttpResult>(
+            await SignAsync(env, http, new SignCsrRequest(CreateCsr("CN=mp.abnahme.home.lan", key, ["mp.abnahme.home.lan"], []), ValidityDays: 2))).Value!;
+
+        var export = await ExportFullChainAsync(env, http, signed.Id);
+        var file = Assert.IsType<PhysicalFileHttpResult>(export);
+        Assert.Equal("application/x-pem-file", file.ContentType);
+        Assert.Equal($"{signed.Id}-fullchain.pem", file.FileDownloadName);
+        var pem = await File.ReadAllTextAsync(file.FileName);
+        Assert.DoesNotContain("PRIVATE KEY", pem);
+        var chain = new X509Certificate2Collection();
+        chain.ImportFromPem(pem);
+        Assert.True(chain.Count >= 2);
+        using var issued = X509Certificate2.CreateFromPem(await File.ReadAllTextAsync(Path.Combine(env.Storage.RootPath, "exports", signed.Id, "certificate.pem")));
+        Assert.Equal(issued.Thumbprint, chain[0].Thumbprint);
+        Assert.Contains(chain.Skip(1), issuer => issuer.Subject == chain[0].Issuer);
+        Assert.Contains(await env.Administration.ReadAuditLogAsync(0, 100, "issuance-token.exported", CancellationToken.None),
+            entry => entry.Subject.Contains($"full chain of certificate {signed.Id}"));
+
+        var adminCertificate = await env.Certificates.IssueAsync(new IssueCertificateRequest("TLS", ["admin.abnahme.home.lan"], [], 30), CancellationToken.None);
+        Assert.Equal(404, Status(await ExportFullChainAsync(env, otherHttp, signed.Id)));
+        Assert.Equal(404, Status(await ExportFullChainAsync(env, http, adminCertificate.Id)));
+        Assert.Equal(404, Status(await ExportFullChainAsync(env, http, "0123456789abcdef0123456789abcdef")));
+    }
+
+    [Fact]
     public async Task Issuance_requests_per_token_are_rate_limited()
     {
         var env = await SetupAsync(requestsPerHour: 2);
@@ -233,12 +264,14 @@ public sealed class IssuanceTokenTests : IDisposable
 
         Assert.Equal(200, await FilterAsync(env.Filter, created.Secret));
         Assert.Equal(401, await FilterAsync(env.Filter, expired.Secret));
+        Assert.Equal(401, await FilterAsync(env.Filter, string.Empty, FullChainPath));
         Assert.Equal(401, await FilterAsync(env.Filter, "hca_it_unknown"));
         // An administrator session filter never accepts an issuance token.
         Assert.Equal(401, await FilterAsync(new BearerTokenFilter(env.Administration), created.Secret));
 
         await env.Tokens.RevokeAsync(created.Token.Id, CancellationToken.None);
         Assert.Equal(401, await FilterAsync(env.Filter, created.Secret));
+        Assert.Equal(401, await FilterAsync(env.Filter, created.Secret, FullChainPath));
         var denied = await env.Administration.ReadAuditLogAsync(0, 100, "issuance-token.denied", CancellationToken.None);
         Assert.Contains(denied, entry => entry.Subject.Contains("expired"));
         Assert.Contains(denied, entry => entry.Subject.Contains("revoked"));
@@ -308,14 +341,19 @@ public sealed class IssuanceTokenTests : IDisposable
     private static Task<IResult> IssueAsync(Env env, HttpContext http, IssueCertificateApiRequest request) =>
         IssuanceEndpoints.IssueAsync(request, http, env.Certificates, env.Filter, env.Administration, CancellationToken.None);
 
+    private static Task<IResult> ExportFullChainAsync(Env env, HttpContext http, string id) =>
+        IssuanceEndpoints.ExportFullChainAsync(id, http, env.Certificates, env.Storage, env.Administration, CancellationToken.None);
+
     private static Task<IResult> SignAsync(Env env, HttpContext http, SignCsrRequest request) =>
         IssuanceEndpoints.SignCsrAsync(request, http, env.Certificates, env.Filter, env.Administration, CancellationToken.None);
 
     /// <summary>Runs an endpoint filter for a request carrying <paramref name="secret"/>; 200 means it reached the endpoint.</summary>
-    private static async Task<int> FilterAsync(IEndpointFilter filter, string secret)
+    private const string FullChainPath = "/api/v1/issuance/certificates/0123456789abcdef0123456789abcdef/export/fullchain";
+
+    private static async Task<int> FilterAsync(IEndpointFilter filter, string secret, string path = "/api/v1/issuance/certificates")
     {
         var http = new DefaultHttpContext();
-        http.Request.Path = "/api/v1/issuance/certificates";
+        http.Request.Path = path;
         http.Request.Headers.Authorization = "Bearer " + secret;
         http.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.0.2.10");
         var result = await filter.InvokeAsync(new DefaultEndpointFilterInvocationContext(http), _ => ValueTask.FromResult<object?>(Results.Ok()));

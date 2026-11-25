@@ -67,6 +67,9 @@ curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/csr   -H
 # Details and PFX export of an own certificate
 curl -sS https://homeca.local:5443/api/v1/issuance/certificates/<id> -H "Authorization: Bearer $TOKEN"
 curl -sS -X POST https://homeca.local:5443/api/v1/issuance/certificates/<id>/export/pfx   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"password":"pfx-password"}' -o app.pfx
+
+# Certificate and issuer chain as PEM (no key) – for CSR certificates, for which no PFX export is possible
+curl -sS https://homeca.local:5443/api/v1/issuance/certificates/<id>/export/fullchain -H "Authorization: Bearer $TOKEN" -o fullchain.pem
 ```
 
 Responses: `403` naming the rejected name for scope violations (also

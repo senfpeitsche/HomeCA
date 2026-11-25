@@ -49,7 +49,7 @@ For CSRs, names are taken from the request **and** from the CSR's SAN/CN, and al
 cannot smuggle names past the check. Violations return `403` with a precise reason and are audited.
 
 ### D4: Ownership of certificates
-The certificate record gets an optional `IssuedByTokenId`. `GET` and PFX export under `/issuance` only work for
+The certificate record gets an optional `IssuedByTokenId`. `GET`, PFX export and full-chain export under `/issuance` only work for
 certificates with the caller's token id; others return `404` (no information leak). The management UI shows
 the token name next to such certificates.
 

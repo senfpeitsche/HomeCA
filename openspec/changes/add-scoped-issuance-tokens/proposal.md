@@ -24,7 +24,9 @@ PFX files. If the VM's stored credential leaks, the damage must stay limited to 
   - `POST /api/v1/issuance/certificates` – issue key + certificate (no auto-renew),
   - `POST /api/v1/issuance/certificates/csr` – sign a CSR,
   - `GET  /api/v1/issuance/certificates/{id}` – details of a certificate issued with this token,
-  - `POST /api/v1/issuance/certificates/{id}/export/pfx` – PFX export of a certificate issued with this token.
+  - `POST /api/v1/issuance/certificates/{id}/export/pfx` – PFX export of a certificate issued with this token,
+  - `GET  /api/v1/issuance/certificates/{id}/export/fullchain` – PEM certificate and issuer chain (no key) of a
+    certificate issued with this token; for CSR certificates, for which no PFX export is possible.
 - Tokens are **never** accepted by `BearerTokenFilter`; existing management endpoints keep requiring an
   administrator session. No existing endpoint or contract changes.
 - Only the SHA-256 hash of a token is stored (same pattern as deployment-target tokens); the secret is shown

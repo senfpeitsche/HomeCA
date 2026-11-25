@@ -4,7 +4,7 @@ An issuance token is an API key for one automated client, such as a regularly re
 
 - issue a key and certificate,
 - sign a CSR,
-- read and export as PFX the certificates it issued itself,
+- read the certificates it issued itself and export them as PFX or PEM chain,
 
 and only for the names in its scope. It cannot administer the CA, revoke certificates, change settings or read other certificates. If the token leaks, the damage stays inside its scope.
 
@@ -34,6 +34,7 @@ curl -sS -X POST {{HOMECA_URL}}/api/v1/issuance/certificates \
 | `POST /api/v1/issuance/certificates/csr` | Sign a CSR; its CN and all SANs must be in scope |
 | `GET /api/v1/issuance/certificates/{id}` | Details of an own certificate |
 | `POST /api/v1/issuance/certificates/{id}/export/pfx` | PFX export of an own certificate with a password |
+| `GET /api/v1/issuance/certificates/{id}/export/fullchain` | Certificate and issuer chain as PEM, without key; for CSR certificates, for which no PFX export is possible |
 
 Requests outside the scope return `403` with the rejected name. Certificates of other clients return `404`. An unknown, revoked or expired token returns `401`. Too many issuance requests per hour return `429`.
 

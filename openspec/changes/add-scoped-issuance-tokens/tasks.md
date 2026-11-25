@@ -20,6 +20,7 @@
 - [x] 3.4 Per-token rate limit for issuance requests → 429
 - [x] 3.5 Audit events `issuance-token.created|revoked|issued|csr-signed|exported|denied` without secrets
 - [x] 3.6 Integration tests: token rejected on management endpoints, revoked/expired token, own vs. foreign certificate, rate limit
+- [x] 3.7 `GET /api/v1/issuance/certificates/{id}/export/fullchain` for own certificates (PEM chain without key; for CSR certificates, which have no PFX export); tests and docs
 
 ## 4. Management
 
