@@ -1174,4 +1174,10 @@
   <data name="IssuanceTokenRevokeHint" xml:space="preserve"><value>Click again to revoke. Requests with this token are rejected immediately; issued certificates stay valid.</value></data>
   <data name="IssuanceTokenRequiredFields" xml:space="preserve"><value>Enter a name and at least one DNS suffix or IP network.</value></data>
   <data name="IssuanceTokenIssuedBy" xml:space="preserve"><value>Issued by token {0}</value></data>
+  <data name="CertificateSearch" xml:space="preserve"><value>Search certificates</value></data>
+  <data name="RevokeSelected" xml:space="preserve"><value>Revoke selected ({0})</value></data>
+  <data name="ConfirmRevokeSelected" xml:space="preserve"><value>Confirm: revoke {0}</value></data>
+  <data name="ConfirmRevokeSelectedHint" xml:space="preserve"><value>Click again to revoke {0} certificate(s). This cannot be undone.</value></data>
+  <data name="SelectedCertificatesRevoked" xml:space="preserve"><value>{0} certificate(s) revoked.</value></data>
+  <data name="SelectedCertificatesRevokeFailed" xml:space="preserve"><value>{0} certificate(s) could not be revoked.</value></data>
 </root>
