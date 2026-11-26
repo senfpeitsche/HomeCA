@@ -53,4 +53,11 @@ public sealed class RevocationRegistry(HomeCaStorage storage, ILogger<Revocation
     }
 }
 
-public sealed record RevocationRecord(string SerialNumber, string Reason, DateTimeOffset RevokedAt, string? AuthorityId = null);
+public sealed record RevocationRecord(string SerialNumber, string Reason, DateTimeOffset RevokedAt, string? AuthorityId = null)
+{
+    /// <summary>
+    /// Certificate IDs are the generated serial bytes in hex, but the stored serial is the DER integer: a leading 00 is
+    /// added when the high bit is set and dropped for a leading zero byte. Compare both only in this normalized form.
+    /// </summary>
+    public static string NormalizeSerial(string serialNumber) => serialNumber.TrimStart('0').ToLowerInvariant();
+}

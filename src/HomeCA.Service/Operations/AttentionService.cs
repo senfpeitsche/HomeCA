@@ -30,8 +30,8 @@ public sealed class AttentionService(
     internal async Task<IReadOnlyList<AttentionItem>> GetAsync(DateTimeOffset now, CancellationToken ct)
     {
         var items = new List<AttentionItem>();
-        var revoked = (await revocations.ListAsync(ct)).Select(revocation => revocation.SerialNumber).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var active = (await certificates.ListAsync(ct, take: 500)).Where(certificate => !revoked.Contains(certificate.Id)).ToList();
+        var revoked = (await revocations.ListAsync(ct)).Select(revocation => RevocationRecord.NormalizeSerial(revocation.SerialNumber)).ToHashSet();
+        var active = (await certificates.ListAsync(ct, take: 500)).Where(certificate => !revoked.Contains(RevocationRecord.NormalizeSerial(certificate.Id))).ToList();
         var allPlans = await plans.ListAsync(ct);
         var planned = allPlans.Where(plan => plan.Enabled).Select(plan => plan.CertificateId).ToHashSet(StringComparer.OrdinalIgnoreCase);
 

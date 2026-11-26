@@ -83,6 +83,25 @@ public sealed class CertificateIssuanceTests : IDisposable
     }
 
     [Fact]
+    public async Task Revoke_Records_The_Serial_Under_The_Certificate_Id()
+    {
+        // The UI and CRL matching rely on the revocation record carrying the certificate ID. Serials with the high bit
+        // set or a leading zero byte are DER-encoded with an extra or missing byte, so issue enough to hit both cases.
+        var (_, certificates) = await SetupAsync();
+        var revocations = new RevocationRegistry(_fixture.CreateStorage(), NullLogger<RevocationRegistry>.Instance);
+        var ids = new List<string>();
+        for (var i = 0; i < 24; i++)
+        {
+            var issued = await certificates.IssueAsync(new IssueCertificateRequest("TLS", [$"bulk{i}.example.com"], []), CancellationToken.None);
+            Assert.True(await certificates.RevokeAsync(issued.Id, "cessationOfOperation", CancellationToken.None));
+            ids.Add(issued.Id);
+        }
+
+        var serials = (await revocations.ListAsync(CancellationToken.None)).Select(r => RevocationRecord.NormalizeSerial(r.SerialNumber)).ToHashSet();
+        Assert.All(ids, id => Assert.Contains(RevocationRecord.NormalizeSerial(id), serials));
+    }
+
+    [Fact]
     public async Task Revoke_Retains_Certificate_And_Export_Records_For_Audit()
     {
         var (authorities, certificates) = await SetupAsync();
